@@ -1339,7 +1339,7 @@ function exportPDF() {
    15) דוחות הכנסות / הוצאות לפי טווח תאריכים
 ---------------------------------------------------------- */
 
-// === דו"חות: סינון לפי תאריכים וסוג ===
+// סינון לפי סוג ותאריכים
 function filterByDateAndType(type, from, to) {
   return rows.filter(r => {
     if (r.type !== type) return false;
@@ -1349,7 +1349,7 @@ function filterByDateAndType(type, from, to) {
   });
 }
 
-// מוסיף לכל שורה סכום לפני מע"מ / מע"מ / כולל, וגם מחזיר סיכומים
+// חישוב נטו / מע"מ / כולל + סיכומים
 function addVatInfo(list) {
   const { vatEnabled, vatRate } = getSettings();
 
@@ -1364,12 +1364,10 @@ function addVatInfo(list) {
       ? Math.max(0, Math.min(100, r.deductPct ?? 100)) / 100
       : 1;
 
-    const vatDisplay = r.type === "expense" ? vat * pct : vat;
-
     return {
       ...r,
       net,
-      vat: vatDisplay,
+      vat: r.type === "expense" ? vat * pct : vat,
       gross
     };
   });
@@ -1387,355 +1385,116 @@ function addVatInfo(list) {
   return { rows: rowsWithAmounts, totals };
 }
 
-/* ------------ CSV לדו"חות ------------ */
+/* ------------ CSV לדוחות ------------ */
 btnReportCsv.onclick = () => {
   const type = rType.value;
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  // דו"ח רווח והפסד – CSV
+  // רווח והפסד
   if (type === "pnl") {
-    const incomeList  = filterByDateAndType("income",  from, to);
-    const expenseList = filterByDateAndType("expense", from, to);
-
-    const { totals: incTotals } = addVatInfo(incomeList);
-    const { totals: expTotals } = addVatInfo(expenseList);
-
-    const profitNet  = incTotals.net   - expTotals.net;
-    const profitGross= incTotals.gross - expTotals.gross;
+    const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
+    const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
 
     const lines = [
-      "section,label,net,vat,gross",
-      `income,"סה""כ הכנסות",${incTotals.net.toFixed(2)},${incTotals.vat.toFixed(2)},${incTotals.gross.toFixed(2)}`,
-      `expense,"סה""כ הוצאות",${expTotals.net.toFixed(2)},${expTotals.vat.toFixed(2)},${expTotals.gross.toFixed(2)}`,
-      `summary,"רווח לפני מס (נטו)",${profitNet.toFixed(2)},,`,
-      `summary,"רווח כולל מע""מ (כולל)",${profitGross.toFixed(2)},,`
+      "section,net,vat,gross",
+      `income,${inc.net},${inc.vat},${inc.gross}`,
+      `expense,${exp.net},${exp.vat},${exp.gross}`,
+      `profit,${inc.net - exp.net},,`
     ];
 
     downloadFile("pnl-report.csv", lines.join("\n"));
     return;
   }
 
-  // דו"ח הכנסות / הוצאות מפורט
   const list = filterByDateAndType(type, from, to);
-  if (!list.length) {
-    alert("אין נתונים לטווח שנבחר");
-    return;
-  }
+  if (!list.length) return alert("אין נתונים");
 
-  const { rows: rowsWithAmounts } = addVatInfo(list);
+  const { rows: data } = addVatInfo(list);
 
   const headers = ["date","category","desc","net","vat","gross"];
-  const lines = [headers.join(",")].concat(
-    rowsWithAmounts.map(r => {
-      const row = {
-        date: r.date,
-        category: r.category || "",
-        desc: r.desc || "",
-        net: r.net.toFixed(2),
-        vat: r.vat.toFixed(2),
-        gross: r.gross.toFixed(2)
-      };
-      return headers.map(h => {
-        let v = row[h];
-        if (typeof v === "string") v = '"' + v.replace(/"/g,'""') + '"';
-        return v;
-      }).join(",");
-    })
-  );
+  const csv = [
+    headers.join(","),
+    ...data.map(r =>
+      headers.map(h => `"${String(r[h] ?? "").replace(/"/g,'""')}"`).join(",")
+    )
+  ];
 
-  const fileName = type === "income" ? "income-report.csv" : "expense-report.csv";
-  downloadFile(fileName, lines.join("\n"));
+  downloadFile(
+    type === "income" ? "income-report.csv" : "expense-report.csv",
+    csv.join("\n")
+  );
 };
 
-/* ------------ PDF לדו"חות ------------ */
+/* ------------ PDF לדוחות ------------ */
 btnReportPdf.onclick = () => {
   const type = rType.value;
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  // דו"ח רווח והפסד – PDF
+  // רווח והפסד
   if (type === "pnl") {
-    const incomeList  = filterByDateAndType("income",  from, to);
-    const expenseList = filterByDateAndType("expense", from, to);
-
-    const { totals: incTotals } = addVatInfo(incomeList);
-    const { totals: expTotals } = addVatInfo(expenseList);
-
-    const profitNet   = incTotals.net   - expTotals.net;
-    const profitGross = incTotals.gross - expTotals.gross;
-
-    const title = 'דו"ח רווח והפסד';
+    const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
+    const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
 
     const html = `
-      <!DOCTYPE html>
       <html lang="he" dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <title>${title}</title>
-        <style>
-          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-          table{border-collapse:collapse;width:100%;margin-top:18px}
-          th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}
-          th{background:#f0f2f7}
-          h1{margin-top:0;font-size:20px}
-        </style>
-      </head>
       <body>
-        <h1>${title}</h1>
-        <table>
-          <thead>
-            <tr>
-              <th>סעיף</th>
-              <th>נטו (לפני מע"מ)</th>
-              <th>מע"מ</th>
-              <th>סה"כ כולל מע"מ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>סה"כ הכנסות</td>
-              <td>${toMoney(incTotals.net)}</td>
-              <td>${toMoney(incTotals.vat)}</td>
-              <td>${toMoney(incTotals.gross)}</td>
-            </tr>
-            <tr>
-              <td>סה"כ הוצאות</td>
-              <td>${toMoney(expTotals.net)}</td>
-              <td>${toMoney(expTotals.vat)}</td>
-              <td>${toMoney(expTotals.gross)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:bold">רווח לפני מס (נטו)</td>
-              <td style="font-weight:bold">${toMoney(profitNet)}</td>
-              <td></td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style="font-weight:bold">רווח כולל מע"מ (כולל)</td>
-              <td style="font-weight:bold">${toMoney(profitGross)}</td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
+        <h1>דוח רווח והפסד</h1>
+        <p>סה"כ הכנסות: ${toMoney(inc.gross)}</p>
+        <p>סה"כ הוצאות: ${toMoney(exp.gross)}</p>
+        <p><b>רווח: ${toMoney(inc.gross - exp.gross)}</b></p>
       </body>
       </html>
     `;
 
-    const w = window.open("", "_blank");
+    const w = window.open();
     w.document.write(html);
     w.document.close();
-    w.focus();
     w.print();
     return;
   }
 
-  // דו"ח הכנסות / הוצאות מפורט
   const list = filterByDateAndType(type, from, to);
-  if (!list.length) {
-    alert("אין נתונים לטווח שנבחר");
-    return;
-  }
+  if (!list.length) return alert("אין נתונים");
 
-  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
-  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
+  const { rows: data, totals } = addVatInfo(list);
 
-  let html = `
-    <!DOCTYPE html>
+  const html = `
     <html lang="he" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <title>${title}</title>
-      <style>
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-        table{border-collapse:collapse;width:100%}
-        th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}
-        th{background:#f0f2f7}
-        h1{margin-top:0;font-size:20px}
-      </style>
-    </head>
     <body>
-      <h1>${title}</h1>
-      <table>
-        <thead>
+      <h1>${type === "income" ? "דוח הכנסות" : "דוח הוצאות"}</h1>
+      <table border="1" cellpadding="6">
+        <tr>
+          <th>תאריך</th><th>קטגוריה</th><th>תיאור</th>
+          <th>נטו</th><th>מע"מ</th><th>כולל</th>
+        </tr>
+        ${data.map(r => `
           <tr>
-            <th>תאריך</th>
-            <th>קטגוריה</th>
-            <th>תיאור</th>
-            <th>נטו (לפני מע"מ)</th>
-            <th>מע"מ</th>
-            <th>סה"כ כולל מע"מ</th>
+            <td>${r.date}</td>
+            <td>${escapeHtml(r.category || "")}</td>
+            <td>${escapeHtml(r.desc || "")}</td>
+            <td>${toMoney(r.net)}</td>
+            <td>${toMoney(r.vat)}</td>
+            <td>${toMoney(r.gross)}</td>
           </tr>
-        </thead>
-        <tbody>
-  `;
-
-  rowsWithAmounts.forEach(r => {
-    html += `
-      <tr>
-        <td>${r.date}</td>
-        <td>${escapeHtml(r.category || "")}</td>
-        <td>${escapeHtml(r.desc || "")}</td>
-        <td>${toMoney(r.net)}</td>
-        <td>${toMoney(r.vat)}</td>
-        <td>${toMoney(r.gross)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-      <tr>
-        <td colspan="3" style="font-weight:bold">סה"כ</td>
-        <td style="font-weight:bold">${toMoney(totals.net)}</td>
-        <td style="font-weight:bold">${toMoney(totals.vat)}</td>
-        <td style="font-weight:bold">${toMoney(totals.gross)}</td>
-      </tr>
-        </tbody>
+        `).join("")}
+        <tr>
+          <td colspan="3"><b>סה"כ</b></td>
+          <td><b>${toMoney(totals.net)}</b></td>
+          <td><b>${toMoney(totals.vat)}</b></td>
+          <td><b>${toMoney(totals.gross)}</b></td>
+        </tr>
       </table>
     </body>
     </html>
   `;
 
-  const w = window.open("", "_blank");
+  const w = window.open();
   w.document.write(html);
   w.document.close();
-  w.focus();
-  w.print();
-};    const w = window.open("", "_blank");
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    w.print();
-    return;
-  }
-
-  // דו"ח הכנסות / הוצאות מפורט
-  const list = filterByDateAndType(type, from, to);
-  if (!list.length) {
-    alert("אין נתונים לטווח שנבחר");
-    return;
-  }
-
-  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
-
-  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
-
-  let html = `
-  <!DOCTYPE html>
-  <html lang="he" dir="rtl">
-  <head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-    <style>
-      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-      table{border-collapse:collapse;width:100%}
-      th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}
-      th{background:#f0f2f7}
-      h1{margin-top:0;font-size:20px}
-    </style>
-  </head>
-  <body>
-    <h1>${title}</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>תאריך</th>
-          <th>קטגוריה</th>
-          <th>תיאור</th>
-          <th>נטו (לפני מע"מ)</th>
-          <th>מע"מ</th>
-          <th>סה"כ כולל מע"מ</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  rowsWithAmounts.forEach(r => {
-    html += `
-      <tr>
-        <td>${r.date}</td>
-        <td>${escapeHtml(r.category || "")}</td>
-        <td>${escapeHtml(r.desc || "")}</td>
-        <td>${toMoney(r.net)}</td>
-        <td>${toMoney(r.vat)}</td>
-        <td>${toMoney(r.gross)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-      <tr>
-        <td colspan="3" style="font-weight:bold">סה"כ</td>
-        <td style="font-weight:bold">${toMoney(totals.net)}</td>
-        <td style="font-weight:bold">${toMoney(totals.vat)}</td>
-        <td style="font-weight:bold">${toMoney(totals.gross)}</td>
-      </tr>
-      </tbody>
-    </table>
-  </body>
-  </html>
-  `;
-
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
   w.print();
 };
-  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
-
-  let html = `
-  <!DOCTYPE html>
-  <html lang="he" dir="rtl">
-  <head>
-    <meta charset="UTF-8">
-    <title>${title}</title>
-    <style>
-      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-      table{border-collapse:collapse;width:100%}
-      th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}
-      th{background:#f0f2f7}
-    </style>
-  </head>
-  <body>
-    <h1>${title}</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>תאריך</th>
-          <th>קטגוריה</th>
-          <th>תיאור</th>
-          <th>סכום מקורי</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  list.forEach(r => {
-    html += `
-      <tr>
-        <td>${r.date}</td>
-        <td>${escapeHtml(r.category || "")}</td>
-        <td>${escapeHtml(r.desc || "")}</td>
-        <td>${toMoney(r.amount)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-      </tbody>
-    </table>
-  </body>
-  </html>`;
-
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  w.print();
-};
-
 /* ----------------------------------------------------------
    16) חיבור מאזינים והתחלת האפליקציה לאחר התחברות
 ---------------------------------------------------------- */
