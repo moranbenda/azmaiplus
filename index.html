@@ -154,15 +154,18 @@
     .footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
     .footer .left{display:flex;gap:10px;flex-wrap:wrap}
 
-    /* מסך התחברות – כמו שהיה בהתחלה */
-    #authScreen{
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:radial-gradient(circle at top,#dbe5ff 0,#eef2f7 45%,#e5ecff 100%);
-      padding:20px;
-    }
+/* מסך התחברות - מסך מלא מעל האפליקציה */
+#authScreen{
+  position:fixed;
+  inset:0;                 /* top/right/bottom/left = 0 */
+  z-index:9999;            /* מעל הכל */
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:radial-gradient(circle at top,#dbe5ff 0,#eef2f7 45%,#e5ecff 100%);
+  padding:20px;
+}
     #authCard{
       max-width:420px;width:100%;background:#fff;border-radius:24px;
       box-shadow:0 20px 60px rgba(15,23,42,.18);padding:22px 22px 18px;
@@ -179,7 +182,8 @@
     .auth-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
     .auth-footer{margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center}
 
-    /* shell של האפליקציה */    #appShell{display:none;min-height:100vh}
+    /* shell של האפליקציה */    
+#appShell{display:none;min-height:100vh}
     header.app-header{
       position:sticky;top:0;z-index:10;
       backdrop-filter:saturate(1.1) blur(10px);
@@ -192,6 +196,13 @@
       padding:5px 9px;border-radius:999px;border:1px solid var(--line);
       background:#fff;font-size:12px;color:var(--text-dim);
     }
+#authScreen{display:flex;}
+#appShell{display:none;}
+  body:not(.logged-in) #authScreen{display:flex;}
+  body:not(.logged-in) #appShell{display:none;}
+
+  body.logged-in #authScreen{display:none;}
+  body.logged-in #appShell{display:block;}
   </style>
 </head>
 <body>
@@ -661,23 +672,23 @@ async function createDefaultProfile(uid, email) {
 /* ----------------------------------------------------------
    6) ניטור התחברות – הצגת המסך הנכון
 ---------------------------------------------------------- */
+// מצב התחלתי: לא מחובר
+document.body.classList.remove("logged-in");
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
-    // משתמש לא מחובר – מציגים את מסך ההתחברות ומסתירים את האפליקציה
-    authScreen.style.display = "flex";
-    appShell.style.display = "none";
+    // לא מחובר
+    document.body.classList.remove("logged-in");
     currentUid = null;
     return;
   }
 
-  // משתמש מחובר – מציגים את האפליקציה ומסתירים את מסך ההתחברות
-  authScreen.style.display = "none";
-  appShell.style.display = "block";
-
+  // מחובר
+  document.body.classList.add("logged-in");
   userEmailTag.textContent = user.email || "";
 
   await loadUserProfile(user.uid);
-  initAppLogic(user.uid);  // טוען את המערכת (תנועות, חישובים וכו')
+  initAppLogic(user.uid);
 });
 /* ----------------------------------------------------------
    7) פרופיל משתמש – טעינה ויישום להגדרות המערכת
