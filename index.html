@@ -182,23 +182,8 @@
     .auth-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
     .auth-footer{margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center}
 
-    
-    /* יישור דיאלוגים למרכז + התאמה למובייל */
-    dialog{max-width:calc(100vw - 24px);}
-    dialog[open]{
-      position:fixed;
-      top:50%;
-      left:50%;
-      transform:translate(-50%,-50%);
-      margin:0;
-    }
-    @media(max-width:520px){
-      dialog{width:calc(100vw - 16px); border-radius:16px;}
-      .dlg-bd{max-height:calc(90vh - 64px);}
-    }
-
-
-    /* shell של האפליקציה */    #appShell{display:none;min-height:100vh}
+    /* shell של האפליקציה */    
+#appShell{display:none;min-height:100vh}
     header.app-header{
       position:sticky;top:0;z-index:10;
       backdrop-filter:saturate(1.1) blur(10px);
@@ -265,7 +250,6 @@
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
         <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
-        <button class="btn secondary small" id="btnDevOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
     </div>
@@ -352,7 +336,7 @@
         </div>
         <div class="bd">
           <div class="row" style="margin-bottom:10px">
-            <input id="qText" placeholder="חיפוש בקטגוריה/תיאור…" style="flex:2 1 240px" />
+            <input id="qText" placeholder="חיפוש בתיאור/קטגוריה…" style="flex:2 1 240px" />
             <select id="qType" style="flex:1 1 120px">
               <option value="all">הכל</option>
               <option value="income">הכנסות</option>
@@ -421,8 +405,8 @@
             <option value="expense">הוצאה</option>
           </select>
         </div>
-        <div><label>תיאור</label><input type="text" id="eCategory" list="catsList" /></div>
-        <div><label>קטגוריה</label><input type="text" id="eDesc" /></div>
+        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
+        <div><label>תיאור</label><input type="text" id="eDesc" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -538,36 +522,6 @@
       <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים.</span>
     </div>
   </div>
-
-<!-- דיאלוג פנייה למפתח -->
-<dialog id="devDialog">
-  <div class="dlg-hd">
-    <div>פנייה למפתח</div>
-    <button class="btn secondary small" type="button" id="btnDevClose">סגירה</button>
-  </div>
-  <div class="dlg-bd">
-    <p class="hint" style="margin-top:0">
-      לכל בקשה, הוספת קטגוריה או תקלה — כתבו לנו ונטפל. הפרטים יישלחו מתוך הפרופיל שלך.
-    </p>
-    <div class="grid2">
-      <div><label>שם</label><input type="text" id="devName" readonly /></div>
-      <div><label>טלפון</label><input type="text" id="devPhone" readonly /></div>
-      <div style="grid-column:1 / -1"><label>אימייל</label><input type="text" id="devEmail" readonly /></div>
-      <div style="grid-column:1 / -1">
-        <label>תוכן הפנייה</label>
-        <textarea id="devMessage" rows="5" placeholder="כתבי כאן מה צריך…"></textarea>
-      </div>
-    </div>
-    <div class="footer">
-      <div class="left">
-        <button class="btn" type="button" id="btnDevSend">שליחה</button>
-      </div>
-      <span class="hint" id="devStatus"></span>
-    </div>
-  </div>
-</dialog>
-
-
 </dialog>
 <script type="module">
 /* ----------------------------------------------------------
@@ -605,10 +559,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-
-// כתובת המייל של המפתח/תמיכה (אפשר לשנות)
-const DEVELOPER_EMAIL = "azmaiplusapp@gmail.com";
-
 /* ----------------------------------------------------------
    2) בחירת אלמנטים מה־DOM
 ---------------------------------------------------------- */
@@ -644,18 +594,6 @@ const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
 const categoriesDialog = document.getElementById("categoriesDialog");
 const btnCategoriesClose = document.getElementById("btnCategoriesClose");
 const catTbody = document.getElementById("catTbody");
-
-
-/* פנייה למפתח */
-const btnDevOpen  = document.getElementById("btnDevOpen");
-const devDialog   = document.getElementById("devDialog");
-const btnDevClose = document.getElementById("btnDevClose");
-const devName     = document.getElementById("devName");
-const devPhone    = document.getElementById("devPhone");
-const devEmail    = document.getElementById("devEmail");
-const devMessage  = document.getElementById("devMessage");
-const btnDevSend  = document.getElementById("btnDevSend");
-const devStatus   = document.getElementById("devStatus");
 
 /* כפתור דוחות */
 const btnReportsOpen = document.getElementById("btnReportsOpen");
@@ -734,6 +672,7 @@ async function createDefaultProfile(uid, email) {
 /* ----------------------------------------------------------
    6) ניטור התחברות – הצגת המסך הנכון
 ---------------------------------------------------------- */
+
 // מצב התחלתי: לא מחובר
 document.body.classList.remove("logged-in");
 
@@ -824,48 +763,6 @@ btnCategoriesClose.onclick = () => categoriesDialog.close();
 btnReportsClose.onclick   = () => reportsDialog.close();
 btnEditClose.onclick      = () => editDialog.close();
 
-
-
-/* פנייה למפתח */
-btnDevClose.onclick = () => devDialog.close();
-  devEmail.value = userProfile?.email || auth.currentUser?.email || "";
-  devDialog.showModal();
-};
-
-btnDevSend.onclick = () => {
-  const body = [
-    `שם: ${devName.value || ""}`,
-    `טלפון: ${devPhone.value || ""}`,
-    `אימייל: ${devEmail.value || ""}`,
-    `UID: ${currentUid || ""}`,
-    "",
-    (devMessage.value || "").trim()
-  ].join("
-");
-
-  const subject = "פנייה מהאפליקציה — עצמאי פלוס";
-  const mailto =
-    `mailto:${encodeURIComponent(DEVELOPER_EMAIL)}` +
-    `?subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-
-  // פתיחה של אפליקציית מייל
-  window.location.href = mailto;
-  devStatus.textContent = "נפתחה הודעת מייל ✅";
-};
-
-/* פנייה למפתח */
-btnDevClose.onclick = () => devDialog.close();
-btnDevOpen.onclick = () => {
-  devStatus.textContent = "";
-  devMessage.value = "";
-  devName.value  = userProfile?.displayName || "";
-  devPhone.value = userProfile?.phone || "";
-  devEmail.value = userProfile?.email || auth.currentUser?.email || "";
-  devDialog.showModal();
-};
-
-
 /* פתיחת דיאלוגים */
 btnProfileOpen.onclick    = () => {
   profileStatus.textContent = "";
@@ -946,9 +843,6 @@ const EXPENSE_ITEMS = [
   { item: "ביטוח לאומי",              category: "תשלומי חובה",                  incomeTaxPct: 100, vatAllowed: false },
 
   { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  }
-  ,{ item: "ציוד (כללי)",               category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true  },
-  { item: "שירותי פרילנס / קבלן משנה", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  },
-  { item: "קבלן משנה / שירות חיצוני",  category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  }
 ];
 
 /* טבלת הקטגוריות בדיאלוג */
@@ -1198,33 +1092,22 @@ async function loadFromCloudFirst() {
 ---------------------------------------------------------- */
 
 function uniqueCategories() {
-  const s = new Set(rows.map(r => r.desc).filter(Boolean));
+  const s = new Set(rows.map(r => r.category).filter(Boolean));
   return Array.from(s).sort((a, b) => a.localeCompare(b, "he"));
-}
-
-function allCategoryGroups() {
-  // "תיאור" (קטגוריה כללית) מגיע מהשורות ומהטבלה הסטטית
-  const s = new Set();
-  rows.forEach(r => { if (r.desc) s.add(r.desc); });
-  EXPENSE_ITEMS.forEach(x => { if (x.category) s.add(x.category); });
-  return Array.from(s).sort((a,b) => a.localeCompare(b,"he"));
 }
 
 function updateFiltersUI() {
   const dl = document.getElementById("catsList");
-  const cats = allCategoryGroups();
-
   if (dl) {
-    dl.innerHTML = cats
+    dl.innerHTML = uniqueCategories()
       .map(c => `<option value="${escapeHtml(c)}"></option>`)
       .join("");
   }
-
   const current = qCategory.value;
-  qCategory.innerHTML =
-    `<option value="">כל הקטגוריות</option>` +
-    cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-
+  qCategory.innerHTML = `<option value="">כל הקטגוריות</option>` +
+    uniqueCategories().map(c =>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join("");
   if (current) qCategory.value = current;
 }
 
@@ -1249,7 +1132,7 @@ function queryRows() {
     out = out.filter(r => monthFromDateStr(r.date) === month);
   }
   if (cat) {
-    out = out.filter(r => r.desc === cat);
+    out = out.filter(r => r.category === cat);
   }
   // תאריך יורד
   out.sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
@@ -1359,9 +1242,8 @@ function render() {
 function addRow() {
   const date = fDate.value || todayStr();
   const type = fType.value;
-  // לפי הממשק: "קטגוריה" = פריט ספציפי (דלק/CANVA וכו׳), "תיאור" = קטגוריה כללית (רכב/תוכנות וכו׳)
-  const category = (fDesc.value || "").trim();
-  const desc = (fCategory.value || "").trim();
+  const category = (fCategory.value || "").trim();
+  const desc = (fDesc.value || "").trim();
   const amount = parseFloat(fAmount.value || "0");
   const incVat = !!fIncVAT.checked;
   const deductPct = Math.max(0, Math.min(100, parseFloat(fDeduct.value || "100")));
@@ -1392,8 +1274,8 @@ function openEdit(id) {
   editingId = id;
   eDate.value = r.date;
   eType.value = r.type;
-  eCategory.value = r.desc || "";
-  eDesc.value = r.category || "";
+  eCategory.value = r.category || "";
+  eDesc.value = r.desc || "";
   eAmount.value = r.amount;
   eIncVAT.checked = !!r.incVat;
   eDeduct.value = r.deductPct ?? 100;
@@ -1407,8 +1289,8 @@ function saveEdit() {
 
   r.date = eDate.value;
   r.type = eType.value;
-  r.desc = eCategory.value;
-  r.category = eDesc.value;
+  r.category = eCategory.value;
+  r.desc = eDesc.value;
   r.amount = parseFloat(eAmount.value || "0");
   r.incVat = !!eIncVAT.checked;
   r.deductPct = Math.max(0, Math.min(100, parseFloat(eDeduct.value || "100")));
@@ -1462,71 +1344,7 @@ function exportJSON() {
 }
 
 function exportPDF() {
-  // הדפסה/ייצוא של הסיכומים בלבד (ולא כל המסך)
-  const list = queryRows();
-  const sum = summarize(list);
-  const period = (qMonth.value || monthFromDateStr(todayStr()));
-  const title = "סיכומים — עצמאי פלוס";
-
-  const businessName = userProfile?.businessName || "";
-  const businessId   = userProfile?.businessId || "";
-  const displayName  = userProfile?.displayName || "";
-  const email        = userProfile?.email || auth.currentUser?.email || "";
-
-  const html = `
-    <!DOCTYPE html>
-    <html lang="he" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <title>${title}</title>
-      <style>
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:18px;font-size:13px}
-        h1{margin:0 0 6px;font-size:18px}
-        .meta{color:#475569;margin:0 0 12px}
-        .box{border:1px solid #e5e9f2;border-radius:12px;padding:12px;margin-top:10px}
-        table{width:100%;border-collapse:collapse;margin-top:8px}
-        th,td{border:1px solid #e5e9f2;padding:8px;text-align:right}
-        th{background:#f0f2f7}
-      </style>
-    </head>
-    <body>
-      <h1>${title}</h1>
-      <p class="meta">
-        תקופה: ${period || ""}<br>
-        ${businessName ? `שם עסק: ${escapeHtml(businessName)}<br>` : ""}
-        ${businessId ? `מספר עוסק/ח.פ: ${escapeHtml(businessId)}<br>` : ""}
-        ${displayName ? `שם: ${escapeHtml(displayName)}<br>` : ""}
-        ${email ? `אימייל: ${escapeHtml(email)}` : ""}
-      </p>
-
-      <div class="box">
-        <table>
-          <thead>
-            <tr>
-              <th>מדד</th>
-              <th>סכום</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>סה"כ הכנסות (כולל)</td><td>${toMoney(sum.incGross)}</td></tr>
-            <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
-            <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
-            <tr><td>מע"מ עסקאות</td><td>${toMoney(sum.incVat)}</td></tr>
-            <tr><td>מס תשומות (משוער)</td><td>${toMoney(sum.expVat)}</td></tr>
-            <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <script>window.print();</script>
-    </body>
-    </html>
-  `;
-
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
+  window.print();
 }
 
 /* ----------------------------------------------------------
