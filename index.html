@@ -1186,17 +1186,16 @@ async function saveToCloud() {
   }
 }
 
-
 let _cloudSaveTimer = null;
-
-function scheduleCloudSave() {
-  if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
-
-  _cloudSaveTimer = setTimeout(async () => {
-    await saveToCloud();
+function scheduleCloudSave(){
+  if (!_cloudSaveTimer) {
+    // no-op, just here so clearTimeout below is safe
+  }
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = setTimeout(() => {
+    _cloudSaveTimer = null;
+    saveToCloud();
   }, 800);
-}
-, 800);
 }
 
 async function loadFromCloudFirst() {
