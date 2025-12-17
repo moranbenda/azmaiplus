@@ -165,6 +165,41 @@
       .dlg-bd table{ display:block; overflow-x:auto; }
     }
 
+    /* --- FIX: dialog mobile overflow --- */
+dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  max-height: 90vh;
+}
+
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.dlg-hd {
+  flex: 0 0 auto;
+}
+
+.dlg-bd {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* מובייל */
+@media (max-width: 520px) {
+  dialog {
+    width: 94vw;
+    max-height: 90vh;
+  }
+
+  .dlg-bd {
+    max-height: calc(90vh - 56px);
+  }
+}
+
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
     .footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
