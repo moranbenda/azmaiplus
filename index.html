@@ -162,8 +162,60 @@
    @media(max-width:520px){
       dialog{ width:94vw; }
       .grid2{ grid-template-columns:1fr; }
-      .dlg-bd table{ display:block; overflow-x:auto; }
     }
+
+    /* התאמות מובייל – טבלאות בדיאלוגים */
+@media (max-width: 520px) {
+
+  dialog {
+    width: 94vw;
+    max-width: 94vw;
+  }
+
+  .dlg-bd {
+    overflow-x: hidden;
+  }
+
+  .dlg-bd table,
+  .dlg-bd thead,
+  .dlg-bd tbody,
+  .dlg-bd th,
+  .dlg-bd td,
+  .dlg-bd tr {
+    display: block;
+    width: 100%;
+  }
+
+  .dlg-bd thead {
+    display: none; /* מסתירים כותרות במובייל */
+  }
+
+  .dlg-bd tr {
+    margin-bottom: 12px;
+    border: 1px solid #e5e9f2;
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .dlg-bd td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border: none;
+    font-size: 13px;
+  }
+
+  .dlg-bd td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #5b6573;
+    margin-inline-end: 10px;
+    white-space: nowrap;
+  }
+}
+
 
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
