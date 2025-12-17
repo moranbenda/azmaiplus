@@ -159,11 +159,30 @@
       max-height:calc(90vh - 56px); /* מפחית גובה כותרת */
     }
     /* התאמות מובייל */
-    @media(max-width:520px){
-      dialog{ width:94vw; }
-      .grid2{ grid-template-columns:1fr; }
-      .dlg-bd table{ display:block; overflow-x:auto; }
-    }
+    @media (max-width: 520px) {
+
+  dialog {
+    width: 96vw;
+    max-height: 90vh;
+    margin: auto;
+  }
+
+  .dlg-bd {
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-height: calc(90vh - 56px); /* גובה כותרת הדיאלוג */
+  }
+
+  .dlg-bd table {
+    width: 100%;
+    min-width: 520px; /* מאפשר גלילה אופקית */
+  }
+
+  .dlg-bd table th,
+  .dlg-bd table td {
+    white-space: nowrap;
+  }
+}
 
 .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
