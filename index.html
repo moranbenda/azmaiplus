@@ -129,8 +129,15 @@
       background:#fff;
       color:var(--text);
       width:min(680px,96vw);
+      max-width:96vw;
       max-height:90vh;              /* שלא יחרוג מגובה המסך */
       box-shadow:var(--card-shadow);
+      overflow:hidden;              /* שלא יגלוש אופקית */
+    }
+    dialog[open]{
+      position:fixed;
+      inset:0;
+      margin:auto;                  /* מרכז גם במובייל */
     }
     dialog::backdrop{
       background:rgba(9,14,22,.35);
@@ -146,10 +153,19 @@
     }
     .dlg-bd{
       padding:14px;
-      overflow:auto;               /* גלילה של התוכן בדיאלוג */
+      overflow:auto;                /* גלילה של התוכן בדיאלוג */
+      overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
+      max-height:calc(90vh - 56px); /* מפחית גובה כותרת */
+    }
+    /* התאמות מובייל */
+    @media(max-width:520px){
+      dialog{ width:94vw; }
+      .grid2{ grid-template-columns:1fr; }
+      .dlg-bd table{ display:block; overflow-x:auto; }
     }
 
-    .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
     .footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
     .footer .left{display:flex;gap:10px;flex-wrap:wrap}
@@ -250,6 +266,7 @@
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
         <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
+        <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
     </div>
@@ -277,12 +294,12 @@
               </select>
             </div>
             <div style="flex:2 1 210px">
-              <label>קטגוריה</label>
+              <label>תיאור</label>
               <input type="text" id="fCategory" list="catsList" placeholder="למשל: רכב, ציוד, כיבוד קל" />
               <datalist id="catsList"></datalist>
             </div>
 <div style="flex:3 1 250px">
-  <label>תיאור</label>
+  <label>קטגוריה</label>
   <input
     type="text"
     id="fDesc"
@@ -336,7 +353,7 @@
         </div>
         <div class="bd">
           <div class="row" style="margin-bottom:10px">
-            <input id="qText" placeholder="חיפוש בתיאור/קטגוריה…" style="flex:2 1 240px" />
+            <input id="qText" placeholder="חיפוש בקטגוריה/תיאור…" style="flex:2 1 240px" />
             <select id="qType" style="flex:1 1 120px">
               <option value="all">הכל</option>
               <option value="income">הכנסות</option>
@@ -372,8 +389,8 @@
               <tr>
                 <th>תאריך</th>
 <th>סוג</th>
-                <th>קטגוריה</th>
                 <th>תיאור</th>
+                <th>קטגוריה</th>
                 <th>סכום נטו</th>
                 <th>מע"מ</th>
                 <th>סכום כולל</th>
@@ -405,8 +422,8 @@
             <option value="expense">הוצאה</option>
           </select>
         </div>
-        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
-        <div><label>תיאור</label><input type="text" id="eDesc" /></div>
+        <div><label>תיאור</label><input type="text" id="eCategory" list="catsList" /></div>
+        <div><label>קטגוריה</label><input type="text" id="eDesc" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -523,6 +540,32 @@
     </div>
   </div>
 </dialog>
+
+<!-- דיאלוג פנייה למפתח -->
+<dialog id="supportDialog">
+  <div class="dlg-hd">
+    <div>פנייה למפתח</div>
+    <button class="btn secondary small" type="button" id="btnSupportClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <p class="hint" style="margin-top:0">
+      לכל בקשה, הוספת קטגוריה או תקלה — כתבו לנו ונחזור אליכם.
+    </p>
+    <form id="supportForm" onsubmit="return false;">
+      <div class="grid2">
+        <div><label>שם</label><input type="text" id="sName" readonly /></div>
+        <div><label>טלפון</label><input type="text" id="sPhone" readonly /></div>
+        <div style="grid-column:1 / -1"><label>אימייל</label><input type="email" id="sEmail" readonly /></div>
+        <div style="grid-column:1 / -1"><label>הודעה</label><textarea id="sMsg" rows="6" placeholder="כתבו כאן את הפנייה..."></textarea></div>
+      </div>
+      <div class="footer" style="margin-top:12px">
+        <div class="left"><button class="btn" id="btnSupportSend">שליחה</button></div>
+        <span class="hint" id="supportStatus"></span>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -594,6 +637,18 @@ const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
 const categoriesDialog = document.getElementById("categoriesDialog");
 const btnCategoriesClose = document.getElementById("btnCategoriesClose");
 const catTbody = document.getElementById("catTbody");
+
+
+/* כפתור פנייה למפתח */
+const btnSupportOpen = document.getElementById("btnSupportOpen");
+const supportDialog  = document.getElementById("supportDialog");
+const btnSupportClose= document.getElementById("btnSupportClose");
+const sName   = document.getElementById("sName");
+const sPhone  = document.getElementById("sPhone");
+const sEmail  = document.getElementById("sEmail");
+const sMsg    = document.getElementById("sMsg");
+const btnSupportSend = document.getElementById("btnSupportSend");
+const supportStatus  = document.getElementById("supportStatus");
 
 /* כפתור דוחות */
 const btnReportsOpen = document.getElementById("btnReportsOpen");
@@ -780,6 +835,73 @@ btnReportsOpen.onclick    = () => {
 btnLogout.onclick = () => signOut(auth);
 
 /* ----------------------------------------------------------
+   פנייה למפתח (נשלח ב-mailto)
+---------------------------------------------------------- */
+
+/* לשנות למייל האמיתי של התמיכה */
+const SUPPORT_EMAIL = "azmaiplusapp@gmail.com";
+
+function fillSupportForm() {
+  const name  = userProfile?.displayName || "";
+  const phone = userProfile?.phone || "";
+  const email = userProfile?.email || auth.currentUser?.email || "";
+
+  if (sName)  sName.value  = name;
+  if (sPhone) sPhone.value = phone;
+  if (sEmail) sEmail.value = email;
+  if (supportStatus) supportStatus.textContent = "";
+}
+
+btnSupportClose && (btnSupportClose.onclick = () => supportDialog.close());
+
+btnSupportOpen && (btnSupportOpen.onclick = () => {
+  fillSupportForm();
+  if (sMsg) sMsg.value = "";
+  supportDialog.showModal();
+});
+
+btnSupportSend && (btnSupportSend.onclick = async () => {
+  const name  = (sName?.value || "").trim();
+  const phone = (sPhone?.value || "").trim();
+  const email = (sEmail?.value || "").trim();
+  const msg   = (sMsg?.value || "").trim();
+
+  if (!msg) {
+    supportStatus.textContent = "נא לכתוב הודעה לפני שליחה";
+    return;
+  }
+
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+
+  const subject = `פנייה מהאפליקציה - ${bizName || name || email || "משתמש"}`;
+  const body = [
+    "פנייה למפתח",
+    "----------------",
+    bizName ? `שם עסק: ${bizName}` : null,
+    bizId ? `מס' עוסק/ח.פ: ${bizId}` : null,
+    name ? `שם: ${name}` : null,
+    phone ? `טלפון: ${phone}` : null,
+    email ? `אימייל: ${email}` : null,
+    "",
+    msg
+  ].filter(Boolean).join("\n");
+
+  const mailto = `mailto:${encodeURIComponent(SUPPORT_EMAIL)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  // ניסיון לפתוח תוכנת דוא"ל. אם חסום – נעתיק ללוח.
+  try {
+    window.location.href = mailto;
+    supportStatus.textContent = "פותח הודעת מייל…";
+  } catch (e) {}
+
+  try {
+    await navigator.clipboard.writeText(body);
+    supportStatus.textContent = "הטקסט הועתק ללוח (במידה ותוכנת המייל לא נפתחה)";
+  } catch (e) {}
+});
+
+/* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
 ---------------------------------------------------------- */
 
@@ -842,7 +964,10 @@ const EXPENSE_ITEMS = [
   { item: "קרן השתלמות",              category: "קרן השתלמות",                 incomeTaxPct: 0,   vatAllowed: false },
   { item: "ביטוח לאומי",              category: "תשלומי חובה",                  incomeTaxPct: 100, vatAllowed: false },
 
-  { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  }
+  { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  },
+
+  { item: "ציוד (כללי)",                 category: "ציוד",                         incomeTaxPct: 100, vatAllowed: true  },
+  { item: "קבלני משנה / שירותים חיצוניים", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  }
 ];
 
 /* טבלת הקטגוריות בדיאלוג */
@@ -1061,6 +1186,13 @@ async function saveToCloud() {
   }
 }
 
+let _cloudSaveTimer = null;
+function scheduleCloudSave(){
+  if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = setTimeout(() => { scheduleCloudSave();
+  }, 800);
+}
+
 async function loadFromCloudFirst() {
   if (!currentUid) { rows = []; return; }
   try {
@@ -1259,7 +1391,7 @@ function addRow() {
 
   rows.push({ id, date, type, category, desc, amount, incVat, deductPct });
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   fDesc.value = "";
   fAmount.value = "";
   render();
@@ -1296,7 +1428,7 @@ function saveEdit() {
   r.deductPct = Math.max(0, Math.min(100, parseFloat(eDeduct.value || "100")));
 
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   render();
   editDialog.close();
 }
@@ -1305,7 +1437,7 @@ function deleteRow() {
   if (!confirm("למחוק את התנועה?")) return;
   rows = rows.filter(x => x.id !== editingId);
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   render();
   editDialog.close();
 }
@@ -1344,7 +1476,77 @@ function exportJSON() {
 }
 
 function exportPDF() {
-  window.print();
+  if (!currentUid) return;
+
+  const list = queryRows();              // לפי הפילטרים שבמסך
+  const sum  = summarize(list);
+  const { vatEnabled, vatRate } = getSettings();
+
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+  const display = userProfile?.displayName || "";
+  const email   = userProfile?.email || auth.currentUser?.email || "";
+  const now     = new Date().toLocaleString("he-IL");
+
+  const title = "סיכומים — עצמאי פלוס";
+
+  const html = `
+  <!DOCTYPE html>
+  <html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+      h1{margin:0 0 8px;font-size:18px}
+      .meta{color:#555;margin-bottom:14px}
+      table{border-collapse:collapse;width:100%;margin-top:10px}
+      th,td{border:1px solid #ccc;padding:8px 10px;text-align:right}
+      th{background:#f0f2f7}
+      .row{display:flex;gap:10px;flex-wrap:wrap}
+      .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 0}
+    </style>
+  </head>
+  <body>
+    <h1>סיכומי תקופה</h1>
+    <div class="meta">
+      <div class="row">
+        ${bizName ? `<span class="pill"><b>שם העסק:</b> ${escapeHtml(bizName)}</span>` : ""}
+        ${bizId ? `<span class="pill"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</span>` : ""}
+        ${display ? `<span class="pill"><b>שם:</b> ${escapeHtml(display)}</span>` : ""}
+        ${email ? `<span class="pill"><b>אימייל:</b> ${escapeHtml(email)}</span>` : ""}
+        <span class="pill"><b>נוצר:</b> ${escapeHtml(now)}</span>
+      </div>
+      <div style="margin-top:6px">מע"מ: ${vatEnabled ? "פעיל" : "כבוי"} ${vatEnabled ? `(אחוז: ${vatRate}%)` : ""}</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>מדד</th>
+          <th>סכום</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>סה"כ הכנסות (כולל)</td><td>${toMoney(sum.incGross)}</td></tr>
+        <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
+        <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
+        <tr><td>מע"מ עסקאות</td><td>${toMoney(sum.incVat)}</td></tr>
+        <tr><td>מס תשומות (משוער)</td><td>${toMoney(sum.expVat)}</td></tr>
+        <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
+        <tr><td>בסיס רווח לצרכי מס (נטו, משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
+      </tbody>
+    </table>
+
+    <script>window.print();</script>
+  </body>
+  </html>
+  `;
+
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
 }
 
 /* ----------------------------------------------------------
@@ -1444,68 +1646,180 @@ btnReportPdf.onclick = () => {
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  // רווח והפסד
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+  const created = new Date().toLocaleString("he-IL");
+
+  const rangeText = (from || to)
+    ? `טווח: ${from || "—"} עד ${to || "—"}`
+    : `טווח: כל התאריכים`;
+
+  // דו"ח רווח והפסד – PDF
   if (type === "pnl") {
-    const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
-    const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
+    const incomeList  = filterByDateAndType("income",  from, to);
+    const expenseList = filterByDateAndType("expense", from, to);
+
+    const { totals: incTotals } = addVatInfo(incomeList);
+    const { totals: expTotals } = addVatInfo(expenseList);
+
+    const profitNet   = incTotals.net   - expTotals.net;
+    const profitGross = incTotals.gross - expTotals.gross;
+
+    const title = 'דו"ח רווח והפסד';
 
     const html = `
+      <!DOCTYPE html>
       <html lang="he" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${title}</title>
+        <style>
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+          h1{margin:0 0 6px;font-size:20px}
+          .meta{color:#555;margin-bottom:14px;line-height:1.6}
+          table{border-collapse:collapse;width:100%;margin-top:12px}
+          th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
+          th{background:#f0f2f7}
+        </style>
+      </head>
       <body>
-        <h1>דוח רווח והפסד</h1>
-        <p>סה"כ הכנסות: ${toMoney(inc.gross)}</p>
-        <p>סה"כ הוצאות: ${toMoney(exp.gross)}</p>
-        <p><b>רווח: ${toMoney(inc.gross - exp.gross)}</b></p>
+        <h1>${title}</h1>
+        <div class="meta">
+          ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
+          ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+          <div><b>${escapeHtml(rangeText)}</b></div>
+          <div>הופק: ${escapeHtml(created)}</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>סעיף</th>
+              <th>נטו (לפני מע"מ)</th>
+              <th>מע"מ</th>
+              <th>סה"כ כולל מע"מ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>סה"כ הכנסות</td>
+              <td>${toMoney(incTotals.net)}</td>
+              <td>${toMoney(incTotals.vat)}</td>
+              <td>${toMoney(incTotals.gross)}</td>
+            </tr>
+            <tr>
+              <td>סה"כ הוצאות</td>
+              <td>${toMoney(expTotals.net)}</td>
+              <td>${toMoney(expTotals.vat)}</td>
+              <td>${toMoney(expTotals.gross)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold">רווח לפני מס (נטו)</td>
+              <td style="font-weight:bold">${toMoney(profitNet)}</td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold">רווח כולל מע"מ (כולל)</td>
+              <td style="font-weight:bold">${toMoney(profitGross)}</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <script>window.print();</script>
       </body>
       </html>
     `;
 
-    const w = window.open();
+    const w = window.open("", "_blank");
     w.document.write(html);
     w.document.close();
-    w.print();
+    w.focus();
     return;
   }
 
+  // דו"ח הכנסות / הוצאות מפורט
   const list = filterByDateAndType(type, from, to);
-  if (!list.length) return alert("אין נתונים");
+  if (!list.length) {
+    alert("אין נתונים לטווח שנבחר");
+    return;
+  }
 
-  const { rows: data, totals } = addVatInfo(list);
+  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
+  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
 
-  const html = `
+  let html = `
+    <!DOCTYPE html>
     <html lang="he" dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <title>${title}</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+        h1{margin:0 0 6px;font-size:20px}
+        .meta{color:#555;margin-bottom:14px;line-height:1.6}
+        table{border-collapse:collapse;width:100%}
+        th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
+        th{background:#f0f2f7}
+      </style>
+    </head>
     <body>
-      <h1>${type === "income" ? "דוח הכנסות" : "דוח הוצאות"}</h1>
-      <table border="1" cellpadding="6">
-        <tr>
-          <th>תאריך</th><th>קטגוריה</th><th>תיאור</th>
-          <th>נטו</th><th>מע"מ</th><th>כולל</th>
-        </tr>
-        ${data.map(r => `
+      <h1>${title}</h1>
+      <div class="meta">
+        ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
+        ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+        <div><b>${escapeHtml(rangeText)}</b></div>
+        <div>הופק: ${escapeHtml(created)}</div>
+      </div>
+
+      <table>
+        <thead>
           <tr>
-            <td>${r.date}</td>
-            <td>${escapeHtml(r.category || "")}</td>
-            <td>${escapeHtml(r.desc || "")}</td>
-            <td>${toMoney(r.net)}</td>
-            <td>${toMoney(r.vat)}</td>
-            <td>${toMoney(r.gross)}</td>
+            <th>תאריך</th>
+            <th>תיאור</th>
+            <th>קטגוריה</th>
+            <th>נטו (לפני מע"מ)</th>
+            <th>מע"מ</th>
+            <th>סה"כ כולל מע"מ</th>
           </tr>
-        `).join("")}
-        <tr>
-          <td colspan="3"><b>סה"כ</b></td>
-          <td><b>${toMoney(totals.net)}</b></td>
-          <td><b>${toMoney(totals.vat)}</b></td>
-          <td><b>${toMoney(totals.gross)}</b></td>
-        </tr>
+        </thead>
+        <tbody>
+  `;
+
+  rowsWithAmounts.forEach(r => {
+    html += `
+      <tr>
+        <td>${r.date}</td>
+        <td>${escapeHtml(r.category || "")}</td>
+        <td>${escapeHtml(r.desc || "")}</td>
+        <td>${toMoney(r.net)}</td>
+        <td>${toMoney(r.vat)}</td>
+        <td>${toMoney(r.gross)}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+      <tr>
+        <td colspan="3" style="font-weight:bold">סה"כ</td>
+        <td style="font-weight:bold">${toMoney(totals.net)}</td>
+        <td style="font-weight:bold">${toMoney(totals.vat)}</td>
+        <td style="font-weight:bold">${toMoney(totals.gross)}</td>
+      </tr>
+        </tbody>
       </table>
+
+      <script>window.print();</script>
     </body>
     </html>
   `;
 
-  const w = window.open();
+  const w = window.open("", "_blank");
   w.document.write(html);
   w.document.close();
-  w.print();
+  w.focus();
 };
 /* ----------------------------------------------------------
    16) חיבור מאזינים והתחלת האפליקציה לאחר התחברות
@@ -1527,8 +1841,8 @@ function initAppLogic(uid) {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
       rows = [];
       saveToLocal();
-      saveToCloud();
-      render();
+      scheduleCloudSave();
+  render();
     };
 
     // סינון וניווט חודשים
