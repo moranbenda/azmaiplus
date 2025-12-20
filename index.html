@@ -321,7 +321,7 @@ dialog{
         <label for="authPassword">סיסמה</label>
         <input type="password" id="authPassword" minlength="6" required />
       </div>
-      <button class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
+      <button type="button" class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
     </form>
 
     <div class="auth-footer">
@@ -857,30 +857,34 @@ tabRegister.onclick = () => {
 /* ----------------------------------------------------------
    4) התחברות / הרשמה
 ---------------------------------------------------------- */
-authForm.onsubmit = async (e) => {
-  e.preventDefault();
+async function handleAuth() {
   authError.textContent = "";
   authSubmitBtn.disabled = true;
 
   const email = authEmail.value.trim();
-  const pass = authPassword.value.trim();
+  const pass  = authPassword.value.trim();
 
   try {
-    let userCred;
-
     if (authMode === "login") {
-      userCred = await signInWithEmailAndPassword(auth, email, pass);
+      await signInWithEmailAndPassword(auth, email, pass);
     } else {
-      userCred = await createUserWithEmailAndPassword(auth, email, pass);
+      const userCred = await createUserWithEmailAndPassword(auth, email, pass);
       await createDefaultProfile(userCred.user.uid, email);
     }
-
+    // אין צורך לעשות פה "להציג אפליקציה" — onAuthStateChanged יעשה את זה
   } catch (err) {
-    authError.textContent = err.message;
+    authError.textContent = err?.message || "שגיאת התחברות";
+  } finally {
+    authSubmitBtn.disabled = false;
   }
+}
 
-  authSubmitBtn.disabled = false;
-};
+// לא לתת לטופס לרענן דף
+authForm.addEventListener("submit", (e) => e.preventDefault());
+
+// להתחברות/הרשמה בפועל דרך הכפתור
+authSubmitBtn.addEventListener("click", handleAuth);
+
 
 /* ----------------------------------------------------------
    5) יצירת פרופיל ברירת מחדל למשתמש חדש
