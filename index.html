@@ -271,7 +271,33 @@
 
   body.logged-in #authScreen{display:none;}
   body.logged-in #appShell{display:block;}
-  </style>
+  
+/* --- תיקוני מובייל לדיאלוגים וטבלאות --- */
+dialog{
+  margin: auto;
+}
+@media(max-width:700px){
+  dialog{
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+  .dlg-bd{
+    padding:12px;
+  }
+}
+/* טבלת קטגוריות – לשמור על מבנה טבלה גם במובייל */
+#categoriesDialog .dlg-bd > div{
+  overflow-x:auto;
+}
+#categoriesDialog table{
+  min-width:560px;
+}
+#categoriesDialog th,#categoriesDialog td{
+  white-space:nowrap;
+  font-size:13px;
+}
+
+</style>
 </head>
 <body>
 
@@ -317,7 +343,9 @@
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-        <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
+                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+        <button class="btn secondary small" id="btnDocsOpen">מסמכים</button>
+<button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
@@ -346,7 +374,7 @@
               </select>
             </div>
             <div style="flex:2 1 210px">
-              <label>תיאור</label>
+              <label>קטגוריה</label>
               <input type="text" id="fCategory" list="catsList" placeholder="למשל: רכב, ציוד, כיבוד קל" />
               <datalist id="catsList"></datalist>
             </div>
@@ -412,7 +440,14 @@
               <option value="expense">הוצאות</option>
             </select>
             <input type="month" id="qMonth" style="flex:1 1 150px" />
-            <select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
+                        <select id="qPeriod" style="flex:1 1 140px">
+              <option value="1">חודש</option>
+              <option value="2">חודשיים</option>
+              <option value="3">רבעון</option>
+              <option value="12">שנה</option>
+              <option value="0">כל התקופות</option>
+            </select>
+<select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
             <button class="btn small" id="btnReset">איפוס</button>
           </div>
 
@@ -618,6 +653,72 @@
   </div>
 </dialog>
 
+
+<!-- דיאלוג מסמכים -->
+<dialog id="docsDialog">
+  <div class="dlg-hd">
+    <div>הפקת מסמך חשבונאי</div>
+    <button class="btn secondary small" type="button" id="btnDocsClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <form id="docsForm" onsubmit="return false;">
+      <div class="grid2">
+        <div>
+          <label>סוג מסמך</label>
+          <select id="dType">
+            <option value="invoice">חשבונית מס</option>
+            <option value="invoice_receipt">חשבונית מס + קבלה</option>
+            <option value="receipt">קבלה</option>
+            <option value="deal_invoice">חשבונית עסקה</option>
+            <option value="credit_note">חשבונית זיכוי</option>
+            <option value="quote">הצעת מחיר</option>
+          </select>
+        </div>
+        <div>
+          <label>תאריך</label>
+          <input type="date" id="dDate" />
+        </div>
+        <div>
+          <label>שם לקוח</label>
+          <input type="text" id="dClientName" placeholder="שם מלא / חברה" />
+        </div>
+        <div>
+          <label>טלפון לקוח (אופציונלי)</label>
+          <input type="tel" id="dClientPhone" placeholder="05..." />
+        </div>
+        <div>
+          <label>תיאור</label>
+          <input type="text" id="dDesc" placeholder="שירות / מוצר" />
+        </div>
+        <div>
+          <label>סכום (₪)</label>
+          <input type="number" step="0.01" id="dAmount" placeholder="0" />
+        </div>
+        <div class="pill" style="align-self:end">
+          <input type="checkbox" id="dIncVat" checked />
+          <label for="dIncVat">סכום כולל מע&quot;מ</label>
+        </div>
+      </div>
+
+      <div class="footer" style="margin-top:12px">
+        <div class="left">
+          <button class="btn" id="btnDocCreate">הפקה</button>
+          <button class="btn secondary" id="btnDocEmail">שליחה במייל</button>
+          <button class="btn secondary" id="btnDocWhatsapp">שליחה בווטסאפ</button>
+        </div>
+        <span class="hint" id="docsStatus"></span>
+      </div>
+
+      <div class="card" style="margin-top:12px;border-radius:14px">
+        <div class="hd"><div>תצוגה מקדימה</div></div>
+        <div class="bd" style="overflow:auto;max-height:45vh">
+          <div id="docPreview" class="muted">מלאי פרטים ולחצי על "הפקה" כדי לראות תצוגה.</div>
+        </div>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -706,6 +807,28 @@ const supportStatus  = document.getElementById("supportStatus");
 const btnReportsOpen = document.getElementById("btnReportsOpen");
 const reportsDialog = document.getElementById("reportsDialog");
 const btnReportsClose = document.getElementById("btnReportsClose");
+/* כפתור מע"מ */
+const btnVatLink = document.getElementById("btnVatLink");
+
+/* מסמכים */
+const btnDocsOpen  = document.getElementById("btnDocsOpen");
+const docsDialog   = document.getElementById("docsDialog");
+const btnDocsClose = document.getElementById("btnDocsClose");
+const docsStatus   = document.getElementById("docsStatus");
+const docPreview   = document.getElementById("docPreview");
+const dType        = document.getElementById("dType");
+const dDate        = document.getElementById("dDate");
+const dClientName  = document.getElementById("dClientName");
+const dClientPhone = document.getElementById("dClientPhone");
+const dDesc        = document.getElementById("dDesc");
+const dAmount      = document.getElementById("dAmount");
+const dIncVat      = document.getElementById("dIncVat");
+const btnDocCreate = document.getElementById("btnDocCreate");
+const btnDocEmail  = document.getElementById("btnDocEmail");
+const btnDocWhatsapp = document.getElementById("btnDocWhatsapp");
+let lastDocTextForShare = "";
+let lastDocHtml = "";
+
 
 /* יציאה */
 const btnLogout = document.getElementById("btnLogout");
@@ -829,6 +952,7 @@ const btnQuickToday = document.getElementById("btnQuickToday");
 const qText      = document.getElementById("qText");
 const qType      = document.getElementById("qType");
 const qMonth     = document.getElementById("qMonth");
+const qPeriod    = document.getElementById("qPeriod");
 const qCategory  = document.getElementById("qCategory");
 const btnReset   = document.getElementById("btnReset");
 const btnPrev    = document.getElementById("btnPrev");
@@ -865,10 +989,18 @@ const btnReportCsv = document.getElementById("btnReportCsv");
 const btnReportPdf = document.getElementById("btnReportPdf");
 
 /* סגירת דיאלוגים */
-btnProfileClose.onclick   = () => profileDialog.close();
+btnProfileClose.onclick   = () => {
+  if (profileDialog.dataset.required === "1") return;
+  profileDialog.close();
+};
 btnCategoriesClose.onclick = () => categoriesDialog.close();
 btnReportsClose.onclick   = () => reportsDialog.close();
 btnEditClose.onclick      = () => editDialog.close();
+
+// למנוע סגירת פרופיל בזמן שחובה למלא
+profileDialog.addEventListener("cancel", (ev) => {
+  if (profileDialog.dataset.required === "1") ev.preventDefault();
+});
 
 /* פתיחת דיאלוגים */
 btnProfileOpen.onclick    = () => {
@@ -884,6 +1016,24 @@ btnReportsOpen.onclick    = () => {
   rType.value = "income";
   reportsDialog.showModal();
 };
+btnDocsClose.onclick = () => docsDialog.close();
+btnDocsOpen.onclick = () => {
+  docsStatus.textContent = "";
+  if (!dDate.value) dDate.value = todayStr();
+  // התאמה לעוסק פטור: אין מע"מ
+  if ((userProfile?.businessType || "ptor") === "ptor") {
+    dIncVat.checked = false;
+    dIncVat.disabled = true;
+    // חשבונית מס/מס+קבלה לא רלוונטי – נציג רמז
+    if (dType.value === "invoice" || dType.value === "invoice_receipt") {
+      dType.value = "receipt";
+    }
+  } else {
+    dIncVat.disabled = false;
+  }
+  docsDialog.showModal();
+};
+
 btnLogout.onclick = () => signOut(auth);
 
 /* ----------------------------------------------------------
@@ -1061,6 +1211,18 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+function monthStartEndFrom(baseMonth, monthsBack) {
+  // baseMonth: YYYY-MM (חודש "עוגן" – נכלול עד סוף החודש הזה)
+  const [y, m] = baseMonth.split("-").map(Number);
+  const end = new Date(y, m, 0); // היום האחרון בחודש
+  const start = new Date(y, m-1, 1);
+  start.setMonth(start.getMonth() - (monthsBack - 1));
+  const startStr = `${start.getFullYear()}-${pad(start.getMonth()+1)}-01`;
+  const endStr = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`;
+  return { startStr, endStr };
+}
+
 function monthFromDateStr(s) {
   return s ? s.slice(0, 7) : "";
 }
@@ -1127,6 +1289,27 @@ function applyProfileToUI() {
   }
 }
 
+
+function isProfileComplete(p) {
+  if (!p) return false;
+  // מינימום נדרש לבטא: שם עסק + מספר עוסק/ח"פ + סוג עוסק
+  return !!(String(p.businessName || "").trim()) &&
+         !!(String(p.businessId || "").trim()) &&
+         !!(String(p.businessType || "").trim());
+}
+
+function enforceProfileRequired() {
+  if (!currentUid) return;
+  if (isProfileComplete(userProfile)) {
+    profileDialog.dataset.required = "0";
+    profileStatus.textContent = "";
+    return;
+  }
+  profileDialog.dataset.required = "1";
+  profileStatus.textContent = "כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).";
+  profileDialog.showModal();
+}
+
 async function loadUserProfile(uid) {
   currentUid = uid;
   const ref = doc(db, "users", uid);
@@ -1168,6 +1351,11 @@ btnSaveProfile.onclick = async () => {
     await setDoc(ref, payload, { merge: true });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
+    // אם הפרופיל היה חובה – לאפשר המשך
+    if (profileDialog.dataset.required === "1" && isProfileComplete(userProfile)) {
+      profileDialog.dataset.required = "0";
+      profileDialog.close();
+    }
     applyProfileToUI();
     // לעדכן גם את הסיכומים
     render();
@@ -1246,10 +1434,16 @@ function scheduleCloudSave(){
   clearTimeout(_cloudSaveTimer);
   _cloudSaveTimer = setTimeout(() => {
     _cloudSaveTimer = null;
-    saveToCloud();
+    saveToCloudDebounced();
   }, 800);
 }
 
+
+let cloudSaveTimer = null;
+function saveToCloudDebounced() {
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => { saveToCloud(); }, 400);
+}
 async function loadFromCloudFirst() {
   if (!currentUid) { rows = []; return; }
   try {
@@ -1304,6 +1498,7 @@ function queryRows() {
   const text = (qText.value || "").trim().toLowerCase();
   const type = qType.value;
   const month = qMonth.value;
+  const period = qPeriod ? qPeriod.value : "1";
   const cat = qCategory.value;
 
   let out = rows.slice();
@@ -1317,8 +1512,10 @@ function queryRows() {
   if (type !== "all") {
     out = out.filter(r => r.type === type);
   }
-  if (month) {
-    out = out.filter(r => monthFromDateStr(r.date) === month);
+  if (month && period !== "0") {
+    const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+    const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
+    out = out.filter(r => r.date >= startStr && r.date <= endStr);
   }
   if (cat) {
     out = out.filter(r => r.category === cat);
@@ -1420,7 +1617,16 @@ function render() {
   const m = qMonth.value || monthFromDateStr(todayStr());
   if (m) {
     const [y, mm] = m.split("-");
-    periodLabel.textContent = `חודש: ${mm}/${y}`;
+    const period = qPeriod ? qPeriod.value : "1";
+    if (period === "0") {
+      periodLabel.textContent = "תקופה: כל התקופות";
+    } else {
+      const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+      const { startStr, endStr } = monthStartEndFrom(m, monthsBack);
+      periodLabel.textContent = monthsBack === 1
+        ? `חודש: ${mm}/${y}`
+        : `תקופה: ${startStr} עד ${endStr}`;
+    }
   }
 }
 
@@ -1882,6 +2088,198 @@ btnReportPdf.onclick = () => {
    16) חיבור מאזינים והתחלת האפליקציה לאחר התחברות
 ---------------------------------------------------------- */
 
+
+function docTypeLabel(t){
+  return {
+    invoice: "חשבונית מס",
+    invoice_receipt: "חשבונית מס + קבלה",
+    receipt: "קבלה",
+    deal_invoice: "חשבונית עסקה",
+    credit_note: "חשבונית זיכוי",
+    quote: "הצעת מחיר"
+  }[t] || "מסמך";
+}
+
+function canIssueTaxInvoice(){
+  return (userProfile?.businessType || "ptor") !== "ptor";
+}
+
+function buildDocHtml(payload){
+  const bizName = escapeHtml(userProfile?.businessName || "");
+  const bizId   = escapeHtml(userProfile?.businessId || "");
+  const phone   = escapeHtml(userProfile?.phone || "");
+  const email   = escapeHtml(userProfile?.email || auth.currentUser?.email || "");
+  const display = escapeHtml(userProfile?.displayName || "");
+  const typeLabel = docTypeLabel(payload.type);
+
+  const { vatEnabled, vatRate } = getSettings();
+  const vatRateUse = vatEnabled ? vatRate : 0;
+  const split = splitVAT(payload.amount, payload.incVat, vatRateUse);
+
+  const showVat = (vatRateUse > 0);
+
+  return `
+  <!doctype html>
+  <html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${typeLabel}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;margin:0;padding:24px;color:#111827}
+      .box{max-width:900px;margin:0 auto;border:1px solid #e5e7eb;border-radius:16px;padding:18px}
+      .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+      .biz h1{margin:0;font-size:20px}
+      .muted{color:#6b7280;font-size:13px}
+      .doc-title{font-size:22px;margin:0}
+      table{width:100%;border-collapse:collapse;margin-top:16px}
+      th,td{border:1px solid #e5e7eb;padding:10px;text-align:right}
+      th{background:#f3f4f6}
+      .sum{margin-top:14px;display:flex;justify-content:flex-end}
+      .sum table{width:auto;min-width:320px}
+      .logo{width:120px;height:60px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px}
+      @media print{button{display:none}}
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="top">
+        <div class="biz">
+          <h1>${bizName || "שם העסק"}</h1>
+          <div class="muted">מספר עוסק/ח"פ: ${bizId || "-"}</div>
+          <div class="muted">${display ? ("איש קשר: "+display+" · ") : ""}${phone ? ("טלפון: "+phone+" · ") : ""}${email ? ("אימייל: "+email) : ""}</div>
+        </div>
+        <div style="text-align:left">
+          <div class="logo">לוגו (בהמשך)</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px">
+        <h2 class="doc-title">${typeLabel}</h2>
+        <div class="muted">תאריך: ${payload.date}</div>
+      </div>
+
+      <div style="margin-top:10px" class="muted">
+        לקוח: <strong>${escapeHtml(payload.clientName || "-")}</strong>
+        ${payload.clientPhone ? ` · טלפון: ${escapeHtml(payload.clientPhone)}` : ""}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>תיאור</th>
+            <th>סכום נטו</th>
+            ${showVat ? "<th>מע"מ</th>" : ""}
+            <th>סה"כ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${escapeHtml(payload.desc || "")}</td>
+            <td>${toMoney(split.net)}</td>
+            ${showVat ? `<td>${toMoney(split.vat)}</td>` : ""}
+            <td>${toMoney(split.gross)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="sum">
+        <table>
+          <tr><th>סה"כ לתשלום</th><td>${toMoney(split.gross)}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:14px" class="muted">
+        מסמך זה הופק במערכת עצמאי פלוס.
+      </div>
+      <div style="margin-top:10px">
+        <button onclick="window.print()">הדפסה / שמירה כ-PDF</button>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function setDocPreview(htmlStr){
+  lastDocHtml = htmlStr;
+  // תצוגה בתוך האפליקציה (iframe)
+  docPreview.innerHTML = `<iframe style="width:100%;height:380px;border:1px solid var(--line);border-radius:12px" sandbox="allow-same-origin" srcdoc="${htmlStr.replace(/"/g,'&quot;')}"></iframe>`;
+}
+
+function buildShareText(payload){
+  const label = docTypeLabel(payload.type);
+  const bizName = userProfile?.businessName || "";
+  const amount = payload.amount ? toMoney(payload.amount) : "";
+  return `${label} - ${bizName} - ${payload.date} - ${amount}`;
+}
+
+function openDocInNewTab(){
+  const w = window.open("", "_blank");
+  w.document.write(lastDocHtml);
+  w.document.close();
+  w.focus();
+}
+
+btnDocCreate.onclick = () => {
+  docsStatus.textContent = "";
+  const type = dType.value;
+  const date = dDate.value || todayStr();
+  const clientName = (dClientName.value || "").trim();
+  const clientPhone = (dClientPhone.value || "").trim();
+  const desc = (dDesc.value || "").trim();
+  const amount = parseFloat(dAmount.value || "0");
+  const incVat = !!dIncVat.checked;
+
+  if (!desc) { docsStatus.textContent = "יש למלא תיאור"; return; }
+  if (!amount || amount <= 0) { docsStatus.textContent = "יש למלא סכום גדול מאפס"; return; }
+
+  // חסימה לעוסק פטור למסמכים שאינם רלוונטיים
+  if (!canIssueTaxInvoice() && (type === "invoice" || type === "invoice_receipt")) {
+    docsStatus.textContent = "עוסק פטור לא יכול להפיק חשבונית מס. בחרי קבלה/חשבונית עסקה.";
+    return;
+  }
+
+  const payload = { type, date, clientName, clientPhone, desc, amount, incVat };
+
+  const htmlStr = buildDocHtml(payload);
+  setDocPreview(htmlStr);
+  lastDocTextForShare = buildShareText(payload);
+
+  // מסמכים שיוצרים הכנסה אוטומטית
+  const shouldAddIncome = ["invoice","invoice_receipt","receipt","deal_invoice"].includes(type);
+  if (shouldAddIncome) {
+    // נכניס כהכנסה עם קטגוריה = סוג מסמך, ותיאור = תיאור המסמך (לשמור תואם למבנה הקיים)
+    rows.push({
+      id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2),
+      date,
+      type: "income",
+      category: docTypeLabel(type),
+      desc,
+      amount,
+      incVat,
+      deductPct: 100
+    });
+    saveToLocal();
+    saveToCloudDebounced();
+    render();
+  }
+
+  docsStatus.textContent = "המסמך הופק ✅ (אפשר לפתוח/להדפיס מהתצוגה המקדימה)";
+};
+
+btnDocEmail.onclick = () => {
+  if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
+  const subject = encodeURIComponent("מסמך חשבונאי - עצמאי פלוס");
+  const body = encodeURIComponent(lastDocTextForShare + "\n\nפתחי את המסמך בטאב חדש כדי לשמור כ-PDF ולהצמיד למייל.");
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+};
+
+btnDocWhatsapp.onclick = () => {
+  if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
+  const txt = encodeURIComponent(lastDocTextForShare);
+  window.open(`https://wa.me/?text=${txt}`, "_blank", "noopener");
+};
+
 function initAppLogic(uid) {
   currentUid = uid;
 
@@ -1908,6 +2306,7 @@ function initAppLogic(uid) {
       qType.addEventListener(evName, () => { saveToLocal(); render(); });
       qMonth.addEventListener(evName, () => { saveToLocal(); render(); });
       qCategory.addEventListener(evName, () => { saveToLocal(); render(); });
+      qPeriod.addEventListener(evName, () => { saveToLocal(); render(); });
       vatRateInput.addEventListener(evName, () => { saveToLocal(); render(); });
       vatEnabledCheckbox.addEventListener(evName, () => { saveToLocal(); render(); });
     });
@@ -1917,6 +2316,7 @@ function initAppLogic(uid) {
       qType.value = "all";
       qMonth.value = monthFromDateStr(todayStr());
       qCategory.value = "";
+      qPeriod.value = "1";
       render();
     };
 
@@ -1960,6 +2360,7 @@ renderItemsDatalist();
     await loadFromCloudFirst();
     if (!fDate.value) fDate.value = todayStr();
     if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
+    if (qPeriod && !qPeriod.value) qPeriod.value = "1";
     render();
   })();
 }
@@ -1969,5 +2370,6 @@ tabLogin.click();
 </script>
 </body>
 </html>
+
 
 
