@@ -857,12 +857,25 @@ tabRegister.onclick = () => {
 /* ----------------------------------------------------------
    4) התחברות / הרשמה
 ---------------------------------------------------------- */
-async function handleAuth() {
+/* ----------------------------------------------------------
+   4) התחברות / הרשמה - תיקון באג התחברות
+---------------------------------------------------------- */
+async function handleAuth(e) {
+  if (e) e.preventDefault(); // מניעת רענון דף בכל מקרה
+  
   authError.textContent = "";
   authSubmitBtn.disabled = true;
+  authSubmitBtn.textContent = "מתחבר...";
 
   const email = authEmail.value.trim();
   const pass  = authPassword.value.trim();
+
+  if (!email || !pass) {
+    authError.textContent = "נא להזין אימייל וסיסמה";
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = authMode === "login" ? "התחברות" : "הרשמה";
+    return;
+  }
 
   try {
     if (authMode === "login") {
@@ -871,20 +884,26 @@ async function handleAuth() {
       const userCred = await createUserWithEmailAndPassword(auth, email, pass);
       await createDefaultProfile(userCred.user.uid, email);
     }
-    // אין צורך לעשות פה "להציג אפליקציה" — onAuthStateChanged יעשה את זה
+    // onAuthStateChanged יטפל במעבר למסך האפליקציה
   } catch (err) {
-    authError.textContent = err?.message || "שגיאת התחברות";
+    console.error("Auth error:", err);
+    // תרגום שגיאות נפוצות של פיירבייס לעברית
+    if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      authError.textContent = "פרטי התחברות שגויים. בדקי את המייל והסיסמה.";
+    } else if (err.code === 'auth/invalid-email') {
+      authError.textContent = "כתובת האימייל אינה תקינה.";
+    } else {
+      authError.textContent = "שגיאה: " + err.message;
+    }
   } finally {
     authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = authMode === "login" ? "התחברות" : "הרשמה";
   }
 }
 
-// לא לתת לטופס לרענן דף
-authForm.addEventListener("submit", (e) => e.preventDefault());
-
-// להתחברות/הרשמה בפועל דרך הכפתור
-authSubmitBtn.addEventListener("click", handleAuth);
-
+// עדכון ה-Listeners בצורה בטוחה יותר:
+authForm.onsubmit = handleAuth; // זה יתפוס גם לחיצה על כפתור וגם Enter
+authSubmitBtn.onclick = handleAuth;
 
 /* ----------------------------------------------------------
    5) יצירת פרופיל ברירת מחדל למשתמש חדש
