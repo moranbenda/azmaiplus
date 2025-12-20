@@ -911,20 +911,28 @@ async function createDefaultProfile(uid, email) {
 document.body.classList.remove("logged-in");
 
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    // לא מחובר
+  try {
+    if (!user) {
+      document.body.classList.remove("logged-in");
+      currentUid = null;
+      return;
+    }
+
+    // קודם כל להציג אפליקציה מיד
+    document.body.classList.add("logged-in");
+    userEmailTag.textContent = user.email || "";
+
+    // ואז לטעון נתונים
+    await loadUserProfile(user.uid);
+    initAppLogic(user.uid);
+
+  } catch (err) {
+    console.error("onAuthStateChanged error:", err);
+    authError.textContent = "שגיאה בטעינת המשתמש. בדקי Console.";
     document.body.classList.remove("logged-in");
-    currentUid = null;
-    return;
   }
-
-  // מחובר
-  document.body.classList.add("logged-in");
-  userEmailTag.textContent = user.email || "";
-
-  await loadUserProfile(user.uid);
-  initAppLogic(user.uid);
 });
+
 /* ----------------------------------------------------------
    7) פרופיל משתמש – טעינה ויישום להגדרות המערכת
 ---------------------------------------------------------- */
