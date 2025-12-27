@@ -1192,10 +1192,13 @@ btnSupportSend && (btnSupportSend.onclick = () => {
   );
 
   window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+
   supportMessage.value = "";
-  closeModal(supportModal);
-};
-);
+  // סגירת חלון
+  if (supportDialog && typeof supportDialog.close === "function") {
+    supportDialog.close();
+
+});
 /* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
 ---------------------------------------------------------- */
