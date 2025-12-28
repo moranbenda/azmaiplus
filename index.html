@@ -1197,7 +1197,7 @@ btnSupportSend && (btnSupportSend.onclick = () => {
   // סגירת חלון
   if (supportDialog && typeof supportDialog.close === "function") {
     supportDialog.close();
-
+  }
 });
 /* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
@@ -2306,8 +2306,8 @@ function setDocPreview(htmlStr){
 
   const styleText = Array.from(doc.querySelectorAll("style"))
     .map(s => s.textContent || "")
-    .join("
-");
+    .join("\n");
+
 
   const bodyInner = (doc.body && doc.body.innerHTML) ? doc.body.innerHTML : "";
 
@@ -2762,4 +2762,3 @@ tabLogin.click();
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </body>
 </html>
-
