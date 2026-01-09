@@ -129,8 +129,15 @@
       background:#fff;
       color:var(--text);
       width:min(680px,96vw);
+      max-width:96vw;
       max-height:90vh;              /* שלא יחרוג מגובה המסך */
       box-shadow:var(--card-shadow);
+      overflow:hidden;              /* שלא יגלוש אופקית */
+    }
+    dialog[open]{
+      position:fixed;
+      inset:0;
+      margin:auto;                  /* מרכז גם במובייל */
     }
     dialog::backdrop{
       background:rgba(9,14,22,.35);
@@ -146,10 +153,71 @@
     }
     .dlg-bd{
       padding:14px;
-      overflow:auto;               /* גלילה של התוכן בדיאלוג */
+      overflow:auto;                /* גלילה של התוכן בדיאלוג */
+      overflow-x:hidden;
+      -webkit-overflow-scrolling:touch;
+      max-height:calc(90vh - 56px); /* מפחית גובה כותרת */
     }
+   
+ @media(max-width:520px){
+  dialog{ width:94vw; }
+  .grid2{ grid-template-columns:1fr; }
+}
 
-    .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    /* התאמות מובייל – טבלאות בדיאלוגים */
+@media (max-width: 520px) {
+
+  dialog {
+    width: 94vw;
+    max-width: 94vw;
+  }
+
+  .dlg-bd {
+    overflow-x: hidden;
+  }
+
+  .dlg-bd table,
+  .dlg-bd thead,
+  .dlg-bd tbody,
+  .dlg-bd th,
+  .dlg-bd td,
+  .dlg-bd tr {
+    display: block;
+    width: 100%;
+  }
+
+  .dlg-bd thead {
+    display: none; /* מסתירים כותרות במובייל */
+  }
+
+  .dlg-bd tr {
+    margin-bottom: 12px;
+    border: 1px solid #e5e9f2;
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+  }
+
+  .dlg-bd td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border: none;
+    font-size: 13px;
+  }
+
+  .dlg-bd td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #5b6573;
+    margin-inline-end: 10px;
+    white-space: nowrap;
+  }
+}
+
+
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
     @media(max-width:640px){.grid2{grid-template-columns:1fr}}
     .footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:12px}
     .footer .left{display:flex;gap:10px;flex-wrap:wrap}
@@ -182,23 +250,8 @@
     .auth-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
     .auth-footer{margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center}
 
-    
-    /* יישור דיאלוגים למרכז + התאמה למובייל */
-    dialog{max-width:calc(100vw - 24px);}
-    dialog[open]{
-      position:fixed;
-      top:50%;
-      left:50%;
-      transform:translate(-50%,-50%);
-      margin:0;
-    }
-    @media(max-width:520px){
-      dialog{width:calc(100vw - 16px); border-radius:16px;}
-      .dlg-bd{max-height:calc(90vh - 64px);}
-    }
-
-
-    /* shell של האפליקציה */    #appShell{display:none;min-height:100vh}
+    /* shell של האפליקציה */    
+#appShell{display:none;min-height:100vh}
     header.app-header{
       position:sticky;top:0;z-index:10;
       backdrop-filter:saturate(1.1) blur(10px);
@@ -218,7 +271,33 @@
 
   body.logged-in #authScreen{display:none;}
   body.logged-in #appShell{display:block;}
-  </style>
+  
+/* --- תיקוני מובייל לדיאלוגים וטבלאות --- */
+dialog{
+  margin: auto;
+}
+@media(max-width:700px){
+  dialog{
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+  }
+  .dlg-bd{
+    padding:12px;
+  }
+}
+/* טבלת קטגוריות – לשמור על מבנה טבלה גם במובייל */
+#categoriesDialog .dlg-bd > div{
+  overflow-x:auto;
+}
+#categoriesDialog table{
+  min-width:560px;
+}
+#categoriesDialog th,#categoriesDialog td{
+  white-space:nowrap;
+  font-size:13px;
+}
+
+</style>
 </head>
 <body>
 
@@ -242,7 +321,7 @@
         <label for="authPassword">סיסמה</label>
         <input type="password" id="authPassword" minlength="6" required />
       </div>
-      <button class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
+      <button type="submit" class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
     </form>
 
     <div class="auth-footer">
@@ -264,8 +343,10 @@
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-        <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
-        <a class="btn secondary small" id="btnDevMail" href="mailto:azmaiplusapp@gmail.com">פנייה למפתח</a>
+                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+        <button class="btn secondary small" id="btnDocsOpen">מסמכים</button>
+<button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
+        <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
     </div>
@@ -298,7 +379,7 @@
               <datalist id="catsList"></datalist>
             </div>
 <div style="flex:3 1 250px">
-  <label>תיאור</label>
+  <label>קטגוריה</label>
   <input
     type="text"
     id="fDesc"
@@ -359,7 +440,14 @@
               <option value="expense">הוצאות</option>
             </select>
             <input type="month" id="qMonth" style="flex:1 1 150px" />
-            <select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
+                        <select id="qPeriod" style="flex:1 1 140px">
+              <option value="1">חודש</option>
+              <option value="2">חודשיים</option>
+              <option value="3">רבעון</option>
+              <option value="12">שנה</option>
+              <option value="0">כל התקופות</option>
+            </select>
+<select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
             <button class="btn small" id="btnReset">איפוס</button>
           </div>
 
@@ -388,8 +476,8 @@
               <tr>
                 <th>תאריך</th>
 <th>סוג</th>
-                <th>קטגוריה</th>
                 <th>תיאור</th>
+                <th>קטגוריה</th>
                 <th>סכום נטו</th>
                 <th>מע"מ</th>
                 <th>סכום כולל</th>
@@ -538,9 +626,112 @@
       <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים.</span>
     </div>
   </div>
+</dialog>
 
 <!-- דיאלוג פנייה למפתח -->
+<dialog id="supportDialog">
+  <div class="dlg-hd">
+    <div>פנייה למפתח</div>
+    <button class="btn secondary small" type="button" id="btnSupportClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <p class="hint" style="margin-top:0">
+      לכל בקשה, הוספת קטגוריה או תקלה — כתבו לנו ונחזור אליכם.
+    </p>
+    <form id="supportForm" onsubmit="return false;">
+      <div class="grid2">
+        <div><label>שם</label><input type="text" id="sName" readonly /></div>
+        <div><label>טלפון</label><input type="text" id="sPhone" readonly /></div>
+        <div style="grid-column:1 / -1"><label>אימייל</label><input type="email" id="sEmail" readonly /></div>
+        <div style="grid-column:1 / -1"><label>הודעה</label><textarea id="sMsg" rows="6" placeholder="כתבו כאן את הפנייה..."></textarea></div>
+      </div>
+      <div class="footer" style="margin-top:12px">
+        <div class="left"><button class="btn" id="btnSupportSend">שליחה</button></div>
+        <span class="hint" id="supportStatus"></span>
+      </div>
+    </form>
+  </div>
 </dialog>
+
+
+<!-- דיאלוג מסמכים -->
+<dialog id="docsDialog">
+  <div class="dlg-hd">
+    <div>הפקת מסמך חשבונאי</div>
+    <button class="btn secondary small" type="button" id="btnDocsClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <form id="docsForm" onsubmit="return false;">
+      <div class="grid2">
+        <div>
+          <label>סוג מסמך</label>
+          <select id="dType">
+            <option value="invoice">חשבונית מס</option>
+            <option value="invoice_receipt">חשבונית מס + קבלה</option>
+            <option value="receipt">קבלה</option>
+            <option value="deal_invoice">חשבונית עסקה</option>
+            <option value="credit_note">חשבונית זיכוי</option>
+            <option value="quote">הצעת מחיר</option>
+          </select>
+        </div>
+        <div>
+          <label>תאריך</label>
+          <input type="date" id="dDate" />
+        </div>
+        <div>
+          <label>לקוח</label>
+          <input type="text" id="dClientName" list="customersDatalist" placeholder="התחילי להקליד שם לקוח..." />
+          <input type="hidden" id="dClientId" value="" />
+          <datalist id="customersDatalist"></datalist>
+        </div>
+        <div>
+          <label>טלפון לקוח (אופציונלי)</label>
+          <input type="tel" id="dClientPhone" placeholder="05..." />
+          <label>ח.פ / עוסק מורשה (אופציונלי)</label>
+          <input type="text" id="dClientVatId" placeholder="לדוגמה: 123456789" />
+
+          <div class="row" style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+            <label class="chk" style="display:flex; align-items:center; gap:8px;">
+              <input type="checkbox" id="dSaveCustomer" checked />
+              שמור/עדכן כרטיס לקוח
+            </label>
+            <button class="btn" id="btnCustomerCard" type="button">כרטיס לקוח</button>
+          </div>
+
+        </div>
+        <div>
+          <label>תיאור</label>
+          <input type="text" id="dDesc" placeholder="שירות / מוצר" />
+        </div>
+        <div>
+          <label>סכום (₪)</label>
+          <input type="number" step="0.01" id="dAmount" placeholder="0" />
+        </div>
+        <div class="pill" style="align-self:end">
+          <input type="checkbox" id="dIncVat" checked />
+          <label for="dIncVat">סכום כולל מע&quot;מ</label>
+        </div>
+      </div>
+
+      <div class="footer" style="margin-top:12px">
+        <div class="left">
+          <button class="btn" id="btnDocCreate">הפקה</button>
+          <button class="btn secondary" id="btnDocEmail">שליחה במייל</button>
+          <button class="btn secondary" id="btnDocWhatsapp">שליחה בווטסאפ</button>
+        </div>
+        <span class="hint" id="docsStatus"></span>
+      </div>
+
+      <div class="card" style="margin-top:12px;border-radius:14px">
+        <div class="hd"><div>תצוגה מקדימה</div></div>
+        <div class="bd" style="overflow:auto;max-height:45vh">
+          <div id="docPreview" class="muted">מלאי פרטים ולחצי על "הפקה" כדי לראות תצוגה.</div>
+        </div>
+      </div>
+    </form>
+  </div>
+</dialog>
+
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -559,7 +750,10 @@ import {
   getFirestore,
   doc,
   setDoc,
-  getDoc
+  getDoc,
+  collection,
+  addDoc,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 /* -----  הכניסי את הפרטים שלך  ----- */
@@ -576,10 +770,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-
-// כתובת המייל של המפתח/תמיכה (אפשר לשנות)
-const DEVELOPER_EMAIL = "support@azmaiplus.app";
 
 /* ----------------------------------------------------------
    2) בחירת אלמנטים מה־DOM
@@ -618,16 +808,93 @@ const btnCategoriesClose = document.getElementById("btnCategoriesClose");
 const catTbody = document.getElementById("catTbody");
 
 
-/* פנייה למפתח */
-const devName     = document.getElementById("devName");
-const devPhone    = document.getElementById("devPhone");
-const btnDevSend  = document.getElementById("btnDevSend");
-const devStatus   = document.getElementById("devStatus");
+/* כפתור פנייה למפתח */
+const btnSupportOpen = document.getElementById("btnSupportOpen");
+const supportDialog  = document.getElementById("supportDialog");
+const btnSupportClose= document.getElementById("btnSupportClose");
+const sName   = document.getElementById("sName");
+const sPhone  = document.getElementById("sPhone");
+const sEmail  = document.getElementById("sEmail");
+const sMsg    = document.getElementById("sMsg");
+const btnSupportSend = document.getElementById("btnSupportSend");
+const supportStatus  = document.getElementById("supportStatus");
 
 /* כפתור דוחות */
 const btnReportsOpen = document.getElementById("btnReportsOpen");
 const reportsDialog = document.getElementById("reportsDialog");
 const btnReportsClose = document.getElementById("btnReportsClose");
+/* כפתור מע"מ */
+const btnVatLink = document.getElementById("btnVatLink");
+
+/* מסמכים */
+const btnDocsOpen  = document.getElementById("btnDocsOpen");
+const docsDialog   = document.getElementById("docsDialog");
+const btnDocsClose = document.getElementById("btnDocsClose");
+const docsStatus   = document.getElementById("docsStatus");
+const docPreview   = document.getElementById("docPreview");
+const dType        = document.getElementById("dType");
+const dDate        = document.getElementById("dDate");
+const dClientName  = document.getElementById("dClientName");
+const dClientPhone = document.getElementById("dClientPhone");
+
+const dClientId    = document.getElementById("dClientId");
+const dClientVatId = document.getElementById("dClientVatId");
+const dSaveCustomer= document.getElementById("dSaveCustomer");
+const btnCustomerCard = document.getElementById("btnCustomerCard");
+const customersDatalist = document.getElementById("customersDatalist");
+
+// ---- כרטיסי לקוח ----
+function lsKeyCustomers(uid){ return `customers_${uid}`; }
+function lsKeyDocs(uid){ return `docs_${uid}`; }
+function getCustomers(uid){
+  try { return JSON.parse(localStorage.getItem(lsKeyCustomers(uid)) || "[]"); } catch { return []; }
+}
+function saveCustomers(uid, list){
+  localStorage.setItem(lsKeyCustomers(uid), JSON.stringify(list || []));
+  renderCustomersDatalist();
+  renderCustomerCardSelect();
+}
+function getDocs(uid){
+  try { return JSON.parse(localStorage.getItem(lsKeyDocs(uid)) || "[]"); } catch { return []; }
+}
+function saveDocs(uid, list){
+  localStorage.setItem(lsKeyDocs(uid), JSON.stringify(list || []));
+}
+function upsertCustomer(uid, cust){
+  const list = getCustomers(uid);
+  const i = list.findIndex(x => x.id === cust.id);
+  if (i >= 0) list[i] = { ...list[i], ...cust };
+  else list.push(cust);
+  saveCustomers(uid, list);
+  return cust;
+}
+function findCustomerByName(uid, name){
+  const n = (name || "").trim().toLowerCase();
+  if (!n) return null;
+  return getCustomers(uid).find(c => (c.name || "").trim().toLowerCase() === n) || null;
+}
+function renderCustomersDatalist(){
+  if (!customersDatalist || !currentUid) return;
+  const list = getCustomers(currentUid);
+  customersDatalist.innerHTML = list.map(c => `<option value="${escapeHtml(c.name)}"></option>`).join("");
+}
+function fillFromCustomer(c){
+  if (!c) return;
+  if (dClientName) dClientName.value = c.name || "";
+  if (dClientPhone) dClientPhone.value = c.phone || "";
+  if (dClientVatId) dClientVatId.value = c.vatId || "";
+  if (dClientId) dClientId.value = c.id || "";
+}
+
+const dDesc        = document.getElementById("dDesc");
+const dAmount      = document.getElementById("dAmount");
+const dIncVat      = document.getElementById("dIncVat");
+const btnDocCreate = document.getElementById("btnDocCreate");
+const btnDocEmail  = document.getElementById("btnDocEmail");
+const btnDocWhatsapp = document.getElementById("btnDocWhatsapp");
+let lastDocTextForShare = "";
+let lastDocHtml = "";
+
 
 /* יציאה */
 const btnLogout = document.getElementById("btnLogout");
@@ -656,30 +923,53 @@ tabRegister.onclick = () => {
 /* ----------------------------------------------------------
    4) התחברות / הרשמה
 ---------------------------------------------------------- */
-authForm.onsubmit = async (e) => {
-  e.preventDefault();
+/* ----------------------------------------------------------
+   4) התחברות / הרשמה - תיקון באג התחברות
+---------------------------------------------------------- */
+async function handleAuth(e) {
+  if (e) e.preventDefault(); // מניעת רענון דף בכל מקרה
+  
   authError.textContent = "";
   authSubmitBtn.disabled = true;
+  authSubmitBtn.textContent = "מתחבר...";
 
   const email = authEmail.value.trim();
-  const pass = authPassword.value.trim();
+  const pass  = authPassword.value.trim();
 
-  try {
-    let userCred;
-
-    if (authMode === "login") {
-      userCred = await signInWithEmailAndPassword(auth, email, pass);
-    } else {
-      userCred = await createUserWithEmailAndPassword(auth, email, pass);
-      await createDefaultProfile(userCred.user.uid, email);
-    }
-
-  } catch (err) {
-    authError.textContent = err.message;
+  if (!email || !pass) {
+    authError.textContent = "נא להזין אימייל וסיסמה";
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = authMode === "login" ? "התחברות" : "הרשמה";
+    return;
   }
 
-  authSubmitBtn.disabled = false;
-};
+  try {
+    if (authMode === "login") {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } else {
+      const userCred = await createUserWithEmailAndPassword(auth, email, pass);
+      await createDefaultProfile(userCred.user.uid, email);
+    }
+    // onAuthStateChanged יטפל במעבר למסך האפליקציה
+  } catch (err) {
+    console.error("Auth error:", err);
+    // תרגום שגיאות נפוצות של פיירבייס לעברית
+    if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+      authError.textContent = "פרטי התחברות שגויים. בדקי את המייל והסיסמה.";
+    } else if (err.code === 'auth/invalid-email') {
+      authError.textContent = "כתובת האימייל אינה תקינה.";
+    } else {
+      authError.textContent = "שגיאה: " + err.message;
+    }
+  } finally {
+    authSubmitBtn.disabled = false;
+    authSubmitBtn.textContent = authMode === "login" ? "התחברות" : "הרשמה";
+  }
+}
+
+// עדכון ה-Listeners בצורה בטוחה יותר:
+authForm.onsubmit = handleAuth; // זה יתפוס גם לחיצה על כפתור וגם Enter
+authSubmitBtn.onclick = handleAuth;
 
 /* ----------------------------------------------------------
    5) יצירת פרופיל ברירת מחדל למשתמש חדש
@@ -701,24 +991,33 @@ async function createDefaultProfile(uid, email) {
 /* ----------------------------------------------------------
    6) ניטור התחברות – הצגת המסך הנכון
 ---------------------------------------------------------- */
+
 // מצב התחלתי: לא מחובר
 document.body.classList.remove("logged-in");
 
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    // לא מחובר
+  try {
+    if (!user) {
+      document.body.classList.remove("logged-in");
+      currentUid = null;
+      return;
+    }
+
+    // קודם כל להציג אפליקציה מיד
+    document.body.classList.add("logged-in");
+    userEmailTag.textContent = user.email || "";
+
+    // ואז לטעון נתונים
+    await loadUserProfile(user.uid);
+    initAppLogic(user.uid);
+
+  } catch (err) {
+    console.error("onAuthStateChanged error:", err);
+    authError.textContent = "שגיאה בטעינת המשתמש. בדקי Console.";
     document.body.classList.remove("logged-in");
-    currentUid = null;
-    return;
   }
-
-  // מחובר
-  document.body.classList.add("logged-in");
-  userEmailTag.textContent = user.email || "";
-
-  await loadUserProfile(user.uid);
-  initAppLogic(user.uid);
 });
+
 /* ----------------------------------------------------------
    7) פרופיל משתמש – טעינה ויישום להגדרות המערכת
 ---------------------------------------------------------- */
@@ -750,6 +1049,7 @@ const btnQuickToday = document.getElementById("btnQuickToday");
 const qText      = document.getElementById("qText");
 const qType      = document.getElementById("qType");
 const qMonth     = document.getElementById("qMonth");
+const qPeriod    = document.getElementById("qPeriod");
 const qCategory  = document.getElementById("qCategory");
 const btnReset   = document.getElementById("btnReset");
 const btnPrev    = document.getElementById("btnPrev");
@@ -786,42 +1086,18 @@ const btnReportCsv = document.getElementById("btnReportCsv");
 const btnReportPdf = document.getElementById("btnReportPdf");
 
 /* סגירת דיאלוגים */
-btnProfileClose.onclick   = () => profileDialog.close();
+btnProfileClose.onclick   = () => {
+  if (profileDialog.dataset.required === "1") return;
+  profileDialog.close();
+};
 btnCategoriesClose.onclick = () => categoriesDialog.close();
 btnReportsClose.onclick   = () => reportsDialog.close();
 btnEditClose.onclick      = () => editDialog.close();
 
-
-
-/* פנייה למפתח */
-};
-
-btnDevSend.onclick = () => {
-  const body = [
-    `שם: ${devName.value || ""}`,
-    `טלפון: ${devPhone.value || ""}`,
-    `UID: ${currentUid || ""}`,
-    "",
-  ].join("
-");
-
-  const subject = "פנייה מהאפליקציה — עצמאי פלוס";
-  const mailto =
-    `mailto:${encodeURIComponent(DEVELOPER_EMAIL)}` +
-    `?subject=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-
-  // פתיחה של אפליקציית מייל
-  window.location.href = mailto;
-  devStatus.textContent = "נפתחה הודעת מייל ✅";
-};
-
-/* פנייה למפתח */
-  devStatus.textContent = "";
-  devName.value  = userProfile?.displayName || "";
-  devPhone.value = userProfile?.phone || "";
-};
-
+// למנוע סגירת פרופיל בזמן שחובה למלא
+profileDialog.addEventListener("cancel", (ev) => {
+  if (profileDialog.dataset.required === "1") ev.preventDefault();
+});
 
 /* פתיחת דיאלוגים */
 btnProfileOpen.onclick    = () => {
@@ -837,8 +1113,116 @@ btnReportsOpen.onclick    = () => {
   rType.value = "income";
   reportsDialog.showModal();
 };
+btnDocsClose.onclick = () => docsDialog.close();
+btnDocsOpen.onclick = () => {
+  docsStatus.textContent = "";
+  if (!dDate.value) dDate.value = todayStr();
+  // התאמה לעוסק פטור: אין מע"מ
+  if ((userProfile?.businessType || "ptor") === "ptor") {
+    dIncVat.checked = false;
+    dIncVat.disabled = true;
+    // חשבונית מס/מס+קבלה לא רלוונטי – נציג רמז
+    if (dType.value === "invoice" || dType.value === "invoice_receipt") {
+      dType.value = "receipt";
+    }
+  } else {
+    dIncVat.disabled = false;
+  }
+  docsDialog.showModal();
+};
+
 btnLogout.onclick = () => signOut(auth);
 
+/* ----------------------------------------------------------
+   פנייה למפתח (נשלח ב-mailto)
+---------------------------------------------------------- */
+
+/* לשנות למייל האמיתי של התמיכה */
+const SUPPORT_EMAIL = "azmaiplusapp@gmail.com";
+
+function fillSupportForm() {
+  const name  = userProfile?.displayName || "";
+  const phone = userProfile?.phone || "";
+  const email = userProfile?.email || auth.currentUser?.email || "";
+
+  if (sName)  sName.value  = name;
+  if (sPhone) sPhone.value = phone;
+  if (sEmail) sEmail.value = email;
+  if (supportStatus) supportStatus.textContent = "";
+}
+
+btnSupportClose && (btnSupportClose.onclick = () => supportDialog.close());
+
+btnSupportOpen && (btnSupportOpen.onclick = () => {
+  fillSupportForm();
+  if (sMsg) sMsg.value = "";
+  supportDialog.showModal();
+});
+
+btnSupportSend && (btnSupportSend.onclick = async () => {
+  const msg = (supportMsg?.value || "").trim();
+  if (!msg) { alert("נא לכתוב את תוכן הפנייה"); return; }
+
+  // נשלח מייל אוטומטי דרך Firebase Extension: Trigger Email (firestore-send-email)
+  // התוסף מאזין לקולקשן בשם "mail" (ברירת מחדל) ושולח את המייל.
+  try {
+    const fromName  = userProfile?.fullName || userProfile?.name || "";
+    const fromEmail = userProfile?.email || "";
+    const fromPhone = userProfile?.phone || "";
+    const bizName   = userProfile?.businessName || "";
+    const bizId     = userProfile?.businessId || userProfile?.vatId || userProfile?.taxId || "";
+
+    const subject = `פנייה למפתח – ${bizName || fromName || fromEmail || "משתמש"}${bizId ? " ("+bizId+")" : ""}`;
+
+    const textBody =
+`פנייה למפתח
+================
+שם: ${fromName}
+אימייל: ${fromEmail}
+טלפון: ${fromPhone}
+עסק: ${bizName}
+מספר עוסק/ח.פ: ${bizId}
+
+הודעה:
+${msg}
+`;
+
+    const htmlBody =
+      `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif">
+        <h2 style="margin:0 0 10px">פנייה למפתח</h2>
+        <p style="margin:0 0 6px"><b>שם:</b> ${escapeHtml(fromName)}</p>
+        <p style="margin:0 0 6px"><b>אימייל:</b> ${escapeHtml(fromEmail)}</p>
+        <p style="margin:0 0 6px"><b>טלפון:</b> ${escapeHtml(fromPhone)}</p>
+        <p style="margin:0 0 6px"><b>עסק:</b> ${escapeHtml(bizName)}</p>
+        <p style="margin:0 0 14px"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</p>
+        <pre style="white-space:pre-wrap;background:#f6f7fb;border:1px solid #e6e8ef;border-radius:12px;padding:12px;margin:0">${escapeHtml(msg)}</pre>
+      </div>`;
+
+    await addDoc(collection(db, "mail"), {
+      to: SUPPORT_EMAIL,                 // אפשר גם מערך כתובות
+      replyTo: fromEmail || undefined,   // כדי שתוכלי להשיב ישירות לפונה
+      createdAt: serverTimestamp(),
+      meta: {
+        uid: currentUid || null,
+        fromName, fromEmail, fromPhone,
+        businessName: bizName,
+        businessId: bizId
+      },
+      message: {
+        subject,
+        text: textBody,
+        html: htmlBody
+      }
+    });
+
+    supportMsg.value = "";
+    alert("הפנייה נשלחה. נחזור אליך בהקדם 🙏");
+    supportModal?.classList.remove("open");
+  } catch (err) {
+    console.error("Support send failed:", err);
+    alert("לא הצלחנו לשלוח כרגע. נסי שוב בעוד רגע.");
+  }
+});
 /* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
 ---------------------------------------------------------- */
@@ -902,10 +1286,10 @@ const EXPENSE_ITEMS = [
   { item: "קרן השתלמות",              category: "קרן השתלמות",                 incomeTaxPct: 0,   vatAllowed: false },
   { item: "ביטוח לאומי",              category: "תשלומי חובה",                  incomeTaxPct: 100, vatAllowed: false },
 
-  { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  }
-  ,{ item: "ציוד (כללי)",               category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true  },
-  { item: "שירותי פרילנס / קבלן משנה", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  },
-  { item: "קבלן משנה / שירות חיצוני",  category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  }
+  { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  },
+
+  { item: "ציוד (כללי)",                 category: "ציוד",                         incomeTaxPct: 100, vatAllowed: true  },
+  { item: "קבלני משנה / שירותים חיצוניים", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  }
 ];
 
 /* טבלת הקטגוריות בדיאלוג */
@@ -947,6 +1331,18 @@ function todayStr() {
   const d = new Date();
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
+
+function monthStartEndFrom(baseMonth, monthsBack) {
+  // baseMonth: YYYY-MM (חודש "עוגן" – נכלול עד סוף החודש הזה)
+  const [y, m] = baseMonth.split("-").map(Number);
+  const end = new Date(y, m, 0); // היום האחרון בחודש
+  const start = new Date(y, m-1, 1);
+  start.setMonth(start.getMonth() - (monthsBack - 1));
+  const startStr = `${start.getFullYear()}-${pad(start.getMonth()+1)}-01`;
+  const endStr = `${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`;
+  return { startStr, endStr };
+}
+
 function monthFromDateStr(s) {
   return s ? s.slice(0, 7) : "";
 }
@@ -1013,6 +1409,27 @@ function applyProfileToUI() {
   }
 }
 
+
+function isProfileComplete(p) {
+  if (!p) return false;
+  // מינימום נדרש לבטא: שם עסק + מספר עוסק/ח"פ + סוג עוסק
+  return !!(String(p.businessName || "").trim()) &&
+         !!(String(p.businessId || "").trim()) &&
+         !!(String(p.businessType || "").trim());
+}
+
+function enforceProfileRequired() {
+  if (!currentUid) return;
+  if (isProfileComplete(userProfile)) {
+    profileDialog.dataset.required = "0";
+    profileStatus.textContent = "";
+    return;
+  }
+  profileDialog.dataset.required = "1";
+  profileStatus.textContent = `כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).`;
+  profileDialog.showModal();
+}
+
 async function loadUserProfile(uid) {
   currentUid = uid;
   const ref = doc(db, "users", uid);
@@ -1054,6 +1471,11 @@ btnSaveProfile.onclick = async () => {
     await setDoc(ref, payload, { merge: true });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
+    // אם הפרופיל היה חובה – לאפשר המשך
+    if (profileDialog.dataset.required === "1" && isProfileComplete(userProfile)) {
+      profileDialog.dataset.required = "0";
+      profileDialog.close();
+    }
     applyProfileToUI();
     // לעדכן גם את הסיכומים
     render();
@@ -1124,6 +1546,24 @@ async function saveToCloud() {
   }
 }
 
+let _cloudSaveTimer = null;
+function scheduleCloudSave(){
+  if (!_cloudSaveTimer) {
+    // no-op, just here so clearTimeout below is safe
+  }
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = setTimeout(() => {
+    _cloudSaveTimer = null;
+    saveToCloudDebounced();
+  }, 800);
+}
+
+
+let cloudSaveTimer = null;
+function saveToCloudDebounced() {
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => { saveToCloud(); }, 400);
+}
 async function loadFromCloudFirst() {
   if (!currentUid) { rows = []; return; }
   try {
@@ -1155,33 +1595,22 @@ async function loadFromCloudFirst() {
 ---------------------------------------------------------- */
 
 function uniqueCategories() {
-  const s = new Set(rows.map(r => r.desc).filter(Boolean));
+  const s = new Set(rows.map(r => r.category).filter(Boolean));
   return Array.from(s).sort((a, b) => a.localeCompare(b, "he"));
-}
-
-function allCategoryGroups() {
-  // "תיאור" (קטגוריה כללית) מגיע מהשורות ומהטבלה הסטטית
-  const s = new Set();
-  rows.forEach(r => { if (r.desc) s.add(r.desc); });
-  EXPENSE_ITEMS.forEach(x => { if (x.category) s.add(x.category); });
-  return Array.from(s).sort((a,b) => a.localeCompare(b,"he"));
 }
 
 function updateFiltersUI() {
   const dl = document.getElementById("catsList");
-  const cats = allCategoryGroups();
-
   if (dl) {
-    dl.innerHTML = cats
+    dl.innerHTML = uniqueCategories()
       .map(c => `<option value="${escapeHtml(c)}"></option>`)
       .join("");
   }
-
   const current = qCategory.value;
-  qCategory.innerHTML =
-    `<option value="">כל הקטגוריות</option>` +
-    cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-
+  qCategory.innerHTML = `<option value="">כל הקטגוריות</option>` +
+    uniqueCategories().map(c =>
+      `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
+    ).join("");
   if (current) qCategory.value = current;
 }
 
@@ -1189,6 +1618,7 @@ function queryRows() {
   const text = (qText.value || "").trim().toLowerCase();
   const type = qType.value;
   const month = qMonth.value;
+  const period = qPeriod ? qPeriod.value : "1";
   const cat = qCategory.value;
 
   let out = rows.slice();
@@ -1202,11 +1632,13 @@ function queryRows() {
   if (type !== "all") {
     out = out.filter(r => r.type === type);
   }
-  if (month) {
-    out = out.filter(r => monthFromDateStr(r.date) === month);
+  if (month && period !== "0") {
+    const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+    const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
+    out = out.filter(r => r.date >= startStr && r.date <= endStr);
   }
   if (cat) {
-    out = out.filter(r => r.desc === cat);
+    out = out.filter(r => r.category === cat);
   }
   // תאריך יורד
   out.sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
@@ -1305,7 +1737,16 @@ function render() {
   const m = qMonth.value || monthFromDateStr(todayStr());
   if (m) {
     const [y, mm] = m.split("-");
-    periodLabel.textContent = `חודש: ${mm}/${y}`;
+    const period = qPeriod ? qPeriod.value : "1";
+    if (period === "0") {
+      periodLabel.textContent = "תקופה: כל התקופות";
+    } else {
+      const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+      const { startStr, endStr } = monthStartEndFrom(m, monthsBack);
+      periodLabel.textContent = monthsBack === 1
+        ? `חודש: ${mm}/${y}`
+        : `תקופה: ${startStr} עד ${endStr}`;
+    }
   }
 }
 
@@ -1316,9 +1757,8 @@ function render() {
 function addRow() {
   const date = fDate.value || todayStr();
   const type = fType.value;
-  // לפי הממשק: "קטגוריה" = פריט ספציפי (דלק/CANVA וכו׳), "תיאור" = קטגוריה כללית (רכב/תוכנות וכו׳)
-  const category = (fDesc.value || "").trim();
-  const desc = (fCategory.value || "").trim();
+  const category = (fCategory.value || "").trim();
+  const desc = (fDesc.value || "").trim();
   const amount = parseFloat(fAmount.value || "0");
   const incVat = !!fIncVAT.checked;
   const deductPct = Math.max(0, Math.min(100, parseFloat(fDeduct.value || "100")));
@@ -1334,7 +1774,7 @@ function addRow() {
 
   rows.push({ id, date, type, category, desc, amount, incVat, deductPct });
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   fDesc.value = "";
   fAmount.value = "";
   render();
@@ -1349,8 +1789,8 @@ function openEdit(id) {
   editingId = id;
   eDate.value = r.date;
   eType.value = r.type;
-  eCategory.value = r.desc || "";
-  eDesc.value = r.category || "";
+  eCategory.value = r.category || "";
+  eDesc.value = r.desc || "";
   eAmount.value = r.amount;
   eIncVAT.checked = !!r.incVat;
   eDeduct.value = r.deductPct ?? 100;
@@ -1364,14 +1804,14 @@ function saveEdit() {
 
   r.date = eDate.value;
   r.type = eType.value;
-  r.desc = eCategory.value;
-  r.category = eDesc.value;
+  r.category = eCategory.value;
+  r.desc = eDesc.value;
   r.amount = parseFloat(eAmount.value || "0");
   r.incVat = !!eIncVAT.checked;
   r.deductPct = Math.max(0, Math.min(100, parseFloat(eDeduct.value || "100")));
 
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   render();
   editDialog.close();
 }
@@ -1380,7 +1820,7 @@ function deleteRow() {
   if (!confirm("למחוק את התנועה?")) return;
   rows = rows.filter(x => x.id !== editingId);
   saveToLocal();
-  saveToCloud();
+  scheduleCloudSave();
   render();
   editDialog.close();
 }
@@ -1419,65 +1859,71 @@ function exportJSON() {
 }
 
 function exportPDF() {
-  // הדפסה/ייצוא של הסיכומים בלבד (ולא כל המסך)
-  const list = queryRows();
-  const sum = summarize(list);
-  const period = (qMonth.value || monthFromDateStr(todayStr()));
+  if (!currentUid) return;
+
+  const list = queryRows();              // לפי הפילטרים שבמסך
+  const sum  = summarize(list);
+  const { vatEnabled, vatRate } = getSettings();
+
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+  const display = userProfile?.displayName || "";
+  const email   = userProfile?.email || auth.currentUser?.email || "";
+  const now     = new Date().toLocaleString("he-IL");
+
   const title = "סיכומים — עצמאי פלוס";
 
-  const businessName = userProfile?.businessName || "";
-  const businessId   = userProfile?.businessId || "";
-  const displayName  = userProfile?.displayName || "";
-  const email        = userProfile?.email || auth.currentUser?.email || "";
-
   const html = `
-    <!DOCTYPE html>
-    <html lang="he" dir="rtl">
-    <head>
-      <meta charset="UTF-8">
-      <title>${title}</title>
-      <style>
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:18px;font-size:13px}
-        h1{margin:0 0 6px;font-size:18px}
-        .meta{color:#475569;margin:0 0 12px}
-        .box{border:1px solid #e5e9f2;border-radius:12px;padding:12px;margin-top:10px}
-        table{width:100%;border-collapse:collapse;margin-top:8px}
-        th,td{border:1px solid #e5e9f2;padding:8px;text-align:right}
-        th{background:#f0f2f7}
-      </style>
-    </head>
-    <body>
-      <h1>${title}</h1>
-      <p class="meta">
-        תקופה: ${period || ""}<br>
-        ${businessName ? `שם עסק: ${escapeHtml(businessName)}<br>` : ""}
-        ${businessId ? `מספר עוסק/ח.פ: ${escapeHtml(businessId)}<br>` : ""}
-        ${displayName ? `שם: ${escapeHtml(displayName)}<br>` : ""}
-        ${email ? `אימייל: ${escapeHtml(email)}` : ""}
-      </p>
-
-      <div class="box">
-        <table>
-          <thead>
-            <tr>
-              <th>מדד</th>
-              <th>סכום</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td>סה"כ הכנסות (כולל)</td><td>${toMoney(sum.incGross)}</td></tr>
-            <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
-            <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
-            <tr><td>מע"מ עסקאות</td><td>${toMoney(sum.incVat)}</td></tr>
-            <tr><td>מס תשומות (משוער)</td><td>${toMoney(sum.expVat)}</td></tr>
-            <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
-          </tbody>
-        </table>
+  <!DOCTYPE html>
+  <html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+      h1{margin:0 0 8px;font-size:18px}
+      .meta{color:#555;margin-bottom:14px}
+      table{border-collapse:collapse;width:100%;margin-top:10px}
+      th,td{border:1px solid #ccc;padding:8px 10px;text-align:right}
+      th{background:#f0f2f7}
+      .row{display:flex;gap:10px;flex-wrap:wrap}
+      .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 0}
+    </style>
+  </head>
+  <body>
+    <h1>סיכומי תקופה</h1>
+    <div class="meta">
+      <div class="row">
+        ${bizName ? `<span class="pill"><b>שם העסק:</b> ${escapeHtml(bizName)}</span>` : ""}
+        ${bizId ? `<span class="pill"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</span>` : ""}
+        ${display ? `<span class="pill"><b>שם:</b> ${escapeHtml(display)}</span>` : ""}
+        ${email ? `<span class="pill"><b>אימייל:</b> ${escapeHtml(email)}</span>` : ""}
+        <span class="pill"><b>נוצר:</b> ${escapeHtml(now)}</span>
       </div>
+      <div style="margin-top:6px">מע"מ: ${vatEnabled ? "פעיל" : "כבוי"} ${vatEnabled ? `(אחוז: ${vatRate}%)` : ""}</div>
+    </div>
 
-      <script>window.print();</script>
-    </body>
-    </html>
+    <table>
+      <thead>
+        <tr>
+          <th>מדד</th>
+          <th>סכום</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>סה"כ הכנסות (כולל)</td><td>${toMoney(sum.incGross)}</td></tr>
+        <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
+        <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
+        <tr><td>מע"מ עסקאות</td><td>${toMoney(sum.incVat)}</td></tr>
+        <tr><td>מס תשומות (משוער)</td><td>${toMoney(sum.expVat)}</td></tr>
+        <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
+        <tr><td>בסיס רווח לצרכי מס (נטו, משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
+      </tbody>
+    </table>
+
+    
+  </body>
+  </html>
   `;
 
   const w = window.open("", "_blank");
@@ -1583,75 +2029,576 @@ btnReportPdf.onclick = () => {
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  // רווח והפסד
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+  const created = new Date().toLocaleString("he-IL");
+
+  const rangeText = (from || to)
+    ? `טווח: ${from || "—"} עד ${to || "—"}`
+    : `טווח: כל התאריכים`;
+
+  // דו"ח רווח והפסד – PDF
   if (type === "pnl") {
-    const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
-    const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
+    const incomeList  = filterByDateAndType("income",  from, to);
+    const expenseList = filterByDateAndType("expense", from, to);
+
+    const { totals: incTotals } = addVatInfo(incomeList);
+    const { totals: expTotals } = addVatInfo(expenseList);
+
+    const profitNet   = incTotals.net   - expTotals.net;
+    const profitGross = incTotals.gross - expTotals.gross;
+
+    const title = 'דו"ח רווח והפסד';
 
     const html = `
+      <!DOCTYPE html>
       <html lang="he" dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>${title}</title>
+        <style>
+          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+          h1{margin:0 0 6px;font-size:20px}
+          .meta{color:#555;margin-bottom:14px;line-height:1.6}
+          table{border-collapse:collapse;width:100%;margin-top:12px}
+          th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
+          th{background:#f0f2f7}
+        </style>
+      </head>
       <body>
-        <h1>דוח רווח והפסד</h1>
-        <p>סה"כ הכנסות: ${toMoney(inc.gross)}</p>
-        <p>סה"כ הוצאות: ${toMoney(exp.gross)}</p>
-        <p><b>רווח: ${toMoney(inc.gross - exp.gross)}</b></p>
+        <h1>${title}</h1>
+        <div class="meta">
+          ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
+          ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+          <div><b>${escapeHtml(rangeText)}</b></div>
+          <div>הופק: ${escapeHtml(created)}</div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>סעיף</th>
+              <th>נטו (לפני מע"מ)</th>
+              <th>מע"מ</th>
+              <th>סה"כ כולל מע"מ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>סה"כ הכנסות</td>
+              <td>${toMoney(incTotals.net)}</td>
+              <td>${toMoney(incTotals.vat)}</td>
+              <td>${toMoney(incTotals.gross)}</td>
+            </tr>
+            <tr>
+              <td>סה"כ הוצאות</td>
+              <td>${toMoney(expTotals.net)}</td>
+              <td>${toMoney(expTotals.vat)}</td>
+              <td>${toMoney(expTotals.gross)}</td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold">רווח לפני מס (נטו)</td>
+              <td style="font-weight:bold">${toMoney(profitNet)}</td>
+              <td></td>
+              <td></td>
+            </tr>
+            <tr>
+              <td style="font-weight:bold">רווח כולל מע"מ (כולל)</td>
+              <td style="font-weight:bold">${toMoney(profitGross)}</td>
+              <td></td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+
+        
       </body>
       </html>
     `;
 
-    const w = window.open();
+    const w = window.open("", "_blank");
     w.document.write(html);
     w.document.close();
-    w.print();
+    w.focus();
     return;
   }
 
+  // דו"ח הכנסות / הוצאות מפורט
   const list = filterByDateAndType(type, from, to);
-  if (!list.length) return alert("אין נתונים");
+  if (!list.length) {
+    alert("אין נתונים לטווח שנבחר");
+    return;
+  }
 
-  const { rows: data, totals } = addVatInfo(list);
+  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
+  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
 
-  const html = `
+  let html = `
+    <!DOCTYPE html>
     <html lang="he" dir="rtl">
+    <head>
+      <meta charset="UTF-8">
+      <title>${title}</title>
+      <style>
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+        h1{margin:0 0 6px;font-size:20px}
+        .meta{color:#555;margin-bottom:14px;line-height:1.6}
+        table{border-collapse:collapse;width:100%}
+        th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
+        th{background:#f0f2f7}
+      </style>
+    </head>
     <body>
-      <h1>${type === "income" ? "דוח הכנסות" : "דוח הוצאות"}</h1>
-      <table border="1" cellpadding="6">
-        <tr>
-          <th>תאריך</th><th>קטגוריה</th><th>תיאור</th>
-          <th>נטו</th><th>מע"מ</th><th>כולל</th>
-        </tr>
-        ${data.map(r => `
+      <h1>${title}</h1>
+      <div class="meta">
+        ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
+        ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+        <div><b>${escapeHtml(rangeText)}</b></div>
+        <div>הופק: ${escapeHtml(created)}</div>
+      </div>
+
+      <table>
+        <thead>
           <tr>
-            <td>${r.date}</td>
-            <td>${escapeHtml(r.category || "")}</td>
-            <td>${escapeHtml(r.desc || "")}</td>
-            <td>${toMoney(r.net)}</td>
-            <td>${toMoney(r.vat)}</td>
-            <td>${toMoney(r.gross)}</td>
+            <th>תאריך</th>
+            <th>תיאור</th>
+            <th>קטגוריה</th>
+            <th>נטו (לפני מע"מ)</th>
+            <th>מע"מ</th>
+            <th>סה"כ כולל מע"מ</th>
           </tr>
-        `).join("")}
-        <tr>
-          <td colspan="3"><b>סה"כ</b></td>
-          <td><b>${toMoney(totals.net)}</b></td>
-          <td><b>${toMoney(totals.vat)}</b></td>
-          <td><b>${toMoney(totals.gross)}</b></td>
-        </tr>
+        </thead>
+        <tbody>
+  `;
+
+  rowsWithAmounts.forEach(r => {
+    html += `
+      <tr>
+        <td>${r.date}</td>
+        <td>${escapeHtml(r.category || "")}</td>
+        <td>${escapeHtml(r.desc || "")}</td>
+        <td>${toMoney(r.net)}</td>
+        <td>${toMoney(r.vat)}</td>
+        <td>${toMoney(r.gross)}</td>
+      </tr>
+    `;
+  });
+
+  html += `
+      <tr>
+        <td colspan="3" style="font-weight:bold">סה"כ</td>
+        <td style="font-weight:bold">${toMoney(totals.net)}</td>
+        <td style="font-weight:bold">${toMoney(totals.vat)}</td>
+        <td style="font-weight:bold">${toMoney(totals.gross)}</td>
+      </tr>
+        </tbody>
       </table>
+
+      
     </body>
     </html>
   `;
 
-  const w = window.open();
+  const w = window.open("", "_blank");
   w.document.write(html);
   w.document.close();
-  w.print();
+  w.focus();
 };
 /* ----------------------------------------------------------
    16) חיבור מאזינים והתחלת האפליקציה לאחר התחברות
 ---------------------------------------------------------- */
 
+
+function docTypeLabel(t){
+  return {
+    invoice: "חשבונית מס",
+    invoice_receipt: "חשבונית מס + קבלה",
+    receipt: "קבלה",
+    deal_invoice: "חשבונית עסקה",
+    credit_note: "חשבונית זיכוי",
+    quote: "הצעת מחיר"
+  }[t] || "מסמך";
+}
+
+function canIssueTaxInvoice(){
+  return (userProfile?.businessType || "ptor") !== "ptor";
+}
+
+function buildDocHtml(payload){
+  const bizName = escapeHtml(userProfile?.businessName || "");
+  const bizId   = escapeHtml(userProfile?.businessId || "");
+  const phone   = escapeHtml(userProfile?.phone || "");
+  const email   = escapeHtml(userProfile?.email || auth.currentUser?.email || "");
+  const display = escapeHtml(userProfile?.displayName || "");
+  const typeLabel = docTypeLabel(payload.type);
+
+  const { vatEnabled, vatRate } = getSettings();
+  const vatRateUse = vatEnabled ? vatRate : 0;
+  const split = splitVAT(payload.amount, payload.incVat, vatRateUse);
+
+  const showVat = (vatRateUse > 0);
+
+  return `
+  <!doctype html>
+  <html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${typeLabel}</title>
+    <style>
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;margin:0;padding:24px;color:#111827}
+      .box{max-width:900px;margin:0 auto;border:1px solid #e5e7eb;border-radius:16px;padding:18px}
+      .top{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+      .biz h1{margin:0;font-size:20px}
+      .muted{color:#6b7280;font-size:13px}
+      .doc-title{font-size:22px;margin:0}
+      table{width:100%;border-collapse:collapse;margin-top:16px}
+      th,td{border:1px solid #e5e7eb;padding:10px;text-align:right}
+      th{background:#f3f4f6}
+      .sum{margin-top:14px;display:flex;justify-content:flex-end}
+      .sum table{width:auto;min-width:320px}
+      .logo{width:120px;height:60px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px}
+      @media print{button{display:none}}
+    </style>
+  </head>
+  <body>
+    <div class="box">
+      <div class="top">
+        <div class="biz">
+          <h1>${bizName || "שם העסק"}</h1>
+          <div class="muted">מספר עוסק/ח"פ: ${bizId || "-"}</div>
+          <div class="muted">${display ? ("איש קשר: "+display+" · ") : ""}${phone ? ("טלפון: "+phone+" · ") : ""}${email ? ("אימייל: "+email) : ""}</div>
+        </div>
+        <div style="text-align:left">
+          <div class="logo">לוגו (בהמשך)</div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px">
+        <h2 class="doc-title">${typeLabel}</h2>
+        <div class="muted">תאריך: ${payload.date}</div>
+      </div>
+
+      <div style="margin-top:10px" class="muted">
+        ${payload.number ? `מספר: <strong>${escapeHtml(String(payload.number))}</strong> · ` : ""}לקוח: <strong>${escapeHtml(payload.clientName || "-")}</strong>
+        ${payload.clientVatId ? ` · ח.פ/עוסק: ${escapeHtml(payload.clientVatId)}` : ""}
+        ${payload.clientPhone ? ` · טלפון: ${escapeHtml(payload.clientPhone)}` : ""}
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>תיאור</th>
+            <th>סכום נטו</th>
+            ${showVat ? '<th>מע"מ</th>' : ""}
+            <th>סה"כ</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${escapeHtml(payload.desc || "")}</td>
+            <td>${toMoney(split.net)}</td>
+            ${showVat ? `<td>${toMoney(split.vat)}</td>` : ""}
+            <td>${toMoney(split.gross)}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="sum">
+        <table>
+          <tr><th>סה"כ לתשלום</th><td>${toMoney(split.gross)}</td></tr>
+        </table>
+      </div>
+
+      <div style="margin-top:14px" class="muted">
+        מסמך זה הופק במערכת עצמאי פלוס.
+      </div>
+      <div style="margin-top:10px">
+        <button onclick="(function(){const w=window.open(\"\",\"_blank\");w.document.write(document.documentElement.outerHTML);w.document.close();w.focus();setTimeout(()=>w.print(),300);})()">הדפסה / שמירה כ-PDF</button>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function setDocPreview(htmlStr){
+  lastDocHtml = htmlStr;
+  // תצוגה בתוך האפליקציה (iframe)
+  docPreview.innerHTML = `<iframe style="width:100%;height:380px;border:1px solid var(--line);border-radius:12px" sandbox="allow-same-origin" srcdoc="${htmlStr.replace(/"/g,'&quot;')}"></iframe>`;
+}
+
+function buildShareText(payload){
+  const label = docTypeLabel(payload.type);
+  const bizName = userProfile?.businessName || "";
+  const amount = payload.amount ? toMoney(payload.amount) : "";
+  return `${label} - ${bizName} - ${payload.date} - ${amount}`;
+}
+
+function openDocInNewTab(){
+  const w = window.open("", "_blank");
+  w.document.write(lastDocHtml);
+  w.document.close();
+  w.focus();
+}
+
+
+// Auto-fill לקוח לפי שם
+dClientName && dClientName.addEventListener("change", () => {
+  if (!currentUid) return;
+  const c = findCustomerByName(currentUid, dClientName.value);
+  if (c) fillFromCustomer(c);
+  else {
+    if (dClientId) dClientId.value = "";
+  }
+});
+
+// ---- מספור מסמכים ----
+const DOC_START = {
+  invoice: 10000,        // חשבונית מס
+  invrec: 5000,          // חשבונית מס קבלה
+  receipt: 2000,         // קבלה
+  credit: 100,           // חשבונית זיכוי
+  deal: 10               // חשבונית עסקה
+};
+function seqKey(uid, type){ return `seq_${uid}_${type}`; }
+function getNextNumber(uid, type){
+  if (type === "quote") return ""; // הצעת מחיר בלי מספר
+  const start = DOC_START[type] ?? 1;
+  const key = seqKey(uid, type);
+  let n = parseInt(localStorage.getItem(key) || "", 10);
+  if (!Number.isFinite(n) || n < start) n = start;
+  localStorage.setItem(key, String(n + 1));
+  return String(n);
+}
+
+// ---- מודאל כרטיס לקוח ----
+const customerCardModal = document.getElementById("customerCardModal");
+const btnCustomerCardClose = document.getElementById("btnCustomerCardClose");
+const ccSelect = document.getElementById("ccSelect");
+const ccName = document.getElementById("ccName");
+const ccPhone = document.getElementById("ccPhone");
+const ccVatId = document.getElementById("ccVatId");
+const ccSave = document.getElementById("ccSave");
+const ccDelete = document.getElementById("ccDelete");
+const ccDocsTbody = document.getElementById("ccDocsTbody");
+
+function openCustomerCard(){
+  if (!currentUid) return;
+  renderCustomerCardSelect();
+  customerCardModal?.classList.add("open");
+  // בחר את הלקוח הנוכחי מהמסמך אם יש
+  const cid = dClientId?.value || "";
+  if (cid && ccSelect) ccSelect.value = cid;
+  refreshCustomerCard();
+}
+function closeCustomerCard(){ customerCardModal?.classList.remove("open"); }
+
+function renderCustomerCardSelect(){
+  if (!ccSelect || !currentUid) return;
+  const list = getCustomers(currentUid);
+  ccSelect.innerHTML = [
+    '<option value="">בחרי לקוח...</option>',
+    ...list.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || "(ללא שם)")}</option>`)
+  ].join("");
+}
+
+function refreshCustomerCard(){
+  if (!currentUid) return;
+  const cid = ccSelect?.value || "";
+  const list = getCustomers(currentUid);
+  const c = list.find(x => x.id === cid) || null;
+
+  if (c){
+    ccName.value = c.name || "";
+    ccPhone.value = c.phone || "";
+    ccVatId.value = c.vatId || "";
+  } else {
+    ccName.value = "";
+    ccPhone.value = "";
+    ccVatId.value = "";
+  }
+
+  // היסטוריה
+  const docs = getDocs(currentUid).filter(d => d.customerId && d.customerId === cid);
+  if (ccDocsTbody){
+    ccDocsTbody.innerHTML = docs
+      .sort((a,b)=> (a.date||"").localeCompare(b.date||""))
+      .map(d => `
+        <tr>
+          <td>${escapeHtml(d.date || "")}</td>
+          <td>${escapeHtml(docTypeLabel(d.type) || "")}</td>
+          <td>${escapeHtml(d.number || "")}</td>
+          <td>${escapeHtml(d.desc || "")}</td>
+          <td>${toMoney(d.amount || 0)}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:14px">אין מסמכים ללקוח</td></tr>`;
+  }
+}
+
+btnCustomerCard && (btnCustomerCard.onclick = openCustomerCard);
+btnCustomerCardClose && (btnCustomerCardClose.onclick = closeCustomerCard);
+customerCardModal && (customerCardModal.addEventListener("click", (e) => {
+  if (e.target === customerCardModal) closeCustomerCard();
+}));
+ccSelect && (ccSelect.onchange = refreshCustomerCard);
+
+ccSave && (ccSave.onclick = () => {
+  if (!currentUid) return;
+  const cid = ccSelect?.value || crypto.randomUUID();
+  const cust = { id: cid, name: (ccName.value||"").trim(), phone: (ccPhone.value||"").trim(), vatId: (ccVatId.value||"").trim() };
+  if (!cust.name) { alert("נא למלא שם לקוח"); return; }
+  upsertCustomer(currentUid, cust);
+  ccSelect.value = cid;
+  refreshCustomerCard();
+  // עדכון גם בטופס המסמך אם זה אותו לקוח
+  fillFromCustomer(cust);
+  alert("נשמר");
+});
+
+ccDelete && (ccDelete.onclick = () => {
+  if (!currentUid) return;
+  const cid = ccSelect?.value || "";
+  if (!cid) return;
+  if (!confirm("למחוק את כרטיס הלקוח?")) return;
+  const list = getCustomers(currentUid).filter(c => c.id !== cid);
+  saveCustomers(currentUid, list);
+  ccSelect.value = "";
+  refreshCustomerCard();
+});
+
+btnDocCreate.onclick = () => {
+  if (!currentUid) { alert("יש להתחבר"); return; }
+
+  const docType = dType.value;
+  const date = dDate.value || new Date().toISOString().slice(0,10);
+
+  const clientName = (dClientName.value || "").trim();
+  if (!clientName) { alert("נא למלא שם לקוח"); return; }
+
+  const clientPhone = (dClientPhone.value || "").trim();
+  const clientVatId = (dClientVatId?.value || "").trim();
+  const desc = (dDesc.value || "").trim() || docTypeLabel(docType);
+
+  const amount = parseFloat(String(dAmount.value || "0").replace(/,/g,""));
+  if (!Number.isFinite(amount) || amount <= 0) { alert("נא למלא סכום תקין"); return; }
+
+  const incVat = !!dIncVat.checked;
+  const { vatEnabled, vatRate } = getSettings();
+  const { net, vat, gross } = splitVAT(amount, incVat, vatEnabled ? vatRate : 0);
+
+  // כרטיס לקוח (שם ייחודי = אותו לקוח)
+  let customerId = (dClientId?.value || "").trim();
+  const existing = findCustomerByName(currentUid, clientName);
+  if (existing) customerId = existing.id;
+
+  if (!customerId) customerId = crypto.randomUUID();
+  if (dClientId) dClientId.value = customerId;
+
+  if (dSaveCustomer?.checked) {
+    upsertCustomer(currentUid, {
+      id: customerId,
+      name: clientName,
+      phone: clientPhone,
+      vatId: clientVatId
+    });
+  }
+
+  // מספור
+  const number = getNextNumber(currentUid, docType);
+
+  // שמירת מסמך (לכרטסת/דוחות מסמכים)
+  const docs = getDocs(currentUid);
+  const docRec = {
+    id: crypto.randomUUID(),
+    type: docType,
+    number,
+    date,
+    customerId,
+    clientName,
+    clientPhone,
+    clientVatId,
+    desc,
+    amount,
+    incVat,
+    vatRate: vatEnabled ? vatRate : 0,
+    net, vat, gross,
+    createdAt: Date.now()
+  };
+  docs.push(docRec);
+  saveDocs(currentUid, docs);
+
+  // הוספה אוטומטית להכנסות בהתאם לסוג המסמך
+  if (docType !== "quote") {
+    let incomeAmount = gross;
+    if (docType === "credit") incomeAmount = -Math.abs(gross);
+
+    rows.push({
+      id: crypto.randomUUID(),
+      type: "income",
+      date,
+      category: "מסמכים חשבונאיים",
+      desc: `${docTypeLabel(docType)}${number ? " #" + number : ""} - ${clientName} | ${desc}`,
+      amount: incomeAmount,
+      incVat: true,
+      deductPct: 100,
+      source: "docModule",
+      doc: { type: docType, number, customerId }
+    });
+
+    persistAndRender();
+  }
+
+  // תצוגה מקדימה + פעולות
+  lastDocTextForShare = [
+    `${docTypeLabel(docType)}${number ? " #" + number : ""}`,
+    `תאריך: ${date}`,
+    `לקוח: ${clientName}${clientVatId ? " ("+clientVatId+")" : ""}`,
+    clientPhone ? `טלפון: ${clientPhone}` : "",
+    `תיאור: ${desc}`,
+    `סה״כ: ${toMoney(gross)}`
+  ].filter(Boolean).join("\n");
+  lastDocHtml = buildDocHtml({
+    type: docType,
+    number,
+    date,
+    clientName,
+    clientPhone,
+    clientVatId,
+    desc,
+    net,
+    vat,
+    gross
+  });
+
+  // UI reset (לא שובר)
+  // לא מאפסים שם לקוח כדי לא להקשות על הפקה סדרתית
+  dDesc.value = "";
+  dAmount.value = "";
+  // רענון כרטסת אם פתוחה
+  refreshCustomerCard();
+
+  alert("המסמך הופק ונשמר ✅");
+};
+
+btnDocEmail.onclick = () => {
+  if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
+  const subject = encodeURIComponent("מסמך חשבונאי - עצמאי פלוס");
+  const body = encodeURIComponent(lastDocTextForShare + "\n\nפתחי את המסמך בטאב חדש כדי לשמור כ-PDF ולהצמיד למייל.");
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
+};
+
+btnDocWhatsapp.onclick = () => {
+  if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
+  const txt = encodeURIComponent(lastDocTextForShare);
+  window.open(`https://wa.me/?text=${txt}`, "_blank", "noopener");
+};
+
 function initAppLogic(uid) {
   currentUid = uid;
+
+  // טוען רשימות כרטיסי לקוח/מסמכים
+  renderCustomersDatalist();
+  renderCustomerCardSelect();
 
   if (!appInitialized) {
     // כפתורים ותנועות
@@ -1666,8 +2613,8 @@ function initAppLogic(uid) {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
       rows = [];
       saveToLocal();
-      saveToCloud();
-      render();
+      scheduleCloudSave();
+  render();
     };
 
     // סינון וניווט חודשים
@@ -1676,6 +2623,7 @@ function initAppLogic(uid) {
       qType.addEventListener(evName, () => { saveToLocal(); render(); });
       qMonth.addEventListener(evName, () => { saveToLocal(); render(); });
       qCategory.addEventListener(evName, () => { saveToLocal(); render(); });
+      qPeriod.addEventListener(evName, () => { saveToLocal(); render(); });
       vatRateInput.addEventListener(evName, () => { saveToLocal(); render(); });
       vatEnabledCheckbox.addEventListener(evName, () => { saveToLocal(); render(); });
     });
@@ -1685,6 +2633,7 @@ function initAppLogic(uid) {
       qType.value = "all";
       qMonth.value = monthFromDateStr(todayStr());
       qCategory.value = "";
+      qPeriod.value = "1";
       render();
     };
 
@@ -1728,6 +2677,7 @@ renderItemsDatalist();
     await loadFromCloudFirst();
     if (!fDate.value) fDate.value = todayStr();
     if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
+    if (qPeriod && !qPeriod.value) qPeriod.value = "1";
     render();
   })();
 }
@@ -1735,6 +2685,54 @@ renderItemsDatalist();
 /* להתחיל במצב "התחברות" כברירת מחדל */
 tabLogin.click();
 </script>
+
+  <!-- כרטיס לקוח -->
+  <div class="modal" id="customerCardModal" aria-hidden="true">
+    <div class="modal-card" style="max-width:980px">
+      <div class="modal-head">
+        <div class="h2">כרטיס לקוח</div>
+        <button class="btn" id="btnCustomerCardClose" type="button">סגירה</button>
+      </div>
+
+      <div class="grid2">
+        <label>בחרי לקוח</label>
+        <select id="ccSelect"></select>
+
+        <label>שם</label>
+        <input id="ccName" type="text" />
+
+        <label>טלפון</label>
+        <input id="ccPhone" type="text" />
+
+        <label>ח.פ / עוסק</label>
+        <input id="ccVatId" type="text" />
+      </div>
+
+      <div class="row" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
+        <button class="btn primary" id="ccSave" type="button">שמירה</button>
+        <button class="btn danger" id="ccDelete" type="button">מחיקה</button>
+      </div>
+
+      <div style="margin-top:18px">
+        <div class="h3" style="margin:0 0 8px;font-size:15px">היסטוריית מסמכים ללקוח</div>
+        <div style="overflow:auto; border:1px solid var(--line); border-radius:14px">
+          <table class="tbl" style="min-width:760px">
+            <thead>
+              <tr>
+                <th>תאריך</th>
+                <th>סוג</th>
+                <th>מספר</th>
+                <th>תיאור</th>
+                <th>סכום</th>
+              </tr>
+            </thead>
+            <tbody id="ccDocsTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>
 
