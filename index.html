@@ -1439,29 +1439,34 @@ btnSupportOpen && (btnSupportOpen.onclick = () => {
   supportDialog.showModal();
 });
 
-btnSupportSend && (
-btnSupportSend.onclick = async () => {
-  const msg = (supportMsg.value || "").trim();
-  if (!msg) { alert("נא לכתוב הודעה"); return; }
-  const prof = await loadUserProfile(currentUid).catch(() => ({}));
-  const name  = (prof?.fullName || prof?.name || "").trim();
-  const phone = (prof?.phone || "").trim();
-  const email = (auth.currentUser?.email || "").trim();
+if (btnSupportSend) {
+    btnSupportSend.onclick = async () => {
+      const msg = (sMsg?.value || '').trim();
+      if (!msg) return alert('נא לכתוב הודעה');
 
-  const subject = encodeURIComponent("פנייה למפתח - עצמאי פלוס");
-  const body = encodeURIComponent(
-`שם: ${name}
-טלפון: ${phone}
-אימייל: ${email}
+      const profile = await getMyProfileSafe(currentUid);
+      const payload = {
+        createdAt: new Date().toISOString(),
+        uid: currentUid || null,
+        fromEmail: profile?.email || userEmailTag?.textContent || '',
+        fromName: profile?.name || profile?.fullName || '',
+        fromPhone: profile?.phone || '',
+        message: msg,
+        status: 'new'
+      };
 
-הודעה:
-${msg}`
-  );
+      try {
+        await addDoc(collection(db, "support_requests"), payload);
+        alert('הפנייה נשמרה. (שליחה אוטומטית במייל תופעל אחרי שתקיני Extension/Function.)');
+        if (sMsg) sMsg.value = '';
+        if (supportDialog) supportDialog.close();
+      } catch (e) {
+        console.error(e);
+        alert('שגיאה בשמירה. בדקי הרשאות Firestore.');
+      }
+    };
+  }
 
-  // פותח Gmail/תוכנת מייל עם טיוטה מוכנה
-  window.location.href = `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
-};
-);
 
 
 function monthFromDateStr(s) {
