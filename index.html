@@ -3,70 +3,74 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>עצמאי פלוס - ניהול מקצועי</title>
+  <title>עצמאי פלוס - גרסה מקצועית 8</title>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+
   <style>
-    :root { --bg:#f0f2f5; --panel:#fff; --accent:#1877f2; --good:#42b72a; --bad:#f02849; --text:#1c1e21; --line:#dddfe2; --radius:12px; }
+    :root { --bg:#f8fafc; --panel:#ffffff; --accent:#2563eb; --good:#22c55e; --bad:#ef4444; --text:#1e293b; --line:#e2e8f0; --radius:16px; }
     body { margin:0; background:var(--bg); color:var(--text); font:15px system-ui, sans-serif; direction:rtl; }
-    .wrap { max-width:1300px; margin:0 auto; padding:15px; }
-    header { background:#fff; border-bottom:1px solid var(--line); padding:10px 0; position:sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+    .wrap { max-width:1400px; margin:0 auto; padding:20px; }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:15px 0; position:sticky; top:0; z-index:100; box-shadow:0 2px 10px rgba(0,0,0,0.05); }
     .nav-flex { display:flex; justify-content:space-between; align-items:center; }
-    .logo { font-size:22px; font-weight:800; color:var(--accent); text-decoration:none; }
-    .btn { cursor:pointer; padding:8px 14px; border-radius:8px; border:none; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:5px; }
+    .logo { font-size:24px; font-weight:900; color:var(--accent); text-decoration:none; letter-spacing:-1px; }
+    .btn { cursor:pointer; padding:10px 18px; border-radius:10px; border:none; font-weight:600; font-size:14px; display:inline-flex; align-items:center; gap:8px; transition:0.2s; }
     .btn-p { background:var(--accent); color:#fff; }
-    .btn-s { background:#e4e6eb; color:var(--text); }
-    .btn-danger { background:#fce9e9; color:var(--bad); }
-    .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin:20px 0; }
-    .stat-box { background:#fff; padding:15px; border-radius:10px; border:1px solid var(--line); text-align:center; }
-    .stat-val { font-size:20px; font-weight:800; display:block; margin-top:5px; }
-    .grid { display:grid; grid-template-columns: 350px 1fr; gap:20px; }
-    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .card { background:#fff; border-radius:var(--radius); border:1px solid var(--line); overflow:hidden; }
-    .card-hd { padding:12px 15px; background:#f5f6f7; border-bottom:1px solid var(--line); font-weight:700; display:flex; justify-content:space-between; }
-    .card-bd { padding:15px; }
-    input, select { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); margin-bottom:12px; font-size:14px; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    th { background:#f5f6f7; padding:12px; text-align:right; border-bottom:2px solid var(--line); }
-    td { padding:12px; border-bottom:1px solid var(--line); }
-    #authOverlay { position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; }
-    .auth-box { background:#fff; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:350px; text-align:center; }
-    dialog { border:none; border-radius:15px; padding:0; width:90%; max-width:550px; box-shadow:0 15px 35px rgba(0,0,0,0.2); }
-    .dlg-h { padding:15px; background:#f5f6f7; font-weight:700; display:flex; justify-content:space-between; }
-    .dlg-b { padding:20px; }
+    .btn-s { background:#f1f5f9; color:var(--text); border:1px solid var(--line); }
+    .btn-danger { background:#fee2e2; color:var(--bad); }
+    .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap:20px; margin-bottom:30px; }
+    .stat-box { background:#fff; padding:25px; border-radius:var(--radius); border:1px solid var(--line); text-align:center; box-shadow:0 4px 6px -1px rgba(0,0,0,0.05); }
+    .stat-val { font-size:26px; font-weight:900; display:block; margin-top:10px; }
+    .grid { display:grid; grid-template-columns: 380px 1fr; gap:25px; }
+    @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+    .card { background:#fff; border-radius:var(--radius); border:1px solid var(--line); box-shadow:0 4px 20px rgba(0,0,0,0.03); }
+    .card-hd { padding:20px 25px; background:#fcfdfe; border-bottom:1px solid var(--line); font-weight:800; font-size:16px; display:flex; justify-content:space-between; }
+    .card-bd { padding:25px; }
+    input, select { width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); margin-bottom:15px; font-size:15px; background:#f9fafb; }
+    label { font-size:13px; font-weight:700; color:#64748b; display:block; margin-bottom:6px; }
+    table { width:100%; border-collapse:collapse; }
+    th { background:#f8fafc; padding:15px; text-align:right; border-bottom:2px solid var(--line); color:#64748b; font-size:13px; }
+    td { padding:15px; border-bottom:1px solid var(--line); }
+    #authOverlay { position:fixed; inset:0; background:var(--bg); z-index:2000; display:flex; align-items:center; justify-content:center; }
+    .auth-box { background:#fff; padding:40px; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.15); width:100%; max-width:400px; text-align:center; }
+    dialog { border:none; border-radius:20px; padding:0; width:95%; max-width:600px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); }
+    .dlg-h { padding:20px; background:#f8fafc; font-weight:800; display:flex; justify-content:space-between; border-bottom:1px solid var(--line); }
+    .dlg-b { padding:25px; }
   </style>
 </head>
 <body>
 
 <div id="authOverlay">
   <div class="auth-box">
-    <h1 style="color:var(--accent)">עצמאי פלוס</h1>
+    <h1 style="color:var(--accent); margin-bottom:10px">עצמאי פלוס</h1>
+    <p style="margin-bottom:25px; color:#64748b">התחברי כדי לנהל את העסק שלך</p>
     <input type="email" id="authEmail" placeholder="אימייל">
     <input type="password" id="authPass" placeholder="סיסמה">
-    <button class="btn btn-p" style="width:100%; padding:12px" onclick="handleAuth('login')">התחברות</button>
-    <button class="btn btn-s" style="width:100%; margin-top:8px" onclick="handleAuth('signup')">הרשמה</button>
-    <p id="authError" style="color:var(--bad); font-size:12px; margin-top:10px"></p>
+    <button class="btn btn-p" style="width:100%; padding:14px" id="btnLoginAction">התחברות</button>
+    <button class="btn btn-s" style="width:100%; margin-top:10px" id="btnSignupAction">יצירת חשבון חדש</button>
+    <p id="authError" style="color:var(--bad); font-size:13px; margin-top:15px; font-weight:600"></p>
   </div>
 </div>
 
-<div id="app" hidden>
+<div id="app" style="display:none">
   <header>
     <div class="wrap nav-flex">
       <div class="logo">עצמאי פלוס</div>
-      <div style="display:flex; gap:8px">
+      <div class="nav-btns">
         <button class="btn btn-s" onclick="document.getElementById('dlgReports').showModal()">📄 דוחות</button>
-        <button class="btn btn-s" onclick="document.getElementById('dlgCats').showModal()">📊 קטגוריות</button>
+        <button class="btn btn-s" onclick="document.getElementById('dlgCustomers').showModal()">👥 כרטיס לקוח</button>
         <button class="btn btn-s" onclick="window.open('https://www.gov.il/he/service/reporting-or-payment-of-vat-reports')">🏦 מע"מ</button>
-        <button class="btn btn-s" onclick="openSettings()">⚙️ הגדרות</button>
-        <button class="btn btn-danger" onclick="auth.signOut()">יציאה</button>
+        <button class="btn btn-s" id="btnOpenSettings">⚙️ הגדרות</button>
+        <button class="btn btn-danger" id="btnLogoutAction">יציאה</button>
       </div>
     </div>
   </header>
 
   <main class="wrap">
     <div class="stats">
-      <div class="stat-box">הכנסות (נטו)<span class="stat-val" id="sInc" style="color:var(--good)">₪0</span></div>
+      <div class="stat-box">הכנסות נטו<span class="stat-val" id="sInc" style="color:var(--good)">₪0</span></div>
       <div class="stat-box">הוצאות מוכרות<span class="stat-val" id="sExp" style="color:var(--bad)">₪0</span></div>
       <div class="stat-box">מע"מ (לתשלום/החזר)<span class="stat-val" id="sVat">₪0</span></div>
       <div class="stat-box">רווח נקי<span class="stat-val" id="sNet" style="color:var(--accent)">₪0</span></div>
@@ -74,29 +78,31 @@
 
     <div class="grid">
       <div class="card">
-        <div class="card-hd" id="formTitle">הוספת תנועה</div>
+        <div class="card-hd" id="formTitle">תנועה חדשה</div>
         <div class="card-bd">
           <form id="txForm">
             <input type="hidden" id="fId">
             <label>תאריך</label><input type="date" id="fDate" required>
-            <label>סוג</label><select id="fType"><option value="income">הכנסה</option><option value="expense">הוצאה</option></select>
+            <label>סוג</label><select id="fType"><option value="income">הכנסה (+)</option><option value="expense">הוצאה (-)</option></select>
             <label>קטגוריה</label><select id="fCat"></select>
-            <label>תיאור / ספק</label><input type="text" id="fDesc" required>
-            <label>סכום כולל</label><input type="number" step="0.01" id="fSum" required>
-            <button type="submit" class="btn btn-p" style="width:100%; padding:12px">שמירה</button>
-            <button type="button" id="btnCancelEdit" class="btn btn-s" style="width:100%; margin-top:8px; display:none" onclick="resetForm()">ביטול עריכה</button>
+            <label>תיאור / ספק / לקוח</label><input type="text" id="fDesc" required>
+            <label>סכום כולל (₪)</label><input type="number" step="0.01" id="fSum" required>
+            <button type="submit" class="btn btn-p" style="width:100%; padding:14px">שמירה במערכת</button>
+            <button type="button" id="btnCancel" class="btn btn-s" style="width:100%; margin-top:10px; display:none" onclick="resetForm()">ביטול עריכה</button>
           </form>
         </div>
       </div>
 
       <div class="card">
         <div class="card-hd">
-          תנועות אחרונות
-          <input type="month" id="filterMonth" style="margin:0; width:140px">
+          פירוט תנועות
+          <input type="month" id="filterMonth" style="margin:0; width:150px">
         </div>
         <div class="card-bd" style="overflow-x:auto">
           <table id="txTable">
-            <thead><tr><th>תאריך</th><th>תיאור</th><th>סה"כ</th><th>מע"מ</th><th>מוכר</th><th>פעולות</th></tr></thead>
+            <thead>
+              <tr><th>תאריך</th><th>תיאור / קטגוריה</th><th>סה"כ</th><th>מע"מ</th><th>מוכר</th><th>פעולות</th></tr>
+            </thead>
             <tbody id="txBody"></tbody>
           </table>
         </div>
@@ -106,34 +112,35 @@
 </div>
 
 <dialog id="dlgReports">
-  <div class="dlg-h">הפקת דוחות <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
+  <div class="dlg-h">הפקת דוחות PDF <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
   <div class="dlg-b">
-    <p>בחרי את סוג הדוח להורדה (PDF):</p>
-    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="genReport('income')">דוח הכנסות</button>
-    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="genReport('expense')">דוח הוצאות</button>
-    <button class="btn btn-danger" style="width:100%" onclick="genReport('all')">דוח רווח והפסד שנתי</button>
+    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="exportPDF('income')">דוח הכנסות</button>
+    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="exportPDF('expense')">דוח הוצאות</button>
+    <button class="btn btn-danger" style="width:100%" onclick="exportPDF('all')">דוח רווח והפסד שנתי</button>
+  </div>
+</dialog>
+
+<dialog id="dlgCustomers">
+  <div class="dlg-h">כרטיס לקוח <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
+  <div class="dlg-b">
+    <p>ניהול רשימת לקוחות ופרטי התקשרות יתווסף כאן בגרסה הבאה.</p>
   </div>
 </dialog>
 
 <dialog id="dlgSettings">
-  <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
+  <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
   <div class="dlg-b">
     <label>שם העסק</label><input type="text" id="pName">
     <label>ח.פ / ת.ז</label><input type="text" id="pId">
     <label>סוג עוסק</label>
     <select id="pType"><option value="ptor">עוסק פטור</option><option value="morasha">עוסק מורשה</option></select>
-    <button class="btn btn-p" style="width:100%" onclick="saveProfile()">שמור הגדרות</button>
+    <button class="btn btn-p" style="width:100%" id="btnSaveSettings">שמירת שינויים</button>
   </div>
-</dialog>
-
-<dialog id="dlgCats">
-  <div class="dlg-h">טבלת קטגוריות <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
-  <div class="dlg-b" id="catsUI" style="font-size:12px"></div>
 </dialog>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
   import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, onSnapshot, deleteDoc, orderBy, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -153,81 +160,75 @@
     "הכנסה מפעילות": { v: 1.0, t: 1.0, type: 'income' },
     "שיווק ופרסום": { v: 1.0, t: 1.0, type: 'expense' },
     "ציוד משרדי": { v: 1.0, t: 1.0, type: 'expense' },
-    "אחזקת רכב (2/3 מוכר)": { v: 0.666, t: 0.45, type: 'expense' },
-    "אחזקת רכב (1/4 מוכר)": { v: 0.25, t: 0.45, type: 'expense' },
-    "תיקון רכב": { v: 0.666, t: 0.45, type: 'expense' },
-    "דלק": { v: 0.666, t: 0.45, type: 'expense' },
-    "ביטוח רכב": { v: 0.0, t: 0.45, type: 'expense' },
-    "טסט רכב": { v: 0.0, t: 0.45, type: 'expense' },
-    "טלפון וסלולר": { v: 0.666, t: 0.25, type: 'expense' },
-    "אינטרנט ותקשורת": { v: 1.0, t: 1.0, type: 'expense' },
-    "ביטוחים": { v: 0.0, t: 1.0, type: 'expense' },
-    "כיבודים": { v: 0.0, t: 0.8, type: 'expense' },
+    "אחזקת רכב (2/3)": { v: 0.66, t: 0.45, type: 'expense' },
+    "דלק": { v: 0.66, t: 0.45, type: 'expense' },
+    "טלפון וסלולר": { v: 0.66, t: 0.25, type: 'expense' },
     "שכר דירה עסקי": { v: 1.0, t: 1.0, type: 'expense' },
-    "חשמל": { v: 1.0, t: 1.0, type: 'expense' },
-    "ארנונה": { v: 0.0, t: 1.0, type: 'expense' },
-    "מים": { v: 1.0, t: 1.0, type: 'expense' },
-    "עמלות בנק": { v: 0.0, t: 1.0, type: 'expense' },
-    "דואר ומשלוחים": { v: 1.0, t: 1.0, type: 'expense' },
-    "ייעוץ מקצועי": { v: 1.0, t: 1.0, type: 'expense' },
-    "השתלמויות": { v: 1.0, t: 1.0, type: 'expense' },
-    "בגדי עבודה": { v: 0.0, t: 1.0, type: 'expense' },
-    "מתנות ללקוחות": { v: 0.0, t: 1.0, type: 'expense' },
-    "נסיעות לחו\"ל": { v: 0.0, t: 1.0, type: 'expense' }
+    "כיבודים": { v: 0.0, t: 0.8, type: 'expense' }
   };
 
-  let user = null, profile = { pName:'', pId:'', pType:'ptor' }, allTx = [];
+  let currentUser = null, profile = { pName:'', pId:'', pType:'ptor' }, allTx = [];
 
-  window.handleAuth = async (m) => {
+  // --- AUTH LOGIC ---
+  const login = async () => {
     const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
-    try { m==='login' ? await signInWithEmailAndPassword(auth,e,p) : await createUserWithEmailAndPassword(auth,e,p); }
-    catch(err) { document.getElementById('authError').innerText = err.message; }
+    try {
+      await setPersistence(auth, browserLocalPersistence);
+      await signInWithEmailAndPassword(auth, e, p);
+    } catch(err) { document.getElementById('authError').innerText = "טעות במייל או בסיסמה"; }
   };
 
-  onAuthStateChanged(auth, async (u) => {
-    if(u) {
-      user = u;
-      const s = await getDoc(doc(db, "users", u.uid));
-      if(s.exists()) profile = s.data();
-      document.getElementById('authOverlay').hidden = true;
-      document.getElementById('app').hidden = false;
-      init();
+  const signup = async () => {
+    const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
+    try {
+      const res = await createUserWithEmailAndPassword(auth, e, p);
+      await setDoc(doc(db, "users", res.user.uid), profile);
+    } catch(err) { document.getElementById('authError').innerText = "המייל כבר קיים במערכת"; }
+  };
+
+  document.getElementById('btnLoginAction').onclick = login;
+  document.getElementById('btnSignupAction').onclick = signup;
+  document.getElementById('btnLogoutAction').onclick = () => signOut(auth);
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      currentUser = user;
+      const snap = await getDoc(doc(db, "users", user.uid));
+      if(snap.exists()) profile = snap.data();
+      document.getElementById('authOverlay').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+      loadData();
     } else {
-      document.getElementById('authOverlay').hidden = false;
-      document.getElementById('app').hidden = true;
+      document.getElementById('authOverlay').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
     }
   });
 
-  function init() {
-    const sel = document.getElementById('fCat'), catsUI = document.getElementById('catsUI');
-    sel.innerHTML = '';
-    let html = '<table><tr><th>קטגוריה</th><th>מע"מ</th><th>מס</th></tr>';
-    Object.keys(categories).forEach(k => {
-      sel.innerHTML += `<option value="${k}">${k}</option>`;
-      html += `<tr><td>${k}</td><td>${(categories[k].v*100).toFixed(0)}%</td><td>${(categories[k].t*100).toFixed(0)}%</td></tr>`;
-    });
-    catsUI.innerHTML = html + '</table>';
+  // --- DATA LOGIC ---
+  function loadData() {
+    const sel = document.getElementById('fCat');
+    sel.innerHTML = Object.keys(categories).map(k => `<option value="${k}">${k}</option>`).join('');
 
-    onSnapshot(query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")), (snap) => {
+    onSnapshot(query(collection(db, "users", currentUser.uid, "transactions"), orderBy("date", "desc")), (snap) => {
       allTx = []; snap.forEach(d => allTx.push({id: d.id, ...d.data()}));
       render();
     });
   }
 
-  // --- שמירה / עריכה ---
   document.getElementById('txForm').onsubmit = async (e) => {
     e.preventDefault();
     const id = document.getElementById('fId').value;
     const sum = parseFloat(document.getElementById('fSum').value);
     const cat = categories[document.getElementById('fCat').value];
-    const vatRate = profile.pType === 'morasha' ? 0.17 : 0;
+    const isMorasha = profile.pType === 'morasha';
+    const vatRate = isMorasha ? 0.17 : 0;
 
     const net = sum / (1 + vatRate);
     const vat = sum - net;
     const recVat = vat * cat.v;
     const recTax = (net + (vat - recVat)) * cat.t;
 
-    const data = {
+    const payload = {
       date: document.getElementById('fDate').value,
       type: document.getElementById('fType').value,
       cat: document.getElementById('fCat').value,
@@ -235,15 +236,15 @@
       total: sum, net, recVat, recTax
     };
 
-    if(id) await updateDoc(doc(db, "users", user.uid, "transactions", id), data);
-    else await addDoc(collection(db, "users", user.uid, "transactions"), data);
+    if(id) await updateDoc(doc(db, "users", currentUser.uid, "transactions", id), payload);
+    else await addDoc(collection(db, "users", currentUser.uid, "transactions"), payload);
     
     resetForm();
   };
 
   function render() {
-    const month = document.getElementById('filterMonth').value;
-    const filtered = month ? allTx.filter(t => t.date.startsWith(month)) : allTx;
+    const m = document.getElementById('filterMonth').value;
+    const filtered = m ? allTx.filter(t => t.date.startsWith(m)) : allTx;
     let ti=0, te=0, tv=0;
 
     document.getElementById('txBody').innerHTML = filtered.map(t => {
@@ -257,7 +258,7 @@
         <td style="color:${isInc?'var(--good)':'var(--bad)'}">₪${isInc?t.net.toFixed(2):t.recTax.toFixed(2)}</td>
         <td>
           <button class="btn btn-s" onclick="editTx('${t.id}')">✏️</button>
-          <button class="btn btn-danger" onclick="deleteTx('${t.id}')">X</button>
+          <button class="btn btn-danger" style="padding:5px 10px" onclick="deleteTx('${t.id}')">✕</button>
         </td>
       </tr>`;
     }).join('');
@@ -277,49 +278,40 @@
     document.getElementById('fDesc').value = t.desc;
     document.getElementById('fSum').value = t.total;
     document.getElementById('formTitle').innerText = "עריכת תנועה";
-    document.getElementById('btnCancelEdit').style.display = "block";
+    document.getElementById('btnCancel').style.display = "block";
   };
 
   window.resetForm = () => {
     document.getElementById('txForm').reset();
     document.getElementById('fId').value = "";
-    document.getElementById('formTitle').innerText = "הוספת תנועה";
-    document.getElementById('btnCancelEdit').style.display = "none";
+    document.getElementById('formTitle').innerText = "תנועה חדשה";
+    document.getElementById('btnCancel').style.display = "none";
     document.getElementById('fDate').valueAsDate = new Date();
   };
 
-  window.deleteTx = (id) => confirm("למחוק?") && deleteDoc(doc(db, "users", user.uid, "transactions", id));
+  window.deleteTx = (id) => confirm("למחוק?") && deleteDoc(doc(db, "users", currentUser.uid, "transactions", id));
 
-  // --- דוחות PDF ---
-  window.genReport = (mode) => {
+  // --- PDF & SETTINGS ---
+  window.exportPDF = (mode) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    doc.text(`Report: ${mode.toUpperCase()}`, 10, 10);
-    doc.text(`Business: ${profile.pName} | ID: ${profile.pId}`, 10, 20);
-    
-    let filtered = allTx;
-    if(mode==='income') filtered = allTx.filter(t => t.type==='income');
-    if(mode==='expense') filtered = allTx.filter(t => t.type==='expense');
-
-    const data = filtered.map(t => [t.date, t.desc, t.total.toFixed(2), t.recTax.toFixed(2)]);
-    doc.autoTable({ head: [['Date', 'Desc', 'Total', 'Recognized']], body: data, startY: 30 });
-    doc.save(`Report_${mode}.pdf`);
+    doc.text(`Business Report: ${profile.pName}`, 10, 10);
+    doc.text(`ID: ${profile.pId}`, 10, 18);
+    const data = allTx.map(t => [t.date, t.desc, t.total.toFixed(2), t.recTax.toFixed(2)]);
+    doc.autoTable({ head: [['Date', 'Desc', 'Total', 'Tax Rec.']], body: data, startY: 25 });
+    doc.save("Report.pdf");
   };
 
-  window.openSettings = () => {
+  document.getElementById('btnOpenSettings').onclick = () => {
     document.getElementById('pName').value = profile.pName;
     document.getElementById('pId').value = profile.pId;
     document.getElementById('pType').value = profile.pType;
     document.getElementById('dlgSettings').showModal();
   };
 
-  window.saveProfile = async () => {
-    profile = { 
-        pName: document.getElementById('pName').value, 
-        pId: document.getElementById('pId').value, 
-        pType: document.getElementById('pType').value 
-    };
-    await setDoc(doc(db, "users", user.uid), profile);
+  document.getElementById('btnSaveSettings').onclick = async () => {
+    profile = { pName: document.getElementById('pName').value, pId: document.getElementById('pId').value, pType: document.getElementById('pType').value };
+    await setDoc(doc(db, "users", currentUser.uid), profile);
     document.getElementById('dlgSettings').close();
   };
 
