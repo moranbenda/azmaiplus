@@ -3,69 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>עצמאי פלוס - הנהלת חשבונות מקצועית</title>
-  
+  <title>עצמאי פלוס - ניהול מקצועי</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
   <style>
-    :root {
-      --bg:#f4f7fa; --panel:#ffffff; --accent:#2563eb; --good:#10b981; --bad:#ef4444;
-      --text:#1e293b; --line:#e2e8f0; --radius:14px;
-    }
-    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; direction:rtl; }
-    .wrap { max-width:1300px; margin:0 auto; padding:20px; }
-    
-    header { background:#fff; border-bottom:1px solid var(--line); padding:15px 0; position:sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
-    .nav-flex { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
-    .logo { font-size:24px; font-weight:800; color:var(--accent); text-decoration:none; }
-    
-    .nav-btns { display:flex; gap:10px; flex-wrap:wrap; }
-    .btn { cursor:pointer; padding:10px 16px; border-radius:10px; border:none; font-weight:600; font-size:14px; transition:0.2s; display:inline-flex; align-items:center; gap:8px; }
+    :root { --bg:#f0f2f5; --panel:#fff; --accent:#1877f2; --good:#42b72a; --bad:#f02849; --text:#1c1e21; --line:#dddfe2; --radius:12px; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px system-ui, sans-serif; direction:rtl; }
+    .wrap { max-width:1300px; margin:0 auto; padding:15px; }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:10px 0; position:sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.05); }
+    .nav-flex { display:flex; justify-content:space-between; align-items:center; }
+    .logo { font-size:22px; font-weight:800; color:var(--accent); text-decoration:none; }
+    .btn { cursor:pointer; padding:8px 14px; border-radius:8px; border:none; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:5px; }
     .btn-p { background:var(--accent); color:#fff; }
-    .btn-s { background:#fff; border:1px solid var(--line); color:var(--text); }
-    .btn-danger { background:#fee2e2; color:var(--bad); }
-
-    .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:15px; margin-bottom:25px; }
-    .stat-box { background:#fff; padding:20px; border-radius:var(--radius); border:1px solid var(--line); text-align:center; box-shadow:0 4px 6px rgba(0,0,0,0.02); }
-    .stat-val { font-size:22px; font-weight:800; display:block; margin-top:8px; }
-
-    .grid { display:grid; grid-template-columns: 360px 1fr; gap:25px; }
-    @media (max-width: 950px) { .grid { grid-template-columns: 1fr; } }
-
-    .card { background:#fff; border-radius:var(--radius); border:1px solid var(--line); box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); }
-    .card-hd { padding:18px 24px; background:#fafbfc; border-bottom:1px solid var(--line); font-weight:700; display:flex; justify-content:space-between; }
-    .card-bd { padding:24px; }
-
-    input, select { width:100%; padding:12px; border-radius:10px; border:1px solid var(--line); margin-bottom:15px; font-size:15px; }
-    label { font-size:13px; font-weight:700; color:var(--text); display:block; margin-bottom:5px; }
-
-    table { width:100%; border-collapse:collapse; }
-    th { background:#f8fafc; padding:15px; text-align:right; border-bottom:2px solid var(--line); font-size:13px; color:#64748b; }
-    td { padding:15px; border-bottom:1px solid var(--line); }
-
+    .btn-s { background:#e4e6eb; color:var(--text); }
+    .btn-danger { background:#fce9e9; color:var(--bad); }
+    .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; margin:20px 0; }
+    .stat-box { background:#fff; padding:15px; border-radius:10px; border:1px solid var(--line); text-align:center; }
+    .stat-val { font-size:20px; font-weight:800; display:block; margin-top:5px; }
+    .grid { display:grid; grid-template-columns: 350px 1fr; gap:20px; }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+    .card { background:#fff; border-radius:var(--radius); border:1px solid var(--line); overflow:hidden; }
+    .card-hd { padding:12px 15px; background:#f5f6f7; border-bottom:1px solid var(--line); font-weight:700; display:flex; justify-content:space-between; }
+    .card-bd { padding:15px; }
+    input, select { width:100%; padding:10px; border-radius:8px; border:1px solid var(--line); margin-bottom:12px; font-size:14px; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th { background:#f5f6f7; padding:12px; text-align:right; border-bottom:2px solid var(--line); }
+    td { padding:12px; border-bottom:1px solid var(--line); }
     #authOverlay { position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; }
-    .auth-box { background:#fff; padding:40px; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.25); width:400px; text-align:center; }
-
-    dialog { border:none; border-radius:20px; padding:0; width:90%; max-width:600px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); }
-    .dlg-h { padding:20px; background:#f8fafc; font-weight:700; display:flex; justify-content:space-between; border-bottom:1px solid var(--line); }
-    .dlg-b { padding:25px; max-height:70vh; overflow-y:auto; }
+    .auth-box { background:#fff; padding:30px; border-radius:15px; box-shadow:0 10px 25px rgba(0,0,0,0.1); width:350px; text-align:center; }
+    dialog { border:none; border-radius:15px; padding:0; width:90%; max-width:550px; box-shadow:0 15px 35px rgba(0,0,0,0.2); }
+    .dlg-h { padding:15px; background:#f5f6f7; font-weight:700; display:flex; justify-content:space-between; }
+    .dlg-b { padding:20px; }
   </style>
 </head>
 <body>
 
 <div id="authOverlay">
   <div class="auth-box">
-    <h1 style="color:var(--accent); margin-bottom:10px">עצמאי פלוס</h1>
-    <p style="color:#64748b; margin-bottom:30px">אנא התחברי לחשבון שלך</p>
-    <div id="authForm">
-      <input type="email" id="authEmail" placeholder="אימייל">
-      <input type="password" id="authPass" placeholder="סיסמה">
-      <button class="btn btn-p" style="width:100%; padding:14px; margin-bottom:10px" id="btnLogin">התחברות</button>
-      <button class="btn btn-s" style="width:100%; padding:14px" id="btnSignup">הרשמה (משתמש חדש)</button>
-    </div>
-    <p id="authError" style="color:var(--bad); font-size:13px; margin-top:15px; font-weight:600"></p>
+    <h1 style="color:var(--accent)">עצמאי פלוס</h1>
+    <input type="email" id="authEmail" placeholder="אימייל">
+    <input type="password" id="authPass" placeholder="סיסמה">
+    <button class="btn btn-p" style="width:100%; padding:12px" onclick="handleAuth('login')">התחברות</button>
+    <button class="btn btn-s" style="width:100%; margin-top:8px" onclick="handleAuth('signup')">הרשמה</button>
+    <p id="authError" style="color:var(--bad); font-size:12px; margin-top:10px"></p>
   </div>
 </div>
 
@@ -73,60 +54,49 @@
   <header>
     <div class="wrap nav-flex">
       <div class="logo">עצמאי פלוס</div>
-      <div class="nav-btns">
-        <button class="btn btn-s" onclick="document.getElementById('dlgCats').showModal()">📊 טבלת קטגוריות</button>
-        <button class="btn btn-s" onclick="window.open('https://www.gov.il/he/service/reporting-or-payment-of-vat-reports')">🏦 דיווח מע"מ</button>
-        <button class="btn btn-s" id="btnSettings">⚙️ הגדרות עסק</button>
-        <button class="btn btn-s" onclick="window.open('https://mail.google.com/mail/?view=cm&fs=1&to=azmaiplusapp@gmail.com')">💬 פנייה למפתח</button>
-        <button class="btn btn-danger" id="btnLogout">יציאה</button>
+      <div style="display:flex; gap:8px">
+        <button class="btn btn-s" onclick="document.getElementById('dlgReports').showModal()">📄 דוחות</button>
+        <button class="btn btn-s" onclick="document.getElementById('dlgCats').showModal()">📊 קטגוריות</button>
+        <button class="btn btn-s" onclick="window.open('https://www.gov.il/he/service/reporting-or-payment-of-vat-reports')">🏦 מע"מ</button>
+        <button class="btn btn-s" onclick="openSettings()">⚙️ הגדרות</button>
+        <button class="btn btn-danger" onclick="auth.signOut()">יציאה</button>
       </div>
     </div>
   </header>
 
   <main class="wrap">
     <div class="stats">
-      <div class="stat-box">הכנסות נטו<span class="stat-val" id="sInc" style="color:var(--good)">₪0</span></div>
+      <div class="stat-box">הכנסות (נטו)<span class="stat-val" id="sInc" style="color:var(--good)">₪0</span></div>
       <div class="stat-box">הוצאות מוכרות<span class="stat-val" id="sExp" style="color:var(--bad)">₪0</span></div>
       <div class="stat-box">מע"מ (לתשלום/החזר)<span class="stat-val" id="sVat">₪0</span></div>
-      <div class="stat-box">רווח נקי (לפני מס)<span class="stat-val" id="sNet" style="color:var(--accent)">₪0</span></div>
+      <div class="stat-box">רווח נקי<span class="stat-val" id="sNet" style="color:var(--accent)">₪0</span></div>
     </div>
 
     <div class="grid">
       <div class="card">
-        <div class="card-hd">➕ תנועה חדשה</div>
+        <div class="card-hd" id="formTitle">הוספת תנועה</div>
         <div class="card-bd">
           <form id="txForm">
+            <input type="hidden" id="fId">
             <label>תאריך</label><input type="date" id="fDate" required>
-            <label>סוג תנועה</label><select id="fType"><option value="income">הכנסה</option><option value="expense">הוצאה</option></select>
+            <label>סוג</label><select id="fType"><option value="income">הכנסה</option><option value="expense">הוצאה</option></select>
             <label>קטגוריה</label><select id="fCat"></select>
-            <label>תיאור / לקוח / ספק</label><input type="text" id="fDesc" required>
-            <label>סכום כולל (₪)</label><input type="number" step="0.01" id="fSum" required>
-            <button type="submit" class="btn btn-p" style="width:100%; padding:14px">שמירה במערכת</button>
+            <label>תיאור / ספק</label><input type="text" id="fDesc" required>
+            <label>סכום כולל</label><input type="number" step="0.01" id="fSum" required>
+            <button type="submit" class="btn btn-p" style="width:100%; padding:12px">שמירה</button>
+            <button type="button" id="btnCancelEdit" class="btn btn-s" style="width:100%; margin-top:8px; display:none" onclick="resetForm()">ביטול עריכה</button>
           </form>
         </div>
       </div>
 
       <div class="card">
         <div class="card-hd">
-          תנועות ודיווחים
-          <div style="display:flex; gap:10px">
-            <input type="month" id="filterMonth" style="margin:0; width:150px">
-            <button class="btn btn-s" id="btnExportPDF">📄 דוח PDF</button>
-            <button class="btn btn-p" style="background:var(--good)" id="btnExportExcel">📥 אקסל</button>
-          </div>
+          תנועות אחרונות
+          <input type="month" id="filterMonth" style="margin:0; width:140px">
         </div>
         <div class="card-bd" style="overflow-x:auto">
           <table id="txTable">
-            <thead>
-              <tr>
-                <th>תאריך</th>
-                <th>תיאור / קטגוריה</th>
-                <th>סה"כ</th>
-                <th>מע"מ מוכר</th>
-                <th>מוכר למס</th>
-                <th></th>
-              </tr>
-            </thead>
+            <thead><tr><th>תאריך</th><th>תיאור</th><th>סה"כ</th><th>מע"מ</th><th>מוכר</th><th>פעולות</th></tr></thead>
             <tbody id="txBody"></tbody>
           </table>
         </div>
@@ -135,28 +105,36 @@
   </main>
 </div>
 
-<dialog id="dlgCats">
-  <div class="dlg-h">טבלת קטגוריות והכרה <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
-  <div class="dlg-b" id="catsTableUI"></div>
+<dialog id="dlgReports">
+  <div class="dlg-h">הפקת דוחות <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
+  <div class="dlg-b">
+    <p>בחרי את סוג הדוח להורדה (PDF):</p>
+    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="genReport('income')">דוח הכנסות</button>
+    <button class="btn btn-p" style="width:100%; margin-bottom:10px" onclick="genReport('expense')">דוח הוצאות</button>
+    <button class="btn btn-danger" style="width:100%" onclick="genReport('all')">דוח רווח והפסד שנתי</button>
+  </div>
 </dialog>
 
 <dialog id="dlgSettings">
-  <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
+  <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
   <div class="dlg-b">
-    <label>שם העסק / בעל העסק</label><input type="text" id="pName">
-    <label>מספר עוסק (ח.פ/ת.ז)</label><input type="text" id="pId">
-    <label>טלפון ליצירת קשר</label><input type="text" id="pPhone">
+    <label>שם העסק</label><input type="text" id="pName">
+    <label>ח.פ / ת.ז</label><input type="text" id="pId">
     <label>סוג עוסק</label>
     <select id="pType"><option value="ptor">עוסק פטור</option><option value="morasha">עוסק מורשה</option></select>
-    <label>אחוז מע"מ (%)</label><input type="number" id="pVatRate" value="18">
-    <button class="btn btn-p" style="width:100%" id="btnSaveProfile">עדכון נתוני עסק</button>
+    <button class="btn btn-p" style="width:100%" onclick="saveProfile()">שמור הגדרות</button>
   </div>
+</dialog>
+
+<dialog id="dlgCats">
+  <div class="dlg-h">טבלת קטגוריות <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
+  <div class="dlg-b" id="catsUI" style="font-size:12px"></div>
 </dialog>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, onSnapshot, deleteDoc, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, onSnapshot, deleteDoc, orderBy, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -198,79 +176,69 @@
     "נסיעות לחו\"ל": { v: 0.0, t: 1.0, type: 'expense' }
   };
 
-  let user = null, profile = { pName:'', pId:'', pPhone:'', pType:'ptor', pVatRate:18 }, allTx = [];
+  let user = null, profile = { pName:'', pId:'', pType:'ptor' }, allTx = [];
 
-  // --- Auth Handlers ---
-  document.getElementById('btnLogin').onclick = async () => {
+  window.handleAuth = async (m) => {
     const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
-    try { await signInWithEmailAndPassword(auth, e, p); }
-    catch(err) { document.getElementById('authError').textContent = "פרטי התחברות שגויים"; }
+    try { m==='login' ? await signInWithEmailAndPassword(auth,e,p) : await createUserWithEmailAndPassword(auth,e,p); }
+    catch(err) { document.getElementById('authError').innerText = err.message; }
   };
-
-  document.getElementById('btnSignup').onclick = async () => {
-    const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
-    try { 
-      const res = await createUserWithEmailAndPassword(auth, e, p);
-      await setDoc(doc(db, "users", res.user.uid), profile);
-    } catch(err) { document.getElementById('authError').textContent = "המייל קיים או סיסמה קצרה מדי"; }
-  };
-
-  document.getElementById('btnLogout').onclick = () => signOut(auth);
 
   onAuthStateChanged(auth, async (u) => {
     if(u) {
       user = u;
       const s = await getDoc(doc(db, "users", u.uid));
-      if(s.exists()) profile = {...profile, ...s.data()};
-      document.getElementById('authOverlay').style.display = 'none';
+      if(s.exists()) profile = s.data();
+      document.getElementById('authOverlay').hidden = true;
       document.getElementById('app').hidden = false;
-      initApp();
+      init();
     } else {
-      document.getElementById('authOverlay').style.display = 'flex';
+      document.getElementById('authOverlay').hidden = false;
       document.getElementById('app').hidden = true;
     }
   });
 
-  function initApp() {
-    // Populate UI
-    const sel = document.getElementById('fCat'), list = document.getElementById('catsTableUI');
+  function init() {
+    const sel = document.getElementById('fCat'), catsUI = document.getElementById('catsUI');
     sel.innerHTML = '';
-    let html = '<table><tr><th>קטגוריה</th><th>מע"מ</th><th>מס הכנסה</th></tr>';
+    let html = '<table><tr><th>קטגוריה</th><th>מע"מ</th><th>מס</th></tr>';
     Object.keys(categories).forEach(k => {
       sel.innerHTML += `<option value="${k}">${k}</option>`;
       html += `<tr><td>${k}</td><td>${(categories[k].v*100).toFixed(0)}%</td><td>${(categories[k].t*100).toFixed(0)}%</td></tr>`;
     });
-    list.innerHTML = html + '</table>';
+    catsUI.innerHTML = html + '</table>';
 
-    // Real-time listener
     onSnapshot(query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")), (snap) => {
       allTx = []; snap.forEach(d => allTx.push({id: d.id, ...d.data()}));
       render();
     });
   }
 
-  // --- Transactions ---
+  // --- שמירה / עריכה ---
   document.getElementById('txForm').onsubmit = async (e) => {
     e.preventDefault();
+    const id = document.getElementById('fId').value;
     const sum = parseFloat(document.getElementById('fSum').value);
     const cat = categories[document.getElementById('fCat').value];
-    const isMorasha = profile.pType === 'morasha';
-    const vatRate = isMorasha ? (profile.pVatRate/100) : 0;
+    const vatRate = profile.pType === 'morasha' ? 0.17 : 0;
 
     const net = sum / (1 + vatRate);
     const vat = sum - net;
     const recVat = vat * cat.v;
     const recTax = (net + (vat - recVat)) * cat.t;
 
-    await addDoc(collection(db, "users", user.uid, "transactions"), {
+    const data = {
       date: document.getElementById('fDate').value,
       type: document.getElementById('fType').value,
       cat: document.getElementById('fCat').value,
       desc: document.getElementById('fDesc').value,
-      total: sum, net, recVat, recTax, created: Date.now()
-    });
-    e.target.reset();
-    document.getElementById('fDate').valueAsDate = new Date();
+      total: sum, net, recVat, recTax
+    };
+
+    if(id) await updateDoc(doc(db, "users", user.uid, "transactions", id), data);
+    else await addDoc(collection(db, "users", user.uid, "transactions"), data);
+    
+    resetForm();
   };
 
   function render() {
@@ -287,7 +255,10 @@
         <td>₪${t.total.toFixed(2)}</td>
         <td>₪${t.recVat.toFixed(2)}</td>
         <td style="color:${isInc?'var(--good)':'var(--bad)'}">₪${isInc?t.net.toFixed(2):t.recTax.toFixed(2)}</td>
-        <td><button class="btn btn-danger" style="padding:5px 10px" onclick="deleteTx('${t.id}')">X</button></td>
+        <td>
+          <button class="btn btn-s" onclick="editTx('${t.id}')">✏️</button>
+          <button class="btn btn-danger" onclick="deleteTx('${t.id}')">X</button>
+        </td>
       </tr>`;
     }).join('');
 
@@ -297,50 +268,64 @@
     document.getElementById('sNet').innerText = `₪${(ti-te).toLocaleString()}`;
   }
 
+  window.editTx = (id) => {
+    const t = allTx.find(x => x.id === id);
+    document.getElementById('fId').value = t.id;
+    document.getElementById('fDate').value = t.date;
+    document.getElementById('fType').value = t.type;
+    document.getElementById('fCat').value = t.cat;
+    document.getElementById('fDesc').value = t.desc;
+    document.getElementById('fSum').value = t.total;
+    document.getElementById('formTitle').innerText = "עריכת תנועה";
+    document.getElementById('btnCancelEdit').style.display = "block";
+  };
+
+  window.resetForm = () => {
+    document.getElementById('txForm').reset();
+    document.getElementById('fId').value = "";
+    document.getElementById('formTitle').innerText = "הוספת תנועה";
+    document.getElementById('btnCancelEdit').style.display = "none";
+    document.getElementById('fDate').valueAsDate = new Date();
+  };
+
   window.deleteTx = (id) => confirm("למחוק?") && deleteDoc(doc(db, "users", user.uid, "transactions", id));
 
-  // --- Exports ---
-  document.getElementById('btnExportExcel').onclick = () => {
-    const rows = [
-      ["עוסק:", profile.pName, "ח.פ:", profile.pId, "טלפון:", profile.pPhone],
-      [],
-      ["תאריך", "תיאור", "קטגוריה", "סה\"כ כולל", "מע\"מ מוכר", "מוכר למס"]
-    ];
-    allTx.forEach(t => rows.push([t.date, t.desc, t.cat, t.total, t.recVat, t.recTax]));
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "דוח חשבונאי");
-    XLSX.writeFile(wb, `עצמאי_פלוס_${profile.pName}.xlsx`);
-  };
-
-  document.getElementById('btnExportPDF').onclick = () => {
+  // --- דוחות PDF ---
+  window.genReport = (mode) => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    doc.text("Accounting Report", 10, 10);
+    doc.text(`Report: ${mode.toUpperCase()}`, 10, 10);
     doc.text(`Business: ${profile.pName} | ID: ${profile.pId}`, 10, 20);
-    const data = allTx.map(t => [t.date, t.desc, t.cat, t.total.toFixed(2), t.recVat.toFixed(2), t.recTax.toFixed(2)]);
-    doc.autoTable({ head: [['Date', 'Desc', 'Cat', 'Total', 'VAT', 'Tax']], body: data, startY: 30 });
-    doc.save("Report.pdf");
+    
+    let filtered = allTx;
+    if(mode==='income') filtered = allTx.filter(t => t.type==='income');
+    if(mode==='expense') filtered = allTx.filter(t => t.type==='expense');
+
+    const data = filtered.map(t => [t.date, t.desc, t.total.toFixed(2), t.recTax.toFixed(2)]);
+    doc.autoTable({ head: [['Date', 'Desc', 'Total', 'Recognized']], body: data, startY: 30 });
+    doc.save(`Report_${mode}.pdf`);
   };
 
-  // --- Profile Settings ---
-  document.getElementById('btnSettings').onclick = () => {
-    ['pName','pId','pPhone','pType','pVatRate'].forEach(k => document.getElementById(k).value = profile[k]);
+  window.openSettings = () => {
+    document.getElementById('pName').value = profile.pName;
+    document.getElementById('pId').value = profile.pId;
+    document.getElementById('pType').value = profile.pType;
     document.getElementById('dlgSettings').showModal();
   };
-  document.getElementById('btnSaveProfile').onclick = async () => {
-    profile = {
-      pName: document.getElementById('pName').value, pId: document.getElementById('pId').value,
-      pPhone: document.getElementById('pPhone').value, pType: document.getElementById('pType').value,
-      pVatRate: parseFloat(document.getElementById('pVatRate').value)
+
+  window.saveProfile = async () => {
+    profile = { 
+        pName: document.getElementById('pName').value, 
+        pId: document.getElementById('pId').value, 
+        pType: document.getElementById('pType').value 
     };
     await setDoc(doc(db, "users", user.uid), profile);
     document.getElementById('dlgSettings').close();
   };
 
-  document.getElementById('filterMonth').onchange = render;
   document.getElementById('fDate').valueAsDate = new Date();
-  document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
+  document.getElementById('filterMonth').value = new Date().toISOString().slice(0,7);
+  document.getElementById('filterMonth').onchange = render;
 </script>
 </body>
 </html>
