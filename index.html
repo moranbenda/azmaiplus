@@ -679,25 +679,12 @@ dialog{
           <input type="date" id="dDate" />
         </div>
         <div>
-          <label>לקוח</label>
-          <input type="text" id="dClientName" list="customersDatalist" placeholder="התחילי להקליד שם לקוח..." />
-          <input type="hidden" id="dClientId" value="" />
-          <datalist id="customersDatalist"></datalist>
+          <label>שם לקוח</label>
+          <input type="text" id="dClientName" placeholder="שם מלא / חברה" />
         </div>
         <div>
           <label>טלפון לקוח (אופציונלי)</label>
           <input type="tel" id="dClientPhone" placeholder="05..." />
-          <label>ח.פ / עוסק מורשה (אופציונלי)</label>
-          <input type="text" id="dClientVatId" placeholder="לדוגמה: 123456789" />
-
-          <div class="row" style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-            <label class="chk" style="display:flex; align-items:center; gap:8px;">
-              <input type="checkbox" id="dSaveCustomer" checked />
-              שמור/עדכן כרטיס לקוח
-            </label>
-            <button class="btn" id="btnCustomerCard" type="button">כרטיס לקוח</button>
-          </div>
-
         </div>
         <div>
           <label>תיאור</label>
@@ -750,10 +737,7 @@ import {
   getFirestore,
   doc,
   setDoc,
-  getDoc,
-  collection,
-  addDoc,
-  serverTimestamp
+  getDoc
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 /* -----  הכניסי את הפרטים שלך  ----- */
@@ -775,7 +759,6 @@ const db = getFirestore(app);
    2) בחירת אלמנטים מה־DOM
 ---------------------------------------------------------- */
 
-const ENABLE_DOCS = false; // מסמכים כבוי זמנית
 const authScreen = document.getElementById("authScreen");
 const appShell = document.getElementById("appShell");
 const authForm = document.getElementById("authForm");
@@ -829,8 +812,6 @@ const btnVatLink = document.getElementById("btnVatLink");
 
 /* מסמכים */
 const btnDocsOpen  = document.getElementById("btnDocsOpen");
-
-if (!ENABLE_DOCS && btnDocsOpen) { btnDocsOpen.style.display = "none"; }
 const docsDialog   = document.getElementById("docsDialog");
 const btnDocsClose = document.getElementById("btnDocsClose");
 const docsStatus   = document.getElementById("docsStatus");
@@ -839,56 +820,6 @@ const dType        = document.getElementById("dType");
 const dDate        = document.getElementById("dDate");
 const dClientName  = document.getElementById("dClientName");
 const dClientPhone = document.getElementById("dClientPhone");
-
-const dClientId    = document.getElementById("dClientId");
-const dClientVatId = document.getElementById("dClientVatId");
-const dSaveCustomer= document.getElementById("dSaveCustomer");
-const btnCustomerCard = document.getElementById("btnCustomerCard");
-const customersDatalist = document.getElementById("customersDatalist");
-
-// ---- כרטיסי לקוח ----
-function lsKeyCustomers(uid){ return `customers_${uid}`; }
-function lsKeyDocs(uid){ return `docs_${uid}`; }
-function getCustomers(uid){
-  try { return JSON.parse(localStorage.getItem(lsKeyCustomers(uid)) || "[]"); } catch { return []; }
-}
-function saveCustomers(uid, list){
-  localStorage.setItem(lsKeyCustomers(uid), JSON.stringify(list || []));
-  renderCustomersDatalist();
-  renderCustomerCardSelect();
-}
-function getDocs(uid){
-  try { return JSON.parse(localStorage.getItem(lsKeyDocs(uid)) || "[]"); } catch { return []; }
-}
-function saveDocs(uid, list){
-  localStorage.setItem(lsKeyDocs(uid), JSON.stringify(list || []));
-}
-function upsertCustomer(uid, cust){
-  const list = getCustomers(uid);
-  const i = list.findIndex(x => x.id === cust.id);
-  if (i >= 0) list[i] = { ...list[i], ...cust };
-  else list.push(cust);
-  saveCustomers(uid, list);
-  return cust;
-}
-function findCustomerByName(uid, name){
-  const n = (name || "").trim().toLowerCase();
-  if (!n) return null;
-  return getCustomers(uid).find(c => (c.name || "").trim().toLowerCase() === n) || null;
-}
-function renderCustomersDatalist(){
-  if (!customersDatalist || !currentUid) return;
-  const list = getCustomers(currentUid);
-  customersDatalist.innerHTML = list.map(c => `<option value="${escapeHtml(c.name)}"></option>`).join("");
-}
-function fillFromCustomer(c){
-  if (!c) return;
-  if (dClientName) dClientName.value = c.name || "";
-  if (dClientPhone) dClientPhone.value = c.phone || "";
-  if (dClientVatId) dClientVatId.value = c.vatId || "";
-  if (dClientId) dClientId.value = c.id || "";
-}
-
 const dDesc        = document.getElementById("dDesc");
 const dAmount      = document.getElementById("dAmount");
 const dIncVat      = document.getElementById("dIncVat");
@@ -1114,14 +1045,10 @@ btnReportsOpen.onclick    = () => {
   rFrom.value = "";
   rTo.value   = "";
   rType.value = "income";
-  if (ENABLE_DOCS) {
   reportsDialog.showModal();
-}
 };
-// מסמכים כבוי כרגע: לא מחברים מאזינים כדי לא לשבור התחברות/אפליקציה
-if (ENABLE_DOCS && btnDocsClose) btnDocsClose.onclick = () => docsDialog.close();
-if (ENABLE_DOCS && btnDocsOpen) btnDocsOpen.onclick = () => {
-
+btnDocsClose.onclick = () => docsDialog.close();
+btnDocsOpen.onclick = () => {
   docsStatus.textContent = "";
   if (!dDate.value) dDate.value = todayStr();
   // התאמה לעוסק פטור: אין מע"מ
@@ -1160,72 +1087,53 @@ function fillSupportForm() {
 
 btnSupportClose && (btnSupportClose.onclick = () => supportDialog.close());
 
-btnSupportOpen && (btnSupportOpen.onclick = () => { window.location.href = "mailto:azmaiplusapp@gmail.com?subject=%D7%A4%D7%A0%D7%99%D7%99%D7%94%20%D7%9C%D7%9E%D7%A4%D7%AA%D7%97%20-%20%D7%A2%D7%A6%D7%9E%D7%90%D7%99%20%D7%A4%D7%9C%D7%95%D7%A1"; });
+btnSupportOpen && (btnSupportOpen.onclick = () => {
+  fillSupportForm();
+  if (sMsg) sMsg.value = "";
+  supportDialog.showModal();
+});
 
 btnSupportSend && (btnSupportSend.onclick = async () => {
-  const msg = (supportMsg?.value || "").trim();
-  if (!msg) { alert("נא לכתוב את תוכן הפנייה"); return; }
+  const name  = (sName?.value || "").trim();
+  const phone = (sPhone?.value || "").trim();
+  const email = (sEmail?.value || "").trim();
+  const msg   = (sMsg?.value || "").trim();
 
-  // נשלח מייל אוטומטי דרך Firebase Extension: Trigger Email (firestore-send-email)
-  // התוסף מאזין לקולקשן בשם "mail" (ברירת מחדל) ושולח את המייל.
-  try {
-    const fromName  = userProfile?.fullName || userProfile?.name || "";
-    const fromEmail = userProfile?.email || "";
-    const fromPhone = userProfile?.phone || "";
-    const bizName   = userProfile?.businessName || "";
-    const bizId     = userProfile?.businessId || userProfile?.vatId || userProfile?.taxId || "";
-
-    const subject = `פנייה למפתח – ${bizName || fromName || fromEmail || "משתמש"}${bizId ? " ("+bizId+")" : ""}`;
-
-    const textBody =
-`פנייה למפתח
-================
-שם: ${fromName}
-אימייל: ${fromEmail}
-טלפון: ${fromPhone}
-עסק: ${bizName}
-מספר עוסק/ח.פ: ${bizId}
-
-הודעה:
-${msg}
-`;
-
-    const htmlBody =
-      `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif">
-        <h2 style="margin:0 0 10px">פנייה למפתח</h2>
-        <p style="margin:0 0 6px"><b>שם:</b> ${escapeHtml(fromName)}</p>
-        <p style="margin:0 0 6px"><b>אימייל:</b> ${escapeHtml(fromEmail)}</p>
-        <p style="margin:0 0 6px"><b>טלפון:</b> ${escapeHtml(fromPhone)}</p>
-        <p style="margin:0 0 6px"><b>עסק:</b> ${escapeHtml(bizName)}</p>
-        <p style="margin:0 0 14px"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</p>
-        <pre style="white-space:pre-wrap;background:#f6f7fb;border:1px solid #e6e8ef;border-radius:12px;padding:12px;margin:0">${escapeHtml(msg)}</pre>
-      </div>`;
-
-    await addDoc(collection(db, "mail"), {
-      to: SUPPORT_EMAIL,                 // אפשר גם מערך כתובות
-      replyTo: fromEmail || undefined,   // כדי שתוכלי להשיב ישירות לפונה
-      createdAt: serverTimestamp(),
-      meta: {
-        uid: currentUid || null,
-        fromName, fromEmail, fromPhone,
-        businessName: bizName,
-        businessId: bizId
-      },
-      message: {
-        subject,
-        text: textBody,
-        html: htmlBody
-      }
-    });
-
-    supportMsg.value = "";
-    alert("הפנייה נשלחה. נחזור אליך בהקדם 🙏");
-    supportModal?.classList.remove("open");
-  } catch (err) {
-    console.error("Support send failed:", err);
-    alert("לא הצלחנו לשלוח כרגע. נסי שוב בעוד רגע.");
+  if (!msg) {
+    supportStatus.textContent = "נא לכתוב הודעה לפני שליחה";
+    return;
   }
+
+  const bizName = userProfile?.businessName || "";
+  const bizId   = userProfile?.businessId || "";
+
+  const subject = `פנייה מהאפליקציה - ${bizName || name || email || "משתמש"}`;
+  const body = [
+    "פנייה למפתח",
+    "----------------",
+    bizName ? `שם עסק: ${bizName}` : null,
+    bizId ? `מס' עוסק/ח.פ: ${bizId}` : null,
+    name ? `שם: ${name}` : null,
+    phone ? `טלפון: ${phone}` : null,
+    email ? `אימייל: ${email}` : null,
+    "",
+    msg
+  ].filter(Boolean).join("\n");
+
+  const mailto = `mailto:${encodeURIComponent(SUPPORT_EMAIL)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+  // ניסיון לפתוח תוכנת דוא"ל. אם חסום – נעתיק ללוח.
+  try {
+    window.location.href = mailto;
+    supportStatus.textContent = "פותח הודעת מייל…";
+  } catch (e) {}
+
+  try {
+    await navigator.clipboard.writeText(body);
+    supportStatus.textContent = "הטקסט הועתק ללוח (במידה ותוכנת המייל לא נפתחה)";
+  } catch (e) {}
 });
+
 /* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
 ---------------------------------------------------------- */
@@ -2283,8 +2191,7 @@ function buildDocHtml(payload){
       </div>
 
       <div style="margin-top:10px" class="muted">
-        ${payload.number ? `מספר: <strong>${escapeHtml(String(payload.number))}</strong> · ` : ""}לקוח: <strong>${escapeHtml(payload.clientName || "-")}</strong>
-        ${payload.clientVatId ? ` · ח.פ/עוסק: ${escapeHtml(payload.clientVatId)}` : ""}
+        לקוח: <strong>${escapeHtml(payload.clientName || "-")}</strong>
         ${payload.clientPhone ? ` · טלפון: ${escapeHtml(payload.clientPhone)}` : ""}
       </div>
 
@@ -2293,7 +2200,7 @@ function buildDocHtml(payload){
           <tr>
             <th>תיאור</th>
             <th>סכום נטו</th>
-            ${showVat ? '<th>מע"מ</th>' : ""}
+            ${showVat ? "<th>מע"מ</th>" : ""}
             <th>סה"כ</th>
           </tr>
         </thead>
@@ -2317,7 +2224,7 @@ function buildDocHtml(payload){
         מסמך זה הופק במערכת עצמאי פלוס.
       </div>
       <div style="margin-top:10px">
-        <button onclick="(function(){const w=window.open(\"\",\"_blank\");w.document.write(document.documentElement.outerHTML);w.document.close();w.focus();setTimeout(()=>w.print(),300);})()">הדפסה / שמירה כ-PDF</button>
+        <button onclick="window.print()">הדפסה / שמירה כ-PDF</button>
       </div>
     </div>
   </body>
@@ -2344,243 +2251,51 @@ function openDocInNewTab(){
   w.focus();
 }
 
-
-// Auto-fill לקוח לפי שם
-dClientName && dClientName.addEventListener("change", () => {
-  if (!currentUid) return;
-  const c = findCustomerByName(currentUid, dClientName.value);
-  if (c) fillFromCustomer(c);
-  else {
-    if (dClientId) dClientId.value = "";
-  }
-});
-
-// ---- מספור מסמכים ----
-const DOC_START = {
-  invoice: 10000,        // חשבונית מס
-  invrec: 5000,          // חשבונית מס קבלה
-  receipt: 2000,         // קבלה
-  credit: 100,           // חשבונית זיכוי
-  deal: 10               // חשבונית עסקה
-};
-function seqKey(uid, type){ return `seq_${uid}_${type}`; }
-function getNextNumber(uid, type){
-  if (type === "quote") return ""; // הצעת מחיר בלי מספר
-  const start = DOC_START[type] ?? 1;
-  const key = seqKey(uid, type);
-  let n = parseInt(localStorage.getItem(key) || "", 10);
-  if (!Number.isFinite(n) || n < start) n = start;
-  localStorage.setItem(key, String(n + 1));
-  return String(n);
-}
-
-// ---- מודאל כרטיס לקוח ----
-const customerCardModal = document.getElementById("customerCardModal");
-const btnCustomerCardClose = document.getElementById("btnCustomerCardClose");
-const ccSelect = document.getElementById("ccSelect");
-const ccName = document.getElementById("ccName");
-const ccPhone = document.getElementById("ccPhone");
-const ccVatId = document.getElementById("ccVatId");
-const ccSave = document.getElementById("ccSave");
-const ccDelete = document.getElementById("ccDelete");
-const ccDocsTbody = document.getElementById("ccDocsTbody");
-
-function openCustomerCard(){
-  if (!currentUid) return;
-  renderCustomerCardSelect();
-  customerCardModal?.classList.add("open");
-  // בחר את הלקוח הנוכחי מהמסמך אם יש
-  const cid = dClientId?.value || "";
-  if (cid && ccSelect) ccSelect.value = cid;
-  refreshCustomerCard();
-}
-function closeCustomerCard(){ customerCardModal?.classList.remove("open"); }
-
-function renderCustomerCardSelect(){
-  if (!ccSelect || !currentUid) return;
-  const list = getCustomers(currentUid);
-  ccSelect.innerHTML = [
-    '<option value="">בחרי לקוח...</option>',
-    ...list.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || "(ללא שם)")}</option>`)
-  ].join("");
-}
-
-function refreshCustomerCard(){
-  if (!currentUid) return;
-  const cid = ccSelect?.value || "";
-  const list = getCustomers(currentUid);
-  const c = list.find(x => x.id === cid) || null;
-
-  if (c){
-    ccName.value = c.name || "";
-    ccPhone.value = c.phone || "";
-    ccVatId.value = c.vatId || "";
-  } else {
-    ccName.value = "";
-    ccPhone.value = "";
-    ccVatId.value = "";
-  }
-
-  // היסטוריה
-  const docs = getDocs(currentUid).filter(d => d.customerId && d.customerId === cid);
-  if (ccDocsTbody){
-    ccDocsTbody.innerHTML = docs
-      .sort((a,b)=> (a.date||"").localeCompare(b.date||""))
-      .map(d => `
-        <tr>
-          <td>${escapeHtml(d.date || "")}</td>
-          <td>${escapeHtml(docTypeLabel(d.type) || "")}</td>
-          <td>${escapeHtml(d.number || "")}</td>
-          <td>${escapeHtml(d.desc || "")}</td>
-          <td>${toMoney(d.amount || 0)}</td>
-        </tr>
-      `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:14px">אין מסמכים ללקוח</td></tr>`;
-  }
-}
-
-btnCustomerCard && (btnCustomerCard.onclick = openCustomerCard);
-btnCustomerCardClose && (btnCustomerCardClose.onclick = closeCustomerCard);
-customerCardModal && (customerCardModal.addEventListener("click", (e) => {
-  if (e.target === customerCardModal) closeCustomerCard();
-}));
-ccSelect && (ccSelect.onchange = refreshCustomerCard);
-
-ccSave && (ccSave.onclick = () => {
-  if (!currentUid) return;
-  const cid = ccSelect?.value || crypto.randomUUID();
-  const cust = { id: cid, name: (ccName.value||"").trim(), phone: (ccPhone.value||"").trim(), vatId: (ccVatId.value||"").trim() };
-  if (!cust.name) { alert("נא למלא שם לקוח"); return; }
-  upsertCustomer(currentUid, cust);
-  ccSelect.value = cid;
-  refreshCustomerCard();
-  // עדכון גם בטופס המסמך אם זה אותו לקוח
-  fillFromCustomer(cust);
-  alert("נשמר");
-});
-
-ccDelete && (ccDelete.onclick = () => {
-  if (!currentUid) return;
-  const cid = ccSelect?.value || "";
-  if (!cid) return;
-  if (!confirm("למחוק את כרטיס הלקוח?")) return;
-  const list = getCustomers(currentUid).filter(c => c.id !== cid);
-  saveCustomers(currentUid, list);
-  ccSelect.value = "";
-  refreshCustomerCard();
-});
-
 btnDocCreate.onclick = () => {
-  if (!currentUid) { alert("יש להתחבר"); return; }
-
-  const docType = dType.value;
-  const date = dDate.value || new Date().toISOString().slice(0,10);
-
+  docsStatus.textContent = "";
+  const type = dType.value;
+  const date = dDate.value || todayStr();
   const clientName = (dClientName.value || "").trim();
-  if (!clientName) { alert("נא למלא שם לקוח"); return; }
-
   const clientPhone = (dClientPhone.value || "").trim();
-  const clientVatId = (dClientVatId?.value || "").trim();
-  const desc = (dDesc.value || "").trim() || docTypeLabel(docType);
-
-  const amount = parseFloat(String(dAmount.value || "0").replace(/,/g,""));
-  if (!Number.isFinite(amount) || amount <= 0) { alert("נא למלא סכום תקין"); return; }
-
+  const desc = (dDesc.value || "").trim();
+  const amount = parseFloat(dAmount.value || "0");
   const incVat = !!dIncVat.checked;
-  const { vatEnabled, vatRate } = getSettings();
-  const { net, vat, gross } = splitVAT(amount, incVat, vatEnabled ? vatRate : 0);
 
-  // כרטיס לקוח (שם ייחודי = אותו לקוח)
-  let customerId = (dClientId?.value || "").trim();
-  const existing = findCustomerByName(currentUid, clientName);
-  if (existing) customerId = existing.id;
+  if (!desc) { docsStatus.textContent = "יש למלא תיאור"; return; }
+  if (!amount || amount <= 0) { docsStatus.textContent = "יש למלא סכום גדול מאפס"; return; }
 
-  if (!customerId) customerId = crypto.randomUUID();
-  if (dClientId) dClientId.value = customerId;
-
-  if (dSaveCustomer?.checked) {
-    upsertCustomer(currentUid, {
-      id: customerId,
-      name: clientName,
-      phone: clientPhone,
-      vatId: clientVatId
-    });
+  // חסימה לעוסק פטור למסמכים שאינם רלוונטיים
+  if (!canIssueTaxInvoice() && (type === "invoice" || type === "invoice_receipt")) {
+    docsStatus.textContent = "עוסק פטור לא יכול להפיק חשבונית מס. בחרי קבלה/חשבונית עסקה.";
+    return;
   }
 
-  // מספור
-  const number = getNextNumber(currentUid, docType);
+  const payload = { type, date, clientName, clientPhone, desc, amount, incVat };
 
-  // שמירת מסמך (לכרטסת/דוחות מסמכים)
-  const docs = getDocs(currentUid);
-  const docRec = {
-    id: crypto.randomUUID(),
-    type: docType,
-    number,
-    date,
-    customerId,
-    clientName,
-    clientPhone,
-    clientVatId,
-    desc,
-    amount,
-    incVat,
-    vatRate: vatEnabled ? vatRate : 0,
-    net, vat, gross,
-    createdAt: Date.now()
-  };
-  docs.push(docRec);
-  saveDocs(currentUid, docs);
+  const htmlStr = buildDocHtml(payload);
+  setDocPreview(htmlStr);
+  lastDocTextForShare = buildShareText(payload);
 
-  // הוספה אוטומטית להכנסות בהתאם לסוג המסמך
-  if (docType !== "quote") {
-    let incomeAmount = gross;
-    if (docType === "credit") incomeAmount = -Math.abs(gross);
-
+  // מסמכים שיוצרים הכנסה אוטומטית
+  const shouldAddIncome = ["invoice","invoice_receipt","receipt","deal_invoice"].includes(type);
+  if (shouldAddIncome) {
+    // נכניס כהכנסה עם קטגוריה = סוג מסמך, ותיאור = תיאור המסמך (לשמור תואם למבנה הקיים)
     rows.push({
-      id: crypto.randomUUID(),
-      type: "income",
+      id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2),
       date,
-      category: "מסמכים חשבונאיים",
-      desc: `${docTypeLabel(docType)}${number ? " #" + number : ""} - ${clientName} | ${desc}`,
-      amount: incomeAmount,
-      incVat: true,
-      deductPct: 100,
-      source: "docModule",
-      doc: { type: docType, number, customerId }
+      type: "income",
+      category: docTypeLabel(type),
+      desc,
+      amount,
+      incVat,
+      deductPct: 100
     });
-
-    persistAndRender();
+    saveToLocal();
+    saveToCloudDebounced();
+    render();
   }
 
-  // תצוגה מקדימה + פעולות
-  lastDocTextForShare = [
-    `${docTypeLabel(docType)}${number ? " #" + number : ""}`,
-    `תאריך: ${date}`,
-    `לקוח: ${clientName}${clientVatId ? " ("+clientVatId+")" : ""}`,
-    clientPhone ? `טלפון: ${clientPhone}` : "",
-    `תיאור: ${desc}`,
-    `סה״כ: ${toMoney(gross)}`
-  ].filter(Boolean).join("\n");
-  lastDocHtml = buildDocHtml({
-    type: docType,
-    number,
-    date,
-    clientName,
-    clientPhone,
-    clientVatId,
-    desc,
-    net,
-    vat,
-    gross
-  });
-
-  // UI reset (לא שובר)
-  // לא מאפסים שם לקוח כדי לא להקשות על הפקה סדרתית
-  dDesc.value = "";
-  dAmount.value = "";
-  // רענון כרטסת אם פתוחה
-  refreshCustomerCard();
-
-  alert("המסמך הופק ונשמר ✅");
+  docsStatus.textContent = "המסמך הופק ✅ (אפשר לפתוח/להדפיס מהתצוגה המקדימה)";
 };
 
 btnDocEmail.onclick = () => {
@@ -2598,10 +2313,6 @@ btnDocWhatsapp.onclick = () => {
 
 function initAppLogic(uid) {
   currentUid = uid;
-
-  // טוען רשימות כרטיסי לקוח/מסמכים
-  renderCustomersDatalist();
-  renderCustomerCardSelect();
 
   if (!appInitialized) {
     // כפתורים ותנועות
@@ -2688,54 +2399,6 @@ renderItemsDatalist();
 /* להתחיל במצב "התחברות" כברירת מחדל */
 tabLogin.click();
 </script>
-
-  <!-- כרטיס לקוח -->
-  <div class="modal" id="customerCardModal" aria-hidden="true">
-    <div class="modal-card" style="max-width:980px">
-      <div class="modal-head">
-        <div class="h2">כרטיס לקוח</div>
-        <button class="btn" id="btnCustomerCardClose" type="button">סגירה</button>
-      </div>
-
-      <div class="grid2">
-        <label>בחרי לקוח</label>
-        <select id="ccSelect"></select>
-
-        <label>שם</label>
-        <input id="ccName" type="text" />
-
-        <label>טלפון</label>
-        <input id="ccPhone" type="text" />
-
-        <label>ח.פ / עוסק</label>
-        <input id="ccVatId" type="text" />
-      </div>
-
-      <div class="row" style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap">
-        <button class="btn primary" id="ccSave" type="button">שמירה</button>
-        <button class="btn danger" id="ccDelete" type="button">מחיקה</button>
-      </div>
-
-      <div style="margin-top:18px">
-        <div class="h3" style="margin:0 0 8px;font-size:15px">היסטוריית מסמכים ללקוח</div>
-        <div style="overflow:auto; border:1px solid var(--line); border-radius:14px">
-          <table class="tbl" style="min-width:760px">
-            <thead>
-              <tr>
-                <th>תאריך</th>
-                <th>סוג</th>
-                <th>מספר</th>
-                <th>תיאור</th>
-                <th>סכום</th>
-              </tr>
-            </thead>
-            <tbody id="ccDocsTbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
 </body>
 </html>
 
