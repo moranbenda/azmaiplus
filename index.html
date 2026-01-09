@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>עצמאי פלוס - אפליקציה לניהול חשבונות</title>
+  <title>עצמאי פלוס - ניהול חשבונות מלא</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root{
-      --bg:#f4f7fa; --panel:#ffffff; --text:#1e293b; --text-dim:#64748b;
+      --bg:#f8fafc; --panel:#ffffff; --text:#1e293b; --text-dim:#64748b;
       --accent:#2563eb; --accent-hover:#1d4ed8; --good:#10b981; --bad:#ef4444;
       --line:#e2e8f0; --radius:16px; --shadow:0 10px 15px -3px rgba(0,0,0,0.1);
     }
@@ -15,9 +15,9 @@
     body{ margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; }
     .wrap{ max-width:1300px; margin:0 auto; padding:20px; }
     
-    header{ background:#fff; border-bottom:1px solid var(--line); padding:15px 0; position:sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.02); }
+    header{ background:#fff; border-bottom:1px solid var(--line); padding:15px 0; position:sticky; top:0; z-index:100; }
     .nav-flex{ display:flex; justify-content:space-between; align-items:center; }
-    .logo{ font-size:24px; font-weight:800; color:var(--accent); text-decoration:none; letter-spacing:-0.5px; }
+    .logo{ font-size:24px; font-weight:800; color:var(--accent); text-decoration:none; }
     .nav-btns{ display:flex; gap:12px; align-items:center; }
 
     .card{ background:var(--panel); border-radius:var(--radius); border:1px solid var(--line); box-shadow:var(--shadow); margin-bottom:24px; overflow:hidden; }
@@ -52,7 +52,6 @@
     dialog{ border:none; border-radius:20px; padding:0; width:450px; box-shadow:var(--shadow); }
     .dlg-h{ padding:20px; background:#f8fafc; border-bottom:1px solid var(--line); font-weight:700; display:flex; justify-content:space-between; }
     .dlg-b{ padding:25px; }
-
     .cat-tag{ font-size:11px; padding:3px 8px; border-radius:6px; background:#f1f5f9; color:var(--text-dim); margin-top:5px; display:inline-block; font-weight:600; }
   </style>
 </head>
@@ -65,7 +64,7 @@
     <form id="authForm">
       <div class="form-group"><input type="email" id="email" placeholder="אימייל" required /></div>
       <div class="form-group"><input type="password" id="pass" placeholder="סיסמה" required /></div>
-      <button type="submit" class="btn btn-p" style="width:100%; padding:14px" id="authBtn">התחברות / הרשמה</button>
+      <button type="submit" class="btn btn-p" style="width:100%; padding:14px">התחברות / הרשמה</button>
     </form>
   </div>
 </div>
@@ -95,7 +94,7 @@
         <div class="card-hd">➕ הוספת תנועה</div>
         <div class="card-bd">
           <form id="txForm">
-            <div class="form-group"><label>תאריך</label><input type="date" id="fDate" required /></div>
+            <div class="form-group"><label>תאריך הפעולה</label><input type="date" id="fDate" required /></div>
             <div class="form-group">
               <label>סוג תנועה</label>
               <select id="fType">
@@ -105,7 +104,7 @@
             </div>
             <div class="form-group"><label>קטגוריה</label><select id="fCat"></select></div>
             <div class="form-group"><label>תיאור / ספק / לקוח</label><input type="text" id="fDesc" required /></div>
-            <div class="form-group"><label>סכום כולל (₪)</label><input type="number" step="0.01" id="fSum" required /></div>
+            <div class="form-group"><label>סכום כולל כולל מע"מ (₪)</label><input type="number" step="0.01" id="fSum" required /></div>
             <button type="submit" class="btn btn-p" style="width:100%; padding:14px">שמירה במערכת</button>
           </form>
         </div>
@@ -116,7 +115,7 @@
           תנועות ודיווחים
           <div style="display:flex; gap:10px">
             <input type="month" id="filterMonth" style="width:auto; padding:6px">
-            <button class="btn btn-s" id="btnExport" style="background:var(--good); color:#fff; border:none">📥 אקסל</button>
+            <button class="btn btn-s" id="btnExport" style="background:var(--good); color:#fff;">📥 ייצוא לאקסל</button>
           </div>
         </div>
         <div class="card-bd" style="overflow-x:auto">
@@ -124,7 +123,7 @@
             <thead>
               <tr>
                 <th>תאריך</th>
-                <th>תיאור</th>
+                <th>תיאור / קטגוריה</th>
                 <th>סה"כ</th>
                 <th>מע"מ מוכר</th>
                 <th>הוצאה מוכרת</th>
@@ -142,9 +141,9 @@
 <dialog id="dlgSettings">
   <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">✕</button></div>
   <div class="dlg-b">
-    <div class="form-group"><label>שם העסק</label><input type="text" id="pName"></div>
-    <div class="form-group"><label>ח.פ / מספר עוסק</label><input type="text" id="pId"></div>
-    <div class="form-group"><label>טלפון ליצירת קשר</label><input type="text" id="pPhone"></div>
+    <div class="form-group"><label>שם העסק / עצמאי</label><input type="text" id="pName"></div>
+    <div class="form-group"><label>ח.פ / עוסק מורשה</label><input type="text" id="pId"></div>
+    <div class="form-group"><label>טלפון</label><input type="text" id="pPhone"></div>
     <div class="form-group">
       <label>סוג עוסק</label>
       <select id="pType">
@@ -153,7 +152,7 @@
       </select>
     </div>
     <div class="form-group"><label>אחוז מע"מ נוכחי (%)</label><input type="number" id="pVatRate" value="18"></div>
-    <button class="btn btn-p" id="btnSaveSettings" style="width:100%; margin-top:10px">עדכון הגדרות</button>
+    <button class="btn btn-p" id="btnSaveSettings" style="width:100%">עדכון ושמירה</button>
   </div>
 </dialog>
 
@@ -175,23 +174,32 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  // --- הרשימה המלאה והמדויקת לפי החוק בישראל ---
+  // --- רשימת הקטגוריות המלאה והמדויקת מהקוד המקורי ---
   const categories = {
     "הכנסה מפעילות": { vRec: 1.0, tRec: 1.0, type: 'income' },
-    "פרסום ושיווק": { vRec: 1.0, tRec: 1.0, type: 'expense' },
-    "ציוד משרדי ודפוס": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "שיווק ופרסום": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "ציוד משרדי": { vRec: 1.0, tRec: 1.0, type: 'expense' },
     "אחזקת רכב (2/3 מוכר)": { vRec: 0.666, tRec: 0.45, type: 'expense' },
     "אחזקת רכב (1/4 מוכר)": { vRec: 0.25, tRec: 0.45, type: 'expense' },
+    "תיקון רכב": { vRec: 0.666, tRec: 0.45, type: 'expense' },
     "דלק": { vRec: 0.666, tRec: 0.45, type: 'expense' },
+    "ביטוח רכב": { vRec: 0.0, tRec: 0.45, type: 'expense' },
+    "טסט רכב": { vRec: 0.0, tRec: 0.45, type: 'expense' },
     "טלפון וסלולר": { vRec: 0.666, tRec: 0.25, type: 'expense' },
     "אינטרנט ותקשורת": { vRec: 1.0, tRec: 1.0, type: 'expense' },
-    "ביטוחים (מקצועי/עסק)": { vRec: 0.0, tRec: 1.0, type: 'expense' },
-    "כיבודים ואירוח": { vRec: 0.0, tRec: 0.8, type: 'expense' },
-    "שכירות עסקית": { vRec: 1.0, tRec: 1.0, type: 'expense' },
-    "חשמל וארנונה": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "ביטוחים": { vRec: 0.0, tRec: 1.0, type: 'expense' },
+    "כיבודים": { vRec: 0.0, tRec: 0.8, type: 'expense' },
+    "שכר דירה עסקי": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "חשמל": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "ארנונה": { vRec: 0.0, tRec: 1.0, type: 'expense' },
+    "מים": { vRec: 1.0, tRec: 1.0, type: 'expense' },
     "עמלות בנק": { vRec: 0.0, tRec: 1.0, type: 'expense' },
-    "נסיעות לחו\"ל (עסקי)": { vRec: 0.0, tRec: 1.0, type: 'expense' },
-    "השתלמויות וכנסים": { vRec: 1.0, tRec: 1.0, type: 'expense' }
+    "דואר ומשלוחים": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "ייעוץ מקצועי": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "השתלמויות": { vRec: 1.0, tRec: 1.0, type: 'expense' },
+    "בגדי עבודה": { vRec: 0.0, tRec: 1.0, type: 'expense' },
+    "מתנות ללקוחות": { vRec: 0.0, tRec: 1.0, type: 'expense' },
+    "נסיעות לחו\"ל": { vRec: 0.0, tRec: 1.0, type: 'expense' }
   };
 
   let user = null;
@@ -230,27 +238,26 @@
     }
   });
 
-  // --- Transactions ---
+  // --- פונקציית החישוב המדויקת ---
   document.getElementById('txForm').onsubmit = async (e) => {
     e.preventDefault();
     const sum = parseFloat(document.getElementById('fSum').value);
     const catKey = document.getElementById('fCat').value;
     const cat = categories[catKey];
-    const isMorasha = profile.pType === 'morasha';
-    const vatRate = isMorasha ? (profile.pVatRate / 100) : 0;
+    const vatRate = profile.pType === 'morasha' ? (profile.pVatRate / 100) : 0;
 
-    // לוגיקה מקצועית לחישוב הכרה
-    const totalVat = sum - (sum / (1 + vatRate));
-    const netCost = sum - totalVat;
-    const recVat = isMorasha ? (totalVat * cat.vRec) : 0;
-    const unrecVat = totalVat - recVat;
-    const recTax = (netCost + unrecVat) * cat.tRec;
+    const net = sum / (1 + vatRate); // סכום הנטו
+    const totalVat = sum - net; // סך המע"מ בתנועה
+    
+    const recVat = totalVat * cat.vRec; // מע"מ מוכר לקיזוז
+    const unrecVat = totalVat - recVat; // מע"מ לא מוכר (מתווסף להוצאה)
+    const recTax = (net + unrecVat) * cat.tRec; // הוצאה מוכרת למס הכנסה
 
     await addDoc(collection(db, "users", user.uid, "transactions"), {
       date: document.getElementById('fDate').value,
       type: document.getElementById('fType').value,
       cat: catKey, desc: document.getElementById('fDesc').value,
-      total: sum, recVat, recTax, net: netCost, created: Date.now()
+      total: sum, recVat, recTax, net, created: Date.now()
     });
     e.target.reset();
     document.getElementById('fDate').valueAsDate = new Date();
@@ -286,15 +293,15 @@
       </tr>`;
     }).join('');
 
-    document.getElementById('sInc').textContent = `₪${ti.toLocaleString()}`;
-    document.getElementById('sExp').textContent = `₪${te.toLocaleString()}`;
-    document.getElementById('sVat').textContent = `₪${tv.toLocaleString()}`;
-    document.getElementById('sNet').textContent = `₪${(ti - te).toLocaleString()}`;
+    document.getElementById('sInc').textContent = `₪${ti.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+    document.getElementById('sExp').textContent = `₪${te.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+    document.getElementById('sVat').textContent = `₪${tv.toLocaleString(undefined, {minimumFractionDigits:2})}`;
+    document.getElementById('sNet').textContent = `₪${(ti - te).toLocaleString(undefined, {minimumFractionDigits:2})}`;
   }
 
   window.deleteTx = (id) => confirm("למחוק?") && deleteDoc(doc(db, "users", user.uid, "transactions", id));
 
-  // --- Settings & Support ---
+  // --- Settings & UI ---
   document.getElementById('btnSettings').onclick = () => {
     ['pName','pId','pPhone','pType','pVatRate'].forEach(k => document.getElementById(k).value = profile[k]);
     document.getElementById('dlgSettings').showModal();
@@ -315,17 +322,17 @@
   };
 
   document.getElementById('btnSupport').onclick = () => {
-    window.location.href = "mailto:azmaiplusapp@gmail.com?subject=פנייה מאפליקציית עצמאי פלוס";
+    window.open("https://mail.google.com/mail/?view=cm&fs=1&to=azmaiplusapp@gmail.com&su=פנייה מאפליקציית עצמאי פלוס");
   };
 
   document.getElementById('btnExport').onclick = () => {
     const excelData = allTransactions.map(t => ({
-      "תאריך": t.date, "תיאור": t.desc, "קטגוריה": t.cat, "סה\"כ": t.total,
-      "מע\"מ מוכר": t.recVat, "הוצאה מוכרת": t.recTax
+      "תאריך": t.date, "תיאור": t.desc, "קטגוריה": t.cat, "סה\"כ כולל": t.total,
+      "מע\"מ מוכר": t.recVat.toFixed(2), "הוצאה מוכרת": t.recTax.toFixed(2)
     }));
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "דוח");
+    XLSX.utils.book_append_sheet(wb, ws, "דוח חשבונאי");
     XLSX.writeFile(wb, `עצמאי_פלוס_דוח.xlsx`);
   };
 
