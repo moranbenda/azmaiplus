@@ -344,7 +344,7 @@ dialog{
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
                 <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
-<button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
+        <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
@@ -628,6 +628,31 @@ dialog{
 </dialog>
 
 <!-- דיאלוג פנייה למפתח -->
+<dialog id="supportDialog">
+  <div class="dlg-hd">
+    <div>פנייה למפתח</div>
+    <button class="btn secondary small" type="button" id="btnSupportClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <p class="hint" style="margin-top:0">
+      לכל בקשה, הוספת קטגוריה או תקלה — כתבו לנו ונחזור אליכם.
+    </p>
+    <form id="supportForm" onsubmit="return false;">
+      <div class="grid2">
+        <div><label>שם</label><input type="text" id="sName" readonly /></div>
+        <div><label>טלפון</label><input type="text" id="sPhone" readonly /></div>
+        <div style="grid-column:1 / -1"><label>אימייל</label><input type="email" id="sEmail" readonly /></div>
+        <div style="grid-column:1 / -1"><label>הודעה</label><textarea id="sMsg" rows="6" placeholder="כתבו כאן את הפנייה..."></textarea></div>
+      </div>
+      <div class="footer" style="margin-top:12px">
+        <div class="left"><button class="btn" id="btnSupportSend">שליחה</button></div>
+        <span class="hint" id="supportStatus"></span>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+
 <!-- דיאלוג מסמכים -->
 <script type="module">
 /* ----------------------------------------------------------
@@ -707,22 +732,13 @@ const catTbody = document.getElementById("catTbody");
 
 /* כפתור פנייה למפתח */
 const btnSupportOpen = document.getElementById("btnSupportOpen");
-
-  if (btnSupportOpen){
-    btnSupportOpen.addEventListener("click", () => {
-      const subject = encodeURIComponent("פנייה למפתח - עצמאי פלוס");
-      const body = encodeURIComponent("היי,
-
-אשמח לעזרה בנושא:
-");
-      window.location.href = `mailto:azmaiplusapp@gmail.com?subject=${subject}&body=${body}`;
-    });
-  }
+const supportDialog  = document.getElementById("supportDialog");
 const btnSupportClose= document.getElementById("btnSupportClose");
 const sName   = document.getElementById("sName");
 const sPhone  = document.getElementById("sPhone");
 const sEmail  = document.getElementById("sEmail");
 const sMsg    = document.getElementById("sMsg");
+const btnSupportSend = document.getElementById("btnSupportSend");
 const supportStatus  = document.getElementById("supportStatus");
 
 /* כפתור דוחות */
@@ -732,73 +748,7 @@ const btnReportsClose = document.getElementById("btnReportsClose");
 /* כפתור מע"מ */
 const btnVatLink = document.getElementById("btnVatLink");
 
-/* מסמכים */
-const btnDocsOpen  = document.getElementById("btnDocsOpen");
-const docsDialog   = document.getElementById("docsDialog");
-const btnDocsClose = document.getElementById("btnDocsClose");
-const docsStatus   = document.getElementById("docsStatus");
-const docPreview   = document.getElementById("docPreview");
-const dType        = document.getElementById("dType");
-const dDate        = document.getElementById("dDate");
-const dClientName  = document.getElementById("dClientName");
-const dClientPhone = document.getElementById("dClientPhone");
-
-const dClientId    = document.getElementById("dClientId");
-const dClientVatId = document.getElementById("dClientVatId");
-const dSaveCustomer= document.getElementById("dSaveCustomer");
-const btnCustomerCard = document.getElementById("btnCustomerCard");
-const customersDatalist = document.getElementById("customersDatalist");
-
-// ---- כרטיסי לקוח ----
-function lsKeyCustomers(uid){ return `customers_${uid}`; }
-function lsKeyDocs(uid){ return `docs_${uid}`; }
-function getCustomers(uid){
-  try { return JSON.parse(localStorage.getItem(lsKeyCustomers(uid)) || "[]"); } catch { return []; }
-}
-function saveCustomers(uid, list){
-  localStorage.setItem(lsKeyCustomers(uid), JSON.stringify(list || []));
-}
-function getDocs(uid){
-  try { return JSON.parse(localStorage.getItem(lsKeyDocs(uid)) || "[]"); } catch { return []; }
-}
-function saveDocs(uid, list){
-  localStorage.setItem(lsKeyDocs(uid), JSON.stringify(list || []));
-}
-function upsertCustomer(uid, cust){
-  const list = getCustomers(uid);
-  const i = list.findIndex(x => x.id === cust.id);
-  if (i >= 0) list[i] = { ...list[i], ...cust };
-  else list.push(cust);
-  saveCustomers(uid, list);
-  return cust;
-}
-function findCustomerByName(uid, name){
-  const n = (name || "").trim().toLowerCase();
-  if (!n) return null;
-  return getCustomers(uid).find(c => (c.name || "").trim().toLowerCase() === n) || null;
-}
-function renderCustomersDatalist(){
-  if (!customersDatalist || !currentUid) return;
-  const list = getCustomers(currentUid);
-  customersDatalist.innerHTML = list.map(c => `<option value="${escapeHtml(c.name)}"></option>`).join("");
-}
-function fillFromCustomer(c){
-  if (!c) return;
-  if (dClientName) dClientName.value = c.name || "";
-  if (dClientPhone) dClientPhone.value = c.phone || "";
-  if (dClientVatId) dClientVatId.value = c.vatId || "";
-  if (dClientId) dClientId.value = c.id || "";
-}
-
-const dDesc        = document.getElementById("dDesc");
-const dAmount      = document.getElementById("dAmount");
-const dIncVat      = document.getElementById("dIncVat");
-const btnDocCreate = document.getElementById("btnDocCreate");
-const btnDocEmail  = document.getElementById("btnDocEmail");
-const btnDocWhatsapp = document.getElementById("btnDocWhatsapp");
-let lastDocTextForShare = "";
-let lastDocHtml = "";
-
+/* מסמכים הוסרו בגרסה זו */
 
 /* יציאה */
 const btnLogout = document.getElementById("btnLogout");
@@ -1055,64 +1005,20 @@ function fillSupportForm() {
   if (supportStatus) supportStatus.textContent = "";
 }
 
+btnSupportClose && (btnSupportClose.onclick = () => supportDialog.close());
+
 btnSupportOpen && (btnSupportOpen.onclick = () => {
   fillSupportForm();
   if (sMsg) sMsg.value = "";
+  supportDialog.showModal();
 });
-  const msg = (supportMsg?.value || "").trim();
-  if (!msg) { alert("נא לכתוב את תוכן הפנייה"); return; }
 
-  // נשלח מייל אוטומטי דרך Firebase Extension: Trigger Email (firestore-send-email)
-  // התוסף מאזין לקולקשן בשם "mail" (ברירת מחדל) ושולח את המייל.
-  try {
-    const fromName  = userProfile?.fullName || userProfile?.name || "";
-    const fromEmail = userProfile?.email || "";
-    const fromPhone = userProfile?.phone || "";
-    const bizName   = userProfile?.businessName || "";
-    const bizId     = userProfile?.businessId || userProfile?.vatId || userProfile?.taxId || "";
-
-    const subject = `פנייה למפתח – ${bizName || fromName || fromEmail || "משתמש"}${bizId ? " ("+bizId+")" : ""}`;
-
-    const textBody =
-`פנייה למפתח
-================
-שם: ${fromName}
-אימייל: ${fromEmail}
-טלפון: ${fromPhone}
-עסק: ${bizName}
-מספר עוסק/ח.פ: ${bizId}
-
-הודעה:
-${msg}
-`;
-
-    const htmlBody =
-      `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif">
-        <h2 style="margin:0 0 10px">פנייה למפתח</h2>
-        <p style="margin:0 0 6px"><b>שם:</b> ${escapeHtml(fromName)}</p>
-        <p style="margin:0 0 6px"><b>אימייל:</b> ${escapeHtml(fromEmail)}</p>
-        <p style="margin:0 0 6px"><b>טלפון:</b> ${escapeHtml(fromPhone)}</p>
-        <p style="margin:0 0 6px"><b>עסק:</b> ${escapeHtml(bizName)}</p>
-        <p style="margin:0 0 14px"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</p>
-        <pre style="white-space:pre-wrap;background:#f6f7fb;border:1px solid #e6e8ef;border-radius:12px;padding:12px;margin:0">${escapeHtml(msg)}</pre>
-      </div>`;
-
-    await addDoc(collection(db, "mail"), {
-      to: SUPPORT_EMAIL,                 // אפשר גם מערך כתובות
-      replyTo: fromEmail || undefined,   // כדי שתוכלי להשיב ישירות לפונה
-      createdAt: serverTimestamp(),
-      meta: {
-        uid: currentUid || null,
-        fromName, fromEmail, fromPhone,
-        businessName: bizName,
-        businessId: bizId
-      },
-      message: {
-        subject,
-        text: textBody,
-        html: htmlBody
-      }
-    });
+btnSupportSend && (btnSupportSend.onclick = () => {
+    const subject = encodeURIComponent('פנייה למפתח - azmaiplus');
+    const body = encodeURIComponent((supportMessage?.value || '').trim());
+    // פתיחה ישירה של Gmail תלויה בהגדרות הדפדפן/מכשיר. mailto הוא הפתרון היציב.
+    window.location.href = `mailto:azmaiplusapp@gmail.com?subject=${subject}&body=${body}`;
+});
 
     supportMsg.value = "";
     alert("הפנייה נשלחה. נחזור אליך בהקדם 🙏");
@@ -2283,6 +2189,7 @@ const ccDocsTbody = document.getElementById("ccDocsTbody");
 
 function openCustomerCard(){
   if (!currentUid) return;
+  renderCustomerCardSelect();
   customerCardModal?.classList.add("open");
   // בחר את הלקוח הנוכחי מהמסמך אם יש
   const cid = dClientId?.value || "";
@@ -2495,6 +2402,9 @@ function initAppLogic(uid) {
   currentUid = uid;
 
   // טוען רשימות כרטיסי לקוח/מסמכים
+  renderCustomersDatalist();
+  renderCustomerCardSelect();
+
   if (!appInitialized) {
     // כפתורים ותנועות
     btnAdd.onclick = addRow;
@@ -2579,6 +2489,29 @@ renderItemsDatalist();
 
 /* להתחיל במצב "התחברות" כברירת מחדל */
 tabLogin.click();
+
+// --- Hardening login submit (avoid page refresh even if something fails) ---
+(() => {
+  try {
+    const form = document.getElementById('authForm');
+    const btn = document.getElementById('authSubmitBtn');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (typeof handleAuth === 'function') handleAuth(e);
+      });
+    }
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (typeof handleAuth === 'function') handleAuth(e);
+      });
+    }
+  } catch (err) {
+    console.error('Login hardening failed:', err);
+  }
+})();
+
 </script>
 
   <!-- כרטיס לקוח -->
