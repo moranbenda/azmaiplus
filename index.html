@@ -1,345 +1,459 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>עצמאי פלוס - הנהלת חשבונות מקצועית</title>
-  
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
+  <title>עצמאי פלוס - מנהל חשבונות</title>
   <style>
-    :root {
-      --bg:#f0f2f5; --panel:#ffffff; --accent:#1877f2; --accent-dark:#166fe5;
-      --good:#42b72a; --bad:#f02849; --text:#1c1e21; --line:#dddfe2; --radius:12px;
+    :root{--bg:#f4f7ff;--card:#fff;--text:#0f172a;--muted:#64748b;--primary:#2f6fed;--border:#e2e8f0;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,Arial,sans-serif;background:linear-gradient(180deg,#ffffff,#f6f8ff 40%,#eef2f7 100%);color:var(--text);}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px;}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:18px;box-shadow:0 10px 30px rgba(2,6,23,.08);}
+    .auth{max-width:520px;margin:60px auto;padding:28px;}
+    h1{margin:0 0 8px;font-size:24px;}
+    p{margin:0 0 18px;color:var(--muted);}
+    .tabs{display:flex;background:#f1f5ff;border-radius:999px;padding:6px;gap:6px;margin:16px 0 18px;}
+    .tab{flex:1;border:0;background:transparent;padding:10px 12px;border-radius:999px;cursor:pointer;color:var(--muted);font-weight:600;}
+    .tab.active{background:#fff;color:var(--primary);box-shadow:0 2px 10px rgba(2,6,23,.08);}
+    label{display:block;font-size:13px;color:var(--muted);margin:12px 0 6px;}
+    input,select,textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:12px;padding:12px 12px;font-size:15px;background:#fff;}
+    textarea{min-height:80px;resize:vertical;}
+    .btn{width:100%;border:0;border-radius:999px;background:var(--primary);color:#fff;padding:12px 14px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px;}
+    .btn.secondary{background:#fff;color:var(--primary);border:1px solid var(--border);}
+    .row{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;}
+    .row > div{grid-column:span 12;}
+    @media(min-width:900px){
+      .row .c3{grid-column:span 3;}
+      .row .c4{grid-column:span 4;}
+      .row .c2{grid-column:span 2;}
+      .row .c6{grid-column:span 6;}
     }
-    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.4 system-ui, sans-serif; direction:rtl; }
-    .wrap { max-width:1200px; margin:0 auto; padding:15px; }
-    
-    header { background:#fff; border-bottom:1px solid var(--line); padding:10px 0; sticky; top:0; z-index:100; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-    .nav-flex { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; }
-    .logo { font-size:22px; font-weight:800; color:var(--accent); text-decoration:none; }
-    
-    .nav-btns { display:flex; gap:8px; }
-    .btn { cursor:pointer; padding:8px 14px; border-radius:6px; border:none; font-weight:600; font-size:13px; transition:0.2s; display:inline-flex; align-items:center; gap:5px; }
-    .btn-p { background:var(--accent); color:#fff; }
-    .btn-s { background:#e4e6eb; color:var(--text); }
-    .btn-danger { background:#fce9e9; color:var(--bad); }
-
-    .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin:15px 0; }
-    .stat-box { background:#fff; padding:15px; border-radius:10px; border:1px solid var(--line); text-align:center; box-shadow:0 1px 2px rgba(0,0,0,0.1); }
-    .stat-val { font-size:18px; font-weight:800; display:block; margin-top:5px; }
-
-    .grid { display:grid; grid-template-columns: 320px 1fr; gap:15px; }
-    @media (max-width: 850px) { .grid { grid-template-columns: 1fr; } }
-
-    .card { background:#fff; border-radius:var(--radius); border:1px solid var(--line); overflow:hidden; }
-    .card-hd { padding:12px 15px; background:#f5f6f7; border-bottom:1px solid var(--line); font-weight:700; display:flex; justify-content:space-between; }
-    .card-bd { padding:15px; }
-
-    input, select { width:100%; padding:9px; border-radius:6px; border:1px solid var(--line); margin-bottom:10px; }
-    label { font-size:12px; font-weight:700; color:#606770; display:block; margin-bottom:3px; }
-
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    th { background:#f5f6f7; padding:10px; text-align:right; border-bottom:2px solid var(--line); }
-    td { padding:10px; border-bottom:1px solid var(--line); }
-
-    #authOverlay { position:fixed; inset:0; background:var(--bg); z-index:1000; display:flex; align-items:center; justify-content:center; }
-    .auth-box { background:#fff; padding:30px; border-radius:12px; box-shadow:0 12px 28px rgba(0,0,0,0.2); width:360px; text-align:center; }
-
-    dialog { border:none; border-radius:12px; padding:0; width:90%; max-width:550px; box-shadow:0 20px 40px rgba(0,0,0,0.3); }
-    .dlg-h { padding:15px; background:#f5f6f7; font-weight:700; display:flex; justify-content:space-between; border-bottom:1px solid var(--line); }
-    .dlg-b { padding:15px; max-height:60vh; overflow-y:auto; }
+    .topbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px;}
+    .pill{display:inline-flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--border);border-radius:999px;padding:8px 12px;}
+    .linkbtn{border:1px solid var(--border);background:#fff;border-radius:999px;padding:10px 14px;cursor:pointer;font-weight:700;color:var(--text);}
+    .linkbtn.primary{background:var(--primary);color:#fff;border:0;}
+    .muted{color:var(--muted);font-size:13px;}
+    table{width:100%;border-collapse:collapse;}
+    th,td{padding:10px;border-bottom:1px solid var(--border);text-align:right;font-size:14px;vertical-align:top;}
+    th{color:var(--muted);font-weight:700;background:#fafcff;position:sticky;top:0;}
+    .pos{color:#059669;font-weight:700;}
+    .neg{color:#b91c1c;font-weight:700;}
+    .right{text-align:left;}
+    .actions button{border:1px solid var(--border);background:#fff;border-radius:10px;padding:6px 10px;cursor:pointer;}
+    .hide{display:none !important;}
+    .error{color:#b91c1c;margin-top:10px;font-size:13px;}
   </style>
 </head>
 <body>
+  <div id="authScreen" class="wrap">
+    <div class="card auth">
+      <h1>התחברות לעצמאי פלוס</h1>
+      <p>יש להתחבר כדי להשתמש במערכת.</p>
+      <div class="tabs">
+        <button id="tabLogin" class="tab active">התחברות</button>
+        <button id="tabRegister" class="tab">הרשמה</button>
+      </div>
 
-<div id="authOverlay">
-  <div class="auth-box">
-    <h1 style="color:var(--accent); margin:0 0 20px">עצמאי פלוס</h1>
-    <div id="authForm">
-      <input type="email" id="authEmail" placeholder="אימייל">
-      <input type="password" id="authPass" placeholder="סיסמה">
-      <button class="btn btn-p" style="width:100%; padding:12px; margin-bottom:8px" id="btnLogin">התחברות</button>
-      <button class="btn btn-s" style="width:100%; padding:12px" id="btnSignup">הרשמה (משתמש חדש)</button>
+      <div id="loginPane">
+        <label for="loginEmail">אימייל</label>
+        <input id="loginEmail" type="email" autocomplete="email" />
+        <label for="loginPassword">סיסמה</label>
+        <input id="loginPassword" type="password" autocomplete="current-password" />
+        <button id="btnLogin" class="btn">התחברות</button>
+      </div>
+
+      <div id="registerPane" class="hide">
+        <label for="regEmail">אימייל</label>
+        <input id="regEmail" type="email" autocomplete="email" />
+        <label for="regPassword">סיסמה</label>
+        <input id="regPassword" type="password" autocomplete="new-password" />
+        <button id="btnRegister" class="btn">הרשמה</button>
+      </div>
+
+      <div id="authError" class="error hide"></div>
+      <button id="btnSupport" class="btn secondary" type="button" style="margin-top:14px;">פנייה למפתח</button>
+      <div class="muted" style="margin-top:10px;">* תיפתח הודעת Gmail חדשה.</div>
     </div>
-    <p id="authError" style="color:var(--bad); font-size:12px; margin-top:10px"></p>
   </div>
-</div>
 
-<div id="app" hidden>
-  <header>
-    <div class="wrap nav-flex">
-      <a href="#" class="logo">עצמאי פלוס</a>
-      <div class="nav-btns">
-        <button class="btn btn-s" onclick="document.getElementById('dlgCats').showModal()">📊 קטגוריות</button>
-        <button class="btn btn-s" onclick="window.open('https://www.gov.il/he/service/reporting-or-payment-of-vat-reports')">🏦 מע"מ</button>
-        <button class="btn btn-s" id="btnSettings">⚙️ הגדרות</button>
-        <button class="btn btn-s" onclick="window.open('https://mail.google.com/mail/?view=cm&fs=1&to=azmaiplusapp@gmail.com')">💬 תמיכה</button>
-        <button class="btn btn-danger" id="btnLogout">יציאה</button>
+  <div id="appScreen" class="wrap hide">
+    <div class="topbar">
+      <div class="pill">
+        <strong id="userEmail">—</strong>
+        <span class="muted" id="syncState">שמירה: מקומית + ענן</span>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button id="btnExportCSV" class="linkbtn">ייצוא CSV</button>
+        <button id="btnLogout" class="linkbtn">התנתקות</button>
       </div>
     </div>
-  </header>
 
-  <main class="wrap">
-    <div class="stats">
-      <div class="stat-box">הכנסות נטו<span class="stat-val" id="sInc" style="color:var(--good)">₪0</span></div>
-      <div class="stat-box">הוצאות מוכרות<span class="stat-val" id="sExp" style="color:var(--bad)">₪0</span></div>
-      <div class="stat-box">מע"מ לתשלום/החזר<span class="stat-val" id="sVat">₪0</span></div>
-      <div class="stat-box">רווח נקי<span class="stat-val" id="sNet" style="color:var(--accent)">₪0</span></div>
-    </div>
-
-    <div class="grid">
-      <div class="card">
-        <div class="card-hd">תיעוד תנועה</div>
-        <div class="card-bd">
-          <form id="txForm">
-            <label>תאריך</label><input type="date" id="fDate" required>
-            <label>סוג</label><select id="fType"><option value="income">הכנסה</option><option value="expense">הוצאה</option></select>
-            <label>קטגוריה</label><select id="fCat"></select>
-            <label>תיאור / ספק</label><input type="text" id="fDesc" required>
-            <label>סכום כולל (₪)</label><input type="number" step="0.01" id="fSum" required>
-            <button type="submit" class="btn btn-p" style="width:100%; padding:12px">שמור תנועה</button>
-          </form>
+    <div class="card" style="padding:18px;">
+      <h2 style="margin:0 0 10px;font-size:18px;">הוספת הכנסה / הוצאה</h2>
+      <div class="row">
+        <div class="c3">
+          <label for="fDate">תאריך</label>
+          <input id="fDate" type="date" />
+        </div>
+        <div class="c3">
+          <label for="fType">סוג</label>
+          <select id="fType">
+            <option value="income">הכנסה</option>
+            <option value="expense">הוצאה</option>
+          </select>
+        </div>
+        <div class="c3">
+          <label for="fCategory">קטגוריה</label>
+          <input id="fCategory" placeholder="למשל: פרסום / שכירות" />
+        </div>
+        <div class="c3">
+          <label for="fAmount">סכום (₪)</label>
+          <input id="fAmount" inputmode="decimal" placeholder="0" />
+        </div>
+        <div class="c6">
+          <label for="fDesc">תיאור</label>
+          <input id="fDesc" placeholder="מה זה היה?" />
+        </div>
+        <div class="c2" style="display:flex;align-items:end;">
+          <button id="btnAdd" class="btn" style="margin:0;">הוספה</button>
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-hd">
-          תנועות אחרונות
-          <div style="display:flex; gap:8px">
-            <input type="month" id="filterMonth" style="margin:0; width:130px">
-            <button class="btn btn-s" id="btnExportPDF">📄 PDF</button>
-            <button class="btn btn-s" id="btnExportExcel">Excel</button>
+      <div class="row" style="margin-top:14px;">
+        <div class="c4">
+          <div class="pill" style="width:100%;justify-content:space-between;">
+            <span class="muted">הכנסות</span>
+            <span id="sumIncome" class="pos">₪ 0</span>
           </div>
         </div>
-        <div class="card-bd" style="overflow-x:auto">
-          <table id="txTable">
-            <thead>
-              <tr>
-                <th>תאריך</th>
-                <th>תיאור / קטגוריה</th>
-                <th>סה"כ</th>
-                <th>מע"מ מוכר</th>
-                <th>מוכר למס</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="txBody"></tbody>
-          </table>
+        <div class="c4">
+          <div class="pill" style="width:100%;justify-content:space-between;">
+            <span class="muted">הוצאות</span>
+            <span id="sumExpense" class="neg">₪ 0</span>
+          </div>
+        </div>
+        <div class="c4">
+          <div class="pill" style="width:100%;justify-content:space-between;">
+            <span class="muted">רווח</span>
+            <span id="sumProfit" style="font-weight:800;">₪ 0</span>
+          </div>
         </div>
       </div>
+
+      <div style="margin-top:14px;border:1px solid var(--border);border-radius:14px;overflow:auto;max-height:420px;">
+        <table>
+          <thead>
+            <tr>
+              <th>תאריך</th>
+              <th>סוג</th>
+              <th>קטגוריה</th>
+              <th>תיאור</th>
+              <th>סכום</th>
+              <th class="right">פעולות</th>
+            </tr>
+          </thead>
+          <tbody id="rowsBody"></tbody>
+        </table>
+      </div>
     </div>
-  </main>
-</div>
-
-<dialog id="dlgCats">
-  <div class="dlg-h">טבלת הכרה <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
-  <div class="dlg-b" id="catsTableUI"></div>
-</dialog>
-
-<dialog id="dlgSettings">
-  <div class="dlg-h">הגדרות עסק <button class="btn" onclick="this.closest('dialog').close()">X</button></div>
-  <div class="dlg-b">
-    <label>שם העסק</label><input type="text" id="pName">
-    <label>ח.פ / עוסק</label><input type="text" id="pId">
-    <label>טלפון</label><input type="text" id="pPhone">
-    <label>סוג עוסק</label>
-    <select id="pType"><option value="ptor">עוסק פטור</option><option value="morasha">עוסק מורשה</option></select>
-    <label>מע"מ נוכחי (%)</label><input type="number" id="pVatRate" value="18">
-    <button class="btn btn-p" style="width:100%" id="btnSaveProfile">שמור הגדרות</button>
   </div>
-</dialog>
 
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-  import { getFirestore, doc, setDoc, getDoc, collection, addDoc, query, onSnapshot, deleteDoc, orderBy } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth, onAuthStateChanged,
+      signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
-    authDomain: "freelance-accounting-6c3bb.firebaseapp.com",
-    projectId: "freelance-accounting-6c3bb",
-    storageBucket: "freelance-accounting-6c3bb.firebasestorage.app",
-    messagingSenderId: "196974556694",
-    appId: "1:196974556694:web:60ba710567f2a7c67c6737"
-  };
+    const firebaseConfig = {
+  apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
+  authDomain: "freelance-accounting-6c3bb.firebaseapp.com",
+  projectId: "freelance-accounting-6c3bb",
+  storageBucket: "freelance-accounting-6c3bb.firebasestorage.app",
+  messagingSenderId: "196974556694",
+  appId: "1:196974556694:web:60ba710567f2a7c67c6737"
+};
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
+    // UI
+    const authScreen = document.getElementById("authScreen");
+    const appScreen = document.getElementById("appScreen");
+    const tabLogin = document.getElementById("tabLogin");
+    const tabRegister = document.getElementById("tabRegister");
+    const loginPane = document.getElementById("loginPane");
+    const registerPane = document.getElementById("registerPane");
+    const authError = document.getElementById("authError");
 
-  const categories = {
-    "הכנסה מפעילות": { v: 1.0, t: 1.0, type: 'income' },
-    "שיווק ופרסום": { v: 1.0, t: 1.0, type: 'expense' },
-    "ציוד משרדי": { v: 1.0, t: 1.0, type: 'expense' },
-    "אחזקת רכב (2/3 מוכר)": { v: 0.666, t: 0.45, type: 'expense' },
-    "אחזקת רכב (1/4 מוכר)": { v: 0.25, t: 0.45, type: 'expense' },
-    "תיקון רכב": { v: 0.666, t: 0.45, type: 'expense' },
-    "דלק": { v: 0.666, t: 0.45, type: 'expense' },
-    "ביטוח רכב": { v: 0.0, t: 0.45, type: 'expense' },
-    "טסט רכב": { v: 0.0, t: 0.45, type: 'expense' },
-    "טלפון וסלולר": { v: 0.666, t: 0.25, type: 'expense' },
-    "אינטרנט ותקשורת": { v: 1.0, t: 1.0, type: 'expense' },
-    "ביטוחים": { v: 0.0, t: 1.0, type: 'expense' },
-    "כיבודים": { v: 0.0, t: 0.8, type: 'expense' },
-    "שכר דירה עסקי": { v: 1.0, t: 1.0, type: 'expense' },
-    "חשמל": { v: 1.0, t: 1.0, type: 'expense' },
-    "ארנונה": { v: 0.0, t: 1.0, type: 'expense' },
-    "מים": { v: 1.0, t: 1.0, type: 'expense' },
-    "עמלות בנק": { v: 0.0, t: 1.0, type: 'expense' },
-    "דואר ומשלוחים": { v: 1.0, t: 1.0, type: 'expense' },
-    "ייעוץ מקצועי": { v: 1.0, t: 1.0, type: 'expense' },
-    "השתלמויות": { v: 1.0, t: 1.0, type: 'expense' },
-    "בגדי עבודה": { v: 0.0, t: 1.0, type: 'expense' },
-    "מתנות ללקוחות": { v: 0.0, t: 1.0, type: 'expense' },
-    "נסיעות לחו\"ל": { v: 0.0, t: 1.0, type: 'expense' }
-  };
+    const loginEmail = document.getElementById("loginEmail");
+    const loginPassword = document.getElementById("loginPassword");
+    const regEmail = document.getElementById("regEmail");
+    const regPassword = document.getElementById("regPassword");
 
-  let user = null, profile = { pName:'', pId:'', pPhone:'', pType:'ptor', pVatRate:18 }, allTx = [];
+    const btnLogin = document.getElementById("btnLogin");
+    const btnRegister = document.getElementById("btnRegister");
+    const btnSupport = document.getElementById("btnSupport");
 
-  // --- Auth Logic ---
-  const handleAuth = async (mode) => {
-    const e = document.getElementById('authEmail').value, p = document.getElementById('authPass').value;
-    try {
-      if(mode==='login') await signInWithEmailAndPassword(auth, e, p);
-      else {
-        const r = await createUserWithEmailAndPassword(auth, e, p);
-        await setDoc(doc(db, "users", r.user.uid), profile);
-      }
-    } catch(err) { document.getElementById('authError').textContent = "שגיאה: " + err.message; }
-  };
-  document.getElementById('btnLogin').onclick = () => handleAuth('login');
-  document.getElementById('btnSignup').onclick = () => handleAuth('signup');
-  document.getElementById('btnLogout').onclick = () => signOut(auth);
+    const userEmail = document.getElementById("userEmail");
+    const syncState = document.getElementById("syncState");
+    const btnLogout = document.getElementById("btnLogout");
+    const btnExportCSV = document.getElementById("btnExportCSV");
 
-  onAuthStateChanged(auth, async (u) => {
-    if(u) {
-      user = u;
-      const s = await getDoc(doc(db, "users", u.uid));
-      if(s.exists()) profile = {...profile, ...s.data()};
-      document.getElementById('authOverlay').style.display = 'none';
-      document.getElementById('app').hidden = false;
-      loadAppData();
-    } else {
-      document.getElementById('authOverlay').style.display = 'flex';
-      document.getElementById('app').hidden = true;
-    }
-  });
+    const fDate = document.getElementById("fDate");
+    const fType = document.getElementById("fType");
+    const fCategory = document.getElementById("fCategory");
+    const fDesc = document.getElementById("fDesc");
+    const fAmount = document.getElementById("fAmount");
+    const btnAdd = document.getElementById("btnAdd");
 
-  function loadAppData() {
-    const catSel = document.getElementById('fCat'), catsList = document.getElementById('catsTableUI');
-    catSel.innerHTML = '';
-    let tableHtml = '<table><tr><th>קטגוריה</th><th>מע"מ</th><th>מס</th></tr>';
-    Object.keys(categories).forEach(k => {
-      catSel.innerHTML += `<option value="${k}">${k}</option>`;
-      tableHtml += `<tr><td>${k}</td><td>${(categories[k].v*100).toFixed(0)}%</td><td>${(categories[k].t*100).toFixed(0)}%</td></tr>`;
-    });
-    catsList.innerHTML = tableHtml + '</table>';
+    const rowsBody = document.getElementById("rowsBody");
+    const sumIncome = document.getElementById("sumIncome");
+    const sumExpense = document.getElementById("sumExpense");
+    const sumProfit = document.getElementById("sumProfit");
 
-    onSnapshot(query(collection(db, "users", user.uid, "transactions"), orderBy("date", "desc")), (snap) => {
-      allTx = []; snap.forEach(d => allTx.push({id: d.id, ...d.data()}));
-      renderTable();
-    });
-  }
-
-  // --- Transaction Logic ---
-  document.getElementById('txForm').onsubmit = async (e) => {
-    e.preventDefault();
-    const sum = parseFloat(document.getElementById('fSum').value);
-    const cat = categories[document.getElementById('fCat').value];
-    const vatRate = profile.pType === 'morasha' ? (profile.pVatRate/100) : 0;
-    
-    const net = sum / (1 + vatRate);
-    const vat = sum - net;
-    const recVat = vat * cat.v;
-    const recTax = (net + (vat - recVat)) * cat.t;
-
-    await addDoc(collection(db, "users", user.uid, "transactions"), {
-      date: document.getElementById('fDate').value,
-      type: document.getElementById('fType').value,
-      cat: document.getElementById('fCat').value,
-      desc: document.getElementById('fDesc').value,
-      total: sum, net, recVat, recTax, created: Date.now()
-    });
-    e.target.reset();
-    document.getElementById('fDate').valueAsDate = new Date();
-  };
-
-  function renderTable() {
-    const month = document.getElementById('filterMonth').value;
-    const filtered = month ? allTx.filter(t => t.date.startsWith(month)) : allTx;
-    let ti=0, te=0, tv=0;
-
-    document.getElementById('txBody').innerHTML = filtered.map(t => {
-      const isInc = t.type === 'income';
-      if(isInc) { ti += t.net; tv += t.recVat; } else { te += t.recTax; tv -= t.recVat; }
-      return `<tr>
-        <td>${t.date.split('-').reverse().join('/')}</td>
-        <td><strong>${t.desc}</strong><br><small>${t.cat}</small></td>
-        <td>₪${t.total.toFixed(2)}</td>
-        <td>₪${t.recVat.toFixed(2)}</td>
-        <td style="color:${isInc?'var(--good)':'var(--bad)'}">₪${isInc?t.net.toFixed(2):t.recTax.toFixed(2)}</td>
-        <td><button class="btn btn-danger" onclick="deleteTx('${t.id}')">X</button></td>
-      </tr>`;
-    }).join('');
-
-    document.getElementById('sInc').innerText = `₪${ti.toLocaleString()}`;
-    document.getElementById('sExp').innerText = `₪${te.toLocaleString()}`;
-    document.getElementById('sVat').innerText = `₪${tv.toLocaleString()}`;
-    document.getElementById('sNet').innerText = `₪${(ti-te).toLocaleString()}`;
-  }
-
-  window.deleteTx = (id) => confirm("למחוק?") && deleteDoc(doc(db, "users", user.uid, "transactions", id));
-
-  // --- Reports & Exports ---
-  document.getElementById('btnExportExcel').onclick = () => {
-    const data = [["עסק:", profile.pName, "עוסק:", profile.pId], ["תאריך", "תיאור", "קטגוריה", "סה\"כ", "מע\"מ מוכר", "מוכר למס"]];
-    allTx.forEach(t => data.push([t.date, t.desc, t.cat, t.total, t.recVat, t.recTax]));
-    const ws = XLSX.utils.aoa_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "דוח");
-    XLSX.writeFile(wb, `עצמאי_פלוס_${profile.pName}.xlsx`);
-  };
-
-  document.getElementById('btnExportPDF').onclick = () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('p', 'pt', 'a4');
-    
-    // הגדרת פונט וכיוון (עברית דורשת פונט תומך, כאן נשתמש בטקסט פשוט)
-    doc.setFontSize(20);
-    doc.text("Report: " + profile.pName, 40, 40);
-    doc.setFontSize(12);
-    doc.text("Business ID: " + profile.pId, 40, 60);
-    
-    const rows = allTx.map(t => [t.date, t.desc, t.cat, t.total.toFixed(2), t.recVat.toFixed(2), t.recTax.toFixed(2)]);
-    doc.autoTable({
-      head: [['Date', 'Description', 'Category', 'Total', 'VAT Rec.', 'Tax Rec.']],
-      body: rows,
-      startY: 80,
-    });
-    doc.save(`Report_${profile.pName}.pdf`);
-  };
-
-  // Settings
-  document.getElementById('btnSettings').onclick = () => {
-    ['pName','pId','pPhone','pType','pVatRate'].forEach(k => document.getElementById(k).value = profile[k]);
-    document.getElementById('dlgSettings').showModal();
-  };
-  document.getElementById('btnSaveProfile').onclick = async () => {
-    profile = {
-      pName: document.getElementById('pName').value, pId: document.getElementById('pId').value,
-      pPhone: document.getElementById('pPhone').value, pType: document.getElementById('pType').value,
-      pVatRate: parseFloat(document.getElementById('pVatRate').value)
+    // mailto support
+    btnSupport.onclick = () => {
+      window.location.href = "mailto:azmaiplusapp@gmail.com?subject=" +
+        encodeURIComponent("פנייה למפתח - AzmaiPlus") +
+        "&body=" + encodeURIComponent("שלום,\n\nתיאור הבעיה/בקשה:\n");
     };
-    await setDoc(doc(db, "users", user.uid), profile);
-    document.getElementById('dlgSettings').close();
-  };
 
-  document.getElementById('filterMonth').onchange = renderTable;
-  document.getElementById('fDate').valueAsDate = new Date();
-  document.getElementById('filterMonth').value = new Date().toISOString().slice(0, 7);
-</script>
+    function showAuthError(msg) {
+      authError.textContent = msg;
+      authError.classList.remove("hide");
+    }
+    function clearAuthError() {
+      authError.classList.add("hide");
+      authError.textContent = "";
+    }
+
+    tabLogin.onclick = () => {
+      tabLogin.classList.add("active");
+      tabRegister.classList.remove("active");
+      loginPane.classList.remove("hide");
+      registerPane.classList.add("hide");
+      clearAuthError();
+    };
+    tabRegister.onclick = () => {
+      tabRegister.classList.add("active");
+      tabLogin.classList.remove("active");
+      registerPane.classList.remove("hide");
+      loginPane.classList.add("hide");
+      clearAuthError();
+    };
+
+    btnLogin.onclick = async () => {
+      clearAuthError();
+      try {
+        await signInWithEmailAndPassword(auth, loginEmail.value.trim(), loginPassword.value);
+      } catch (e) {
+        console.error(e);
+        showAuthError("לא ניתן להתחבר. בדקי אימייל/סיסמה או מצב Firebase.");
+      }
+    };
+    btnRegister.onclick = async () => {
+      clearAuthError();
+      try {
+        await createUserWithEmailAndPassword(auth, regEmail.value.trim(), regPassword.value);
+      } catch (e) {
+        console.error(e);
+        showAuthError("לא ניתן להירשם. בדקי סיסמה/אימייל או מצב Firebase.");
+      }
+    };
+
+    btnLogout.onclick = async () => {
+      await signOut(auth);
+    };
+
+    function todayISO() {
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,"0");
+      const dd = String(d.getDate()).padStart(2,"0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    let currentUid = null;
+    let rows = [];
+
+    function money(n) {
+      try {
+        return new Intl.NumberFormat("he-IL", { style: "currency", currency: "ILS" }).format(n || 0);
+      } catch {
+        return "₪ " + (n||0).toFixed(2);
+      }
+    }
+
+    function render() {
+      rowsBody.innerHTML = "";
+      let inc=0, exp=0;
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        const typeLabel = r.type === "income" ? "הכנסה" : "הוצאה";
+        const amount = Number(r.amount)||0;
+        if (r.type === "income") inc += amount; else exp += amount;
+
+        tr.innerHTML = `
+          <td>${r.date || ""}</td>
+          <td>${typeLabel}</td>
+          <td>${escapeHtml(r.category || "")}</td>
+          <td>${escapeHtml(r.desc || "")}</td>
+          <td class="${r.type === "income" ? "pos" : "neg"}">${money(amount)}</td>
+          <td class="right actions">
+            <button data-id="${r.id}" data-act="del">מחק</button>
+          </td>
+        `;
+        rowsBody.appendChild(tr);
+      }
+      sumIncome.textContent = money(inc);
+      sumExpense.textContent = money(exp);
+      sumProfit.textContent = money(inc - exp);
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#39;");
+    }
+
+    function localKey(uid) { return `azmaiplus_rows_${uid}`; }
+
+    function loadLocal(uid) {
+      try {
+        const raw = localStorage.getItem(localKey(uid));
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveLocal(uid, data) {
+      try {
+        localStorage.setItem(localKey(uid), JSON.stringify(data));
+      } catch {}
+    }
+
+    async function loadCloud(uid) {
+      const ref = doc(db, "users", uid, "app", "ledger");
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return null;
+      const data = snap.data();
+      return Array.isArray(data.rows) ? data.rows : [];
+    }
+
+    async function saveCloud(uid, data) {
+      const ref = doc(db, "users", uid, "app", "ledger");
+      await setDoc(ref, { rows: data, updatedAt: Date.now() }, { merge: true });
+    }
+
+    let cloudTimer = null;
+    function scheduleCloudSave() {
+      if (!currentUid) return;
+      syncState.textContent = "שמירה: מעדכן ענן…";
+      clearTimeout(cloudTimer);
+      cloudTimer = setTimeout(async () => {
+        try {
+          await saveCloud(currentUid, rows);
+          syncState.textContent = "שמירה: מקומית + ענן";
+        } catch (e) {
+          console.error(e);
+          syncState.textContent = "שמירה: מקומית (ענן נכשל)";
+        }
+      }, 600);
+    }
+
+    btnAdd.onclick = () => {
+      try {
+        const date = fDate.value || todayISO();
+        const type = fType.value;
+        const category = (fCategory.value || "").trim();
+        const desc = (fDesc.value || "").trim();
+        const amount = parseFloat(String(fAmount.value).replace(/,/g,"").replace(/₪/g,"").trim());
+        if (!type || !isFinite(amount) || amount <= 0) {
+          alert("נא למלא סכום תקין (>0) ולבחור סוג.");
+          return;
+        }
+        const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + "_" + Math.random().toString(16).slice(2);
+        rows.unshift({ id, date, type, category, desc, amount });
+        saveLocal(currentUid, rows);
+        scheduleCloudSave();
+        render();
+        // reset
+        fAmount.value = "";
+        fDesc.value = "";
+        fCategory.value = "";
+      } catch (e) {
+        console.error(e);
+        alert("שגיאה בהוספה - בדקי Console");
+      }
+    };
+
+    rowsBody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      const id = btn.getAttribute("data-id");
+      const act = btn.getAttribute("data-act");
+      if (act === "del") {
+        rows = rows.filter(r => r.id !== id);
+        saveLocal(currentUid, rows);
+        scheduleCloudSave();
+        render();
+      }
+    });
+
+    btnExportCSV.onclick = () => {
+      const headers = ["date","type","category","desc","amount"];
+      const lines = [headers.join(",")];
+      for (const r of rows) {
+        const vals = headers.map(h => {
+          const v = r[h] ?? "";
+          const s = String(v).replaceAll('"','""');
+          return `"${s}"`;
+        });
+        lines.push(vals.join(","));
+      }
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "azmaiplus-ledger.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        currentUid = null;
+        authScreen.classList.remove("hide");
+        appScreen.classList.add("hide");
+        return;
+      }
+      currentUid = user.uid;
+      userEmail.textContent = user.email || "מחובר";
+      authScreen.classList.add("hide");
+      appScreen.classList.remove("hide");
+      fDate.value = todayISO();
+
+      // Load: prefer cloud; fallback local
+      rows = loadLocal(currentUid);
+      try {
+        const cloud = await loadCloud(currentUid);
+        if (cloud && cloud.length) {
+          rows = cloud;
+          saveLocal(currentUid, rows);
+        }
+      } catch (e) {
+        console.warn("cloud load failed", e);
+      }
+      render();
+    });
+  </script>
 </body>
 </html>
