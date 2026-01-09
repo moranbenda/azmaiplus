@@ -1020,14 +1020,6 @@ btnSupportSend && (btnSupportSend.onclick = () => {
     window.location.href = `mailto:azmaiplusapp@gmail.com?subject=${subject}&body=${body}`;
 });
 
-    supportMsg.value = "";
-    alert("הפנייה נשלחה. נחזור אליך בהקדם 🙏");
-    supportModal?.classList.remove("open");
-  } catch (err) {
-    console.error("Support send failed:", err);
-    alert("לא הצלחנו לשלוח כרגע. נסי שוב בעוד רגע.");
-  }
-});
 /* ----------------------------------------------------------
    8) EXPENSE_ITEMS – טבלת קטגוריות למסך קטגוריות
 ---------------------------------------------------------- */
@@ -2563,4 +2555,3 @@ tabLogin.click();
 
 </body>
 </html>
-
