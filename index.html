@@ -364,7 +364,7 @@ dialog{
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
                 <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
-        <button class="btn secondary small" id="btnDocsOpen">מסמכים</button>
+        
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
@@ -675,82 +675,7 @@ dialog{
 
 
 <!-- דיאלוג מסמכים -->
-<dialog id="docsDialog">
-  <div class="dlg-hd">
-    <div>הפקת מסמך חשבונאי</div>
-    <button class="btn secondary small" type="button" id="btnDocsClose">סגירה</button>
-  </div>
-  <div class="dlg-bd">
-    <form id="docsForm" onsubmit="return false;">
-      <div class="grid2">
-        <div>
-          <label>סוג מסמך</label>
-          <select id="dType">
-            <option value="invoice">חשבונית מס</option>
-            <option value="invoice_receipt">חשבונית מס + קבלה</option>
-            <option value="receipt">קבלה</option>
-            <option value="deal_invoice">חשבונית עסקה</option>
-            <option value="credit_note">חשבונית זיכוי</option>
-            <option value="quote">הצעת מחיר</option>
-          </select>
-        </div>
-        <div>
-          <label>תאריך</label>
-          <input type="date" id="dDate" />
-        </div>
-        <div>
-          <label>לקוח</label>
-          <input type="text" id="dClientName" list="customersDatalist" placeholder="התחילי להקליד שם לקוח..." />
-          <input type="hidden" id="dClientId" value="" />
-          <datalist id="customersDatalist"></datalist>
-        </div>
-        <div>
-          <label>טלפון לקוח (אופציונלי)</label>
-          <input type="tel" id="dClientPhone" placeholder="05..." />
-          <label>ח.פ / עוסק מורשה (אופציונלי)</label>
-          <input type="text" id="dClientVatId" placeholder="לדוגמה: 123456789" />
 
-          <div class="row" style="grid-column: 1 / -1; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-            <label class="chk" style="display:flex; align-items:center; gap:8px;">
-              <input type="checkbox" id="dSaveCustomer" checked />
-              שמור/עדכן כרטיס לקוח
-            </label>
-            <button class="btn" id="btnCustomerCard" type="button">כרטיס לקוח</button>
-          </div>
-
-        </div>
-        <div>
-          <label>תיאור</label>
-          <input type="text" id="dDesc" placeholder="שירות / מוצר" />
-        </div>
-        <div>
-          <label>סכום (₪)</label>
-          <input type="number" step="0.01" id="dAmount" placeholder="0" />
-        </div>
-        <div class="pill" style="align-self:end">
-          <input type="checkbox" id="dIncVat" checked />
-          <label for="dIncVat">סכום כולל מע&quot;מ</label>
-        </div>
-      </div>
-
-      <div class="footer" style="margin-top:12px">
-        <div class="left">
-          <button class="btn" id="btnDocCreate">הפקה</button>
-          <button class="btn secondary" id="btnDocEmail">שליחה במייל</button>
-          <button class="btn secondary" id="btnDocWhatsapp">שליחה בווטסאפ</button>
-        </div>
-        <span class="hint" id="docsStatus"></span>
-      </div>
-
-      <div class="card" style="margin-top:12px;border-radius:14px">
-        <div class="hd"><div>תצוגה מקדימה</div></div>
-        <div class="bd" style="overflow:auto;max-height:45vh">
-          <div id="docPreview" class="muted">מלאי פרטים ולחצי על "הפקה" כדי לראות תצוגה.</div>
-        </div>
-      </div>
-    </form>
-  </div>
-</dialog>
 
 <script type="module">
 /* ----------------------------------------------------------
@@ -874,8 +799,8 @@ function getCustomers(uid){
 }
 function saveCustomers(uid, list){
   localStorage.setItem(lsKeyCustomers(uid), JSON.stringify(list || []));
-  renderCustomersDatalist();
-  renderCustomerCardSelect();
+  if (ENABLE_DOCS) renderCustomersDatalist();
+  if (ENABLE_DOCS) renderCustomerCardSelect();
 }
 function getDocs(uid){
   try { return JSON.parse(localStorage.getItem(lsKeyDocs(uid)) || "[]"); } catch { return []; }
@@ -1138,30 +1063,8 @@ btnReportsOpen.onclick    = () => {
   reportsDialog.showModal();
 }
 };
-// מסמכים כבוי כרגע: לא מחברים מאזינים כדי לא לשבור התחברות/אפליקציה
-if (ENABLE_DOCS && btnDocsClose) btnDocsClose.onclick = () => docsDialog.close();
-if (ENABLE_DOCS && btnDocsOpen) btnDocsOpen.onclick = () => {
-
-  docsStatus.textContent = "";
-  if (!dDate.value) dDate.value = todayStr();
-  // התאמה לעוסק פטור: אין מע"מ
-  if ((userProfile?.businessType || "ptor") === "ptor") {
-    dIncVat.checked = false;
-    dIncVat.disabled = true;
-    // חשבונית מס/מס+קבלה לא רלוונטי – נציג רמז
-    if (dType.value === "invoice" || dType.value === "invoice_receipt") {
-      dType.value = "receipt";
-    }
-  } else {
-    dIncVat.disabled = false;
-  }
-  docsDialog.showModal();
-};
-
-btnLogout.onclick = () => signOut(auth);
-
-/* ----------------------------------------------------------
-   פנייה למפתח (נשלח ב-mailto)
+// /* מסמכים כבוי כרגע (המודול הוסר לפי בקשה) */
+פנייה למפתח (נשלח ב-mailto)
 ---------------------------------------------------------- */
 
 /* לשנות למייל האמיתי של התמיכה */
@@ -2433,7 +2336,7 @@ const ccDocsTbody = document.getElementById("ccDocsTbody");
 
 function openCustomerCard(){
   if (!currentUid) return;
-  renderCustomerCardSelect();
+  if (ENABLE_DOCS) renderCustomerCardSelect();
   customerCardModal?.classList.add("open");
   // בחר את הלקוח הנוכחי מהמסמך אם יש
   const cid = dClientId?.value || "";
@@ -2515,7 +2418,7 @@ ccDelete && (ccDelete.onclick = () => {
   refreshCustomerCard();
 });
 
-btnDocCreate.onclick = () => {
+if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOCS && btnDocCreate) btnDocCreate.onclick = () => {
   if (!currentUid) { alert("יש להתחבר"); return; }
 
   const docType = dType.value;
@@ -2629,14 +2532,14 @@ btnDocCreate.onclick = () => {
   alert("המסמך הופק ונשמר ✅");
 };
 
-btnDocEmail.onclick = () => {
+if (ENABLE_DOCS && btnDocEmail) if (ENABLE_DOCS && btnDocEmail) if (ENABLE_DOCS && btnDocEmail) btnDocEmail.onclick = () => {
   if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
   const subject = encodeURIComponent("מסמך חשבונאי - עצמאי פלוס");
   const body = encodeURIComponent(lastDocTextForShare + "\n\nפתחי את המסמך בטאב חדש כדי לשמור כ-PDF ולהצמיד למייל.");
   window.location.href = `mailto:?subject=${subject}&body=${body}`;
 };
 
-btnDocWhatsapp.onclick = () => {
+if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE_DOCS && btnDocWhatsapp) btnDocWhatsapp.onclick = () => {
   if (!lastDocTextForShare) { docsStatus.textContent = "קודם מפיקים מסמך"; return; }
   const txt = encodeURIComponent(lastDocTextForShare);
   window.open(`https://wa.me/?text=${txt}`, "_blank", "noopener");
@@ -2646,8 +2549,8 @@ function initAppLogic(uid) {
   currentUid = uid;
 
   // טוען רשימות כרטיסי לקוח/מסמכים
-  renderCustomersDatalist();
-  renderCustomerCardSelect();
+  if (ENABLE_DOCS) renderCustomersDatalist();
+  if (ENABLE_DOCS) renderCustomerCardSelect();
 
   if (!appInitialized) {
     // כפתורים ותנועות
