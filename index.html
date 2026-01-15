@@ -318,6 +318,9 @@ dialog{
   .app-toast.err{background:#b91c1c;}
 
 #customerCardModal{display:none !important}
+
+  /* הוסר זמנית: מודול לקוחות/מסמכים */
+  #customerCardModal{display:none !important;}
 </style>
 </head>
 <body>
@@ -1713,12 +1716,16 @@ function addRow() {
     saveToLocal();
     scheduleCloudSave();
 
-    // אם יש פילטרים פעילים שיכולים להסתיר את השורה, נעדכן ונסמן למשתמשת
-    const visibleNow = queryRows().some(r => r.id === row.id);
-    render();
-    showToast(visibleNow ? "נשמר ✅" : "נשמר ✅ (ייתכן שהפילטרים מסתירים את השורה – בדקי טווח תאריכים/סוג)");
+        // כדי שהשורה תופיע מיד: מאפסים פילטרים ומכוונים את החודש לתאריך שנקלט
+    qPeriod.value = "1";               // חודש
+    qMonth.value  = dateStr.slice(0,7); // YYYY-MM
+    qType.value   = "all";
+    qCat.value    = "";
+    qSearch.value = "";
 
-    // ניקוי שדות להזנה הבאה (משאירים תאריך)
+    render();
+    showToast("נשמר ✅");
+// ניקוי שדות להזנה הבאה (משאירים תאריך)
     if(fDesc) fDesc.value = "";
     if(fAmount) fAmount.value = "";
   }catch(e){
