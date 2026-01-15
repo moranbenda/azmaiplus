@@ -317,6 +317,7 @@ dialog{
   .app-toast.show{display:block;}
   .app-toast.err{background:#b91c1c;}
 
+#customerCardModal{display:none !important}
 </style>
 </head>
 <body>
@@ -1691,7 +1692,9 @@ function addRow() {
 
     if(!date){ showToast("חסר תאריך", true); return; }
     if(type !== "income" && type !== "expense"){ showToast("בחרי סוג (הכנסה/הוצאה)", true); return; }
-    if(!desc){ showToast("חסר תיאור", true); return; }
+    // תיאור לא חובה. אם ריק—נמלא אוטומטית.
+    const safeDesc = (desc && desc.trim()) ? desc.trim() : (type === "income" ? "הכנסה" : "הוצאה");
+    const safeCategory = (category && category.trim()) ? category.trim() : "כללי";
     const amount = parseFloat(amountRaw);
     if(!Number.isFinite(amount) || amount <= 0){ showToast("חסר סכום תקין", true); return; }
 
@@ -1699,8 +1702,8 @@ function addRow() {
       id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
       date,
       type,
-      category: category || (type==="income" ? "הכנסה" : "הוצאה"),
-      desc,
+      category: safeCategory || (type==="income" ? "הכנסה" : "הוצאה"),
+      desc: safeDesc,
       amount,
       vatIncluded,
       createdAt: Date.now()
