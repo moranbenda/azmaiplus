@@ -639,7 +639,9 @@ dialog{
         <select id="rType">
           <option value="income">דוח הכנסות</option>
           <option value="expense">דוח הוצאות</option>
-  <option value="pnl">דוח רווח והפסד</option>
+          <option value="both">דוח הכנסות והוצאות</option>
+          <option value="pnl">דוח רווח והפסד</option>
+          <option value="vat">דוח מע״מ</option>
         </select>
       </div>
     </div>
@@ -648,7 +650,7 @@ dialog{
         <button class="btn small" id="btnReportCsv">ייצוא לאקסל (CSV)</button>
         <button class="btn secondary small" id="btnReportPdf">ייצוא ל-PDF</button>
       </div>
-      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים.</span>
+      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים, כולל הכנסות+הוצאות, רווח והפסד ודוח מע״מ.</span>
     </div>
   </div>
 </dialog>
@@ -1421,6 +1423,7 @@ btnSaveProfile.onclick = async () => {
 ---------------------------------------------------------- */
 
 let rows = [];
+let localLedgerMeta = { updatedAt: null };
 
 function ledgerKey(uid) {
   return `ledgerDataV3_${uid}`;
@@ -1435,42 +1438,49 @@ function getSettings() {
   return { vatEnabled, vatRate };
 }
 
+function applyLedgerPayload(obj = {}) {
+  rows = (obj.rows || []).map(r => ({
+    ...r,
+    deductPct: typeof r.deductPct === "number" ? r.deductPct : 100
+  }));
+  localLedgerMeta.updatedAt = obj.updatedAt || null;
+  if (obj.settings && userProfile?.businessType !== "ptor") {
+    vatRateInput.value = obj.settings.vatRate ?? (userProfile?.vatRate ?? DEFAULT_VAT);
+    vatEnabledCheckbox.checked = !!obj.settings.vatEnabled;
+  }
+}
+
 function loadFromLocal() {
-  if (!currentUid) { rows = []; return; }
+  if (!currentUid) { rows = []; localLedgerMeta = { updatedAt: null }; return; }
   const raw = localStorage.getItem(ledgerKey(currentUid));
-  if (!raw) { rows = []; return; }
+  if (!raw) { rows = []; localLedgerMeta = { updatedAt: null }; return; }
   try {
     const obj = JSON.parse(raw);
-    rows = (obj.rows || []).map(r => ({
-      ...r,
-      deductPct: typeof r.deductPct === "number" ? r.deductPct : 100
-    }));
-    if (obj.settings) {
-      if (userProfile?.businessType !== "ptor") {
-        vatRateInput.value = obj.settings.vatRate ?? (userProfile?.vatRate ?? DEFAULT_VAT);
-        vatEnabledCheckbox.checked = !!obj.settings.vatEnabled;
-      }
-    }
+    applyLedgerPayload(obj);
   } catch (e) {
     console.error("parse local ledger fail", e);
     rows = [];
+    localLedgerMeta = { updatedAt: null };
   }
 }
 
 function saveToLocal() {
   if (!currentUid) return;
-  const payload = { rows, settings: getSettings() };
+  const updatedAt = new Date().toISOString();
+  const payload = { rows, settings: getSettings(), updatedAt };
+  localLedgerMeta.updatedAt = updatedAt;
   localStorage.setItem(ledgerKey(currentUid), JSON.stringify(payload));
 }
 
 async function saveToCloud() {
   if (!currentUid) return;
   try {
+    const updatedAt = localLedgerMeta.updatedAt || new Date().toISOString();
     const ref = doc(db, "ledgers", currentUid);
     await setDoc(ref, {
       rows,
       settings: getSettings(),
-      updatedAt: new Date().toISOString()
+      updatedAt
     }, { merge: true });
   } catch (e) {
     console.error("cloud save error", e);
@@ -1497,28 +1507,45 @@ function saveToCloudDebounced() {
 }
 async function loadFromCloudFirst() {
   if (!currentUid) { rows = []; return; }
+
+  loadFromLocal();
+  const localSnapshot = {
+    rows: rows.slice(),
+    settings: getSettings(),
+    updatedAt: localLedgerMeta.updatedAt
+  };
+
   try {
     const ref = doc(db, "ledgers", currentUid);
     const snap = await getDoc(ref);
     if (snap.exists()) {
-      const obj = snap.data();
-      rows = (obj.rows || []).map(r => ({
-        ...r,
-        deductPct: typeof r.deductPct === "number" ? r.deductPct : 100
-      }));
-      if (obj.settings && userProfile?.businessType !== "ptor") {
-        vatRateInput.value = obj.settings.vatRate ?? (userProfile?.vatRate ?? DEFAULT_VAT);
-        vatEnabledCheckbox.checked = !!obj.settings.vatEnabled;
+      const cloudObj = snap.data() || {};
+      const cloudTs = Date.parse(cloudObj.updatedAt || 0) || 0;
+      const localTs = Date.parse(localSnapshot.updatedAt || 0) || 0;
+
+      if (cloudTs >= localTs) {
+        applyLedgerPayload(cloudObj);
+        saveToLocal();
+      } else {
+        rows = localSnapshot.rows;
+        localLedgerMeta.updatedAt = localSnapshot.updatedAt;
+        await saveToCloud();
       }
-      // לשמור גם מקומית
-      saveToLocal();
+      return;
+    }
+
+    if (localSnapshot.rows.length) {
+      rows = localSnapshot.rows;
+      localLedgerMeta.updatedAt = localSnapshot.updatedAt || new Date().toISOString();
+      await saveToCloud();
       return;
     }
   } catch (e) {
     console.error("cloud load error", e);
+    rows = localSnapshot.rows;
+    localLedgerMeta.updatedAt = localSnapshot.updatedAt;
+    return;
   }
-  // אם אין בענן – נטען מקומי
-  loadFromLocal();
 }
 
 /* ----------------------------------------------------------
@@ -1944,33 +1971,84 @@ function addVatInfo(list) {
   return { rows: rowsWithAmounts, totals };
 }
 
+function filterByDateRange(from, to) {
+  return rows.filter(r => {
+    if (from && r.date < from) return false;
+    if (to && r.date > to) return false;
+    return true;
+  });
+}
+
+function buildVatSummary(from, to) {
+  const incomeList  = filterByDateAndType("income",  from, to);
+  const expenseList = filterByDateAndType("expense", from, to);
+  const { totals: incTotals } = addVatInfo(incomeList);
+  const { totals: expTotals } = addVatInfo(expenseList);
+  return {
+    incomeNet: incTotals.net,
+    incomeVat: incTotals.vat,
+    incomeGross: incTotals.gross,
+    expenseNet: expTotals.net,
+    expenseVat: expTotals.vat,
+    expenseGross: expTotals.gross,
+    vatToPay: incTotals.vat - expTotals.vat
+  };
+}
+
 /* ------------ CSV לדוחות ------------ */
 btnReportCsv.onclick = () => {
   const type = rType.value;
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  // רווח והפסד
   if (type === "pnl") {
     const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
     const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
-
     const lines = [
       "section,net,vat,gross",
       `income,${inc.net},${inc.vat},${inc.gross}`,
       `expense,${exp.net},${exp.vat},${exp.gross}`,
-      `profit,${inc.net - exp.net},,`
+      `profit,${inc.net - exp.net},,${inc.gross - exp.gross}`
     ];
-
     downloadFile("pnl-report.csv", lines.join("\n"));
+    return;
+  }
+
+  if (type === "vat") {
+    const vat = buildVatSummary(from, to);
+    const lines = [
+      "section,net,vat,gross",
+      `income,${vat.incomeNet},${vat.incomeVat},${vat.incomeGross}`,
+      `expense,${vat.expenseNet},${vat.expenseVat},${vat.expenseGross}`,
+      `vat_to_pay,,${vat.vatToPay},`
+    ];
+    downloadFile("vat-report.csv", lines.join("\n"));
+    return;
+  }
+
+  if (type === "both") {
+    const list = filterByDateRange(from, to);
+    if (!list.length) return alert("אין נתונים");
+    const { rows: data } = addVatInfo(list);
+    const headers = ["date","type","category","desc","net","vat","gross"];
+    const csv = [
+      headers.join(","),
+      ...data.map(r =>
+        headers.map(h => `"${String(r[h] ?? "").replace(/"/g,'""')}"`).join(",")
+      )
+    ];
+    const totalsInc = addVatInfo(data.filter(r => r.type === "income")).totals;
+    const totalsExp = addVatInfo(data.filter(r => r.type === "expense")).totals;
+    csv.push(`"TOTAL_INCOME","","","",${totalsInc.net},${totalsInc.vat},${totalsInc.gross}`);
+    csv.push(`"TOTAL_EXPENSE","","","",${totalsExp.net},${totalsExp.vat},${totalsExp.gross}`);
+    csv.push(`"BALANCE","","","",${totalsInc.net - totalsExp.net},,${totalsInc.gross - totalsExp.gross}`);
+    downloadFile("income-expense-report.csv", csv.join("\n"));
     return;
   }
 
   const list = filterByDateAndType(type, from, to);
   if (!list.length) return alert("אין נתונים");
-
   const { rows: data } = addVatInfo(list);
-
   const headers = ["date","category","desc","net","vat","gross"];
   const csv = [
     headers.join(","),
@@ -1978,11 +2056,7 @@ btnReportCsv.onclick = () => {
       headers.map(h => `"${String(r[h] ?? "").replace(/"/g,'""')}"`).join(",")
     )
   ];
-
-  downloadFile(
-    type === "income" ? "income-report.csv" : "expense-report.csv",
-    csv.join("\n")
-  );
+  downloadFile(type === "income" ? "income-report.csv" : "expense-report.csv", csv.join("\n"));
 };
 
 /* ------------ PDF לדוחות ------------ */
@@ -1993,112 +2067,16 @@ btnReportPdf.onclick = () => {
 
   const bizName = userProfile?.businessName || "";
   const bizId   = userProfile?.businessId || "";
+  const display = userProfile?.displayName || "";
+  const email   = userProfile?.email || auth.currentUser?.email || "";
   const created = new Date().toLocaleString("he-IL");
 
   const rangeText = (from || to)
     ? `טווח: ${from || "—"} עד ${to || "—"}`
     : `טווח: כל התאריכים`;
 
-  // דו"ח רווח והפסד – PDF
-  if (type === "pnl") {
-    const incomeList  = filterByDateAndType("income",  from, to);
-    const expenseList = filterByDateAndType("expense", from, to);
-
-    const { totals: incTotals } = addVatInfo(incomeList);
-    const { totals: expTotals } = addVatInfo(expenseList);
-
-    const profitNet   = incTotals.net   - expTotals.net;
-    const profitGross = incTotals.gross - expTotals.gross;
-
-    const title = 'דו"ח רווח והפסד';
-
-    const html = `
-      <!DOCTYPE html>
-      <html lang="he" dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <title>${title}</title>
-        <style>
-          body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-          h1{margin:0 0 6px;font-size:20px}
-          .meta{color:#555;margin-bottom:14px;line-height:1.6}
-          table{border-collapse:collapse;width:100%;margin-top:12px}
-          th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
-          th{background:#f0f2f7}
-        </style>
-      </head>
-      <body>
-        <h1>${title}</h1>
-        <div class="meta">
-          ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
-          ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
-          <div><b>${escapeHtml(rangeText)}</b></div>
-          <div>הופק: ${escapeHtml(created)}</div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>סעיף</th>
-              <th>נטו (לפני מע"מ)</th>
-              <th>מע"מ</th>
-              <th>סה"כ כולל מע"מ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>סה"כ הכנסות</td>
-              <td>${toMoney(incTotals.net)}</td>
-              <td>${toMoney(incTotals.vat)}</td>
-              <td>${toMoney(incTotals.gross)}</td>
-            </tr>
-            <tr>
-              <td>סה"כ הוצאות</td>
-              <td>${toMoney(expTotals.net)}</td>
-              <td>${toMoney(expTotals.vat)}</td>
-              <td>${toMoney(expTotals.gross)}</td>
-            </tr>
-            <tr>
-              <td style="font-weight:bold">רווח לפני מס (נטו)</td>
-              <td style="font-weight:bold">${toMoney(profitNet)}</td>
-              <td></td>
-              <td></td>
-            </tr>
-            <tr>
-              <td style="font-weight:bold">רווח כולל מע"מ (כולל)</td>
-              <td style="font-weight:bold">${toMoney(profitGross)}</td>
-              <td></td>
-              <td></td>
-            </tr>
-          </tbody>
-        </table>
-
-        
-      
-<div id="appToast" class="app-toast" role="status" aria-live="polite"></div>
-</body>
-      </html>
-    `;
-
-    const w = window.open("", "_blank");
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    return;
-  }
-
-  // דו"ח הכנסות / הוצאות מפורט
-  const list = filterByDateAndType(type, from, to);
-  if (!list.length) {
-    alert("אין נתונים לטווח שנבחר");
-    return;
-  }
-
-  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
-  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
-
-  let html = `
-    <!DOCTYPE html>
+  const openReportWindow = (title, bodyHtml) => {
+    const html = `<!DOCTYPE html>
     <html lang="he" dir="rtl">
     <head>
       <meta charset="UTF-8">
@@ -2107,68 +2085,134 @@ btnReportPdf.onclick = () => {
         body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
         h1{margin:0 0 6px;font-size:20px}
         .meta{color:#555;margin-bottom:14px;line-height:1.6}
-        table{border-collapse:collapse;width:100%}
+        table{border-collapse:collapse;width:100%;margin-top:12px}
         th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
         th{background:#f0f2f7}
+        .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0}
       </style>
     </head>
     <body>
       <h1>${title}</h1>
       <div class="meta">
-        ${bizName ? `<div><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
-        ${bizId ? `<div><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+        ${bizName ? `<div class="pill"><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
+        ${bizId ? `<div class="pill"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
+        ${display ? `<div class="pill"><b>שם:</b> ${escapeHtml(display)}</div>` : ""}
+        ${email ? `<div class="pill"><b>אימייל:</b> ${escapeHtml(email)}</div>` : ""}
         <div><b>${escapeHtml(rangeText)}</b></div>
         <div>הופק: ${escapeHtml(created)}</div>
       </div>
+      ${bodyHtml}
+    </body>
+    </html>`;
+    const w = window.open("", "_blank");
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+  };
 
+  if (type === "pnl") {
+    const incomeList  = filterByDateAndType("income",  from, to);
+    const expenseList = filterByDateAndType("expense", from, to);
+    const { totals: incTotals } = addVatInfo(incomeList);
+    const { totals: expTotals } = addVatInfo(expenseList);
+    const profitNet   = incTotals.net - expTotals.net;
+    const profitGross = incTotals.gross - expTotals.gross;
+    openReportWindow('דו"ח רווח והפסד', `
       <table>
         <thead>
-          <tr>
-            <th>תאריך</th>
-            <th>תיאור</th>
-            <th>קטגוריה</th>
-            <th>נטו (לפני מע"מ)</th>
-            <th>מע"מ</th>
-            <th>סה"כ כולל מע"מ</th>
-          </tr>
+          <tr><th>סעיף</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
         </thead>
         <tbody>
-  `;
+          <tr><td>סה"כ הכנסות</td><td>${toMoney(incTotals.net)}</td><td>${toMoney(incTotals.vat)}</td><td>${toMoney(incTotals.gross)}</td></tr>
+          <tr><td>סה"כ הוצאות</td><td>${toMoney(expTotals.net)}</td><td>${toMoney(expTotals.vat)}</td><td>${toMoney(expTotals.gross)}</td></tr>
+          <tr><td><b>רווח לפני מס</b></td><td><b>${toMoney(profitNet)}</b></td><td></td><td></td></tr>
+          <tr><td><b>יתרה כולל מע"מ</b></td><td><b>${toMoney(profitGross)}</b></td><td></td><td></td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
 
-  rowsWithAmounts.forEach(r => {
-    html += `
+  if (type === "vat") {
+    const vat = buildVatSummary(from, to);
+    openReportWindow('דו"ח מע"מ', `
+      <table>
+        <thead>
+          <tr><th>סעיף</th><th>בסיס</th><th>מע"מ</th><th>כולל</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>עסקאות (הכנסות)</td><td>${toMoney(vat.incomeNet)}</td><td>${toMoney(vat.incomeVat)}</td><td>${toMoney(vat.incomeGross)}</td></tr>
+          <tr><td>תשומות (הוצאות)</td><td>${toMoney(vat.expenseNet)}</td><td>${toMoney(vat.expenseVat)}</td><td>${toMoney(vat.expenseGross)}</td></tr>
+          <tr><td><b>מע"מ לתשלום / החזר</b></td><td></td><td><b>${toMoney(vat.vatToPay)}</b></td><td></td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
+
+  if (type === "both") {
+    const list = filterByDateRange(from, to);
+    if (!list.length) {
+      alert("אין נתונים לטווח שנבחר");
+      return;
+    }
+    const { rows: rowsWithAmounts } = addVatInfo(list);
+    const incTotals = addVatInfo(rowsWithAmounts.filter(r => r.type === "income")).totals;
+    const expTotals = addVatInfo(rowsWithAmounts.filter(r => r.type === "expense")).totals;
+    const bodyRows = rowsWithAmounts.map(r => `
       <tr>
         <td>${r.date}</td>
+        <td>${r.type === "income" ? "הכנסה" : "הוצאה"}</td>
         <td>${escapeHtml(r.category || "")}</td>
         <td>${escapeHtml(r.desc || "")}</td>
         <td>${toMoney(r.net)}</td>
         <td>${toMoney(r.vat)}</td>
         <td>${toMoney(r.gross)}</td>
-      </tr>
-    `;
-  });
-
-  html += `
-      <tr>
-        <td colspan="3" style="font-weight:bold">סה"כ</td>
-        <td style="font-weight:bold">${toMoney(totals.net)}</td>
-        <td style="font-weight:bold">${toMoney(totals.vat)}</td>
-        <td style="font-weight:bold">${toMoney(totals.gross)}</td>
-      </tr>
+      </tr>`).join("");
+    openReportWindow('דו"ח הכנסות והוצאות', `
+      <table>
+        <thead>
+          <tr><th>תאריך</th><th>סוג</th><th>קטגוריה</th><th>תיאור</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr><td colspan="4"><b>סה"כ הכנסות</b></td><td><b>${toMoney(incTotals.net)}</b></td><td><b>${toMoney(incTotals.vat)}</b></td><td><b>${toMoney(incTotals.gross)}</b></td></tr>
+          <tr><td colspan="4"><b>סה"כ הוצאות</b></td><td><b>${toMoney(expTotals.net)}</b></td><td><b>${toMoney(expTotals.vat)}</b></td><td><b>${toMoney(expTotals.gross)}</b></td></tr>
+          <tr><td colspan="4"><b>יתרה</b></td><td><b>${toMoney(incTotals.net - expTotals.net)}</b></td><td></td><td><b>${toMoney(incTotals.gross - expTotals.gross)}</b></td></tr>
         </tbody>
-      </table>
+      </table>`);
+    return;
+  }
 
-      
-    
-<div id="appToast" class="app-toast" role="status" aria-live="polite"></div>
-</body>
-    </html>
-  `;
-
-  const w = window.open("", "_blank");
-  w.document.write(html);
-  w.document.close();
-  w.focus();
+  const list = filterByDateAndType(type, from, to);
+  if (!list.length) {
+    alert("אין נתונים לטווח שנבחר");
+    return;
+  }
+  const { rows: rowsWithAmounts, totals } = addVatInfo(list);
+  const title = type === "income" ? "דוח הכנסות" : "דוח הוצאות";
+  const bodyRows = rowsWithAmounts.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${escapeHtml(r.category || "")}</td>
+      <td>${escapeHtml(r.desc || "")}</td>
+      <td>${toMoney(r.net)}</td>
+      <td>${toMoney(r.vat)}</td>
+      <td>${toMoney(r.gross)}</td>
+    </tr>`).join("");
+  openReportWindow(title, `
+    <table>
+      <thead>
+        <tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
+      </thead>
+      <tbody>
+        ${bodyRows}
+        <tr>
+          <td colspan="3"><b>סה"כ</b></td>
+          <td><b>${toMoney(totals.net)}</b></td>
+          <td><b>${toMoney(totals.vat)}</b></td>
+          <td><b>${toMoney(totals.gross)}</b></td>
+        </tr>
+      </tbody>
+    </table>`);
 };
 /* ----------------------------------------------------------
    16) חיבור מאזינים והתחלת האפליקציה לאחר התחברות
@@ -2649,6 +2693,15 @@ renderItemsDatalist();
     render();
   })();
 }
+
+window.addEventListener("beforeunload", () => {
+  try {
+    saveToLocal();
+    saveToCloud();
+  } catch (e) {
+    console.error("beforeunload save failed", e);
+  }
+});
 
 /* להתחיל במצב "התחברות" כברירת מחדל */
 tabLogin.click();
