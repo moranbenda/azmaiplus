@@ -322,6 +322,205 @@ dialog{
 
   /* הוסר זמנית: מודול לקוחות/מסמכים */
   #customerCardModal{display:none !important;}
+
+/* ===== מובייל משופר ===== */
+html,body{
+  max-width:100%;
+  overflow-x:hidden;
+}
+body{
+  overflow-x:hidden;
+}
+#appShell, main.wrap, .grid-main, .card, .bd{
+  min-width:0;
+}
+.header-inner{
+  min-width:0;
+}
+.top-right{
+  justify-content:flex-end;
+}
+.top-right > *{
+  flex:0 0 auto;
+}
+.tx-table-wrap,
+.cat-table-wrap{
+  width:100%;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.tx-table-wrap table{
+  min-width:760px;
+}
+#categoriesDialog .cat-table-wrap table{
+  min-width:560px;
+}
+#categoriesDialog .dlg-bd{
+  overflow:hidden;
+}
+#categoriesDialog .cat-table-wrap{
+  max-width:100%;
+}
+#categoriesDialog .cat-table-wrap th,
+#categoriesDialog .cat-table-wrap td{
+  white-space:nowrap;
+}
+#categoriesDialog .cat-table-wrap thead th{
+  position:sticky;
+  top:0;
+  z-index:2;
+}
+#categoriesDialog .cat-table-wrap tbody tr{
+  background:#fff;
+}
+#categoriesDialog .cat-table-wrap tbody tr:hover{
+  background:#f7f9fc;
+}
+#profileDialog .dlg-bd,
+#reportsDialog .dlg-bd,
+#supportDialog .dlg-bd,
+#editDialog .dlg-bd{
+  overflow-x:hidden;
+}
+@media (max-width: 700px){
+  body{
+    font-size:14px;
+  }
+  header.app-header{
+    position:sticky;
+    top:0;
+    z-index:100;
+  }
+  .header-inner{
+    flex-direction:column;
+    align-items:stretch !important;
+    gap:12px !important;
+  }
+  .header-inner > div:first-child{
+    min-width:0;
+  }
+  .brand-title{
+    font-size:18px;
+    line-height:1.25;
+    margin-bottom:6px;
+  }
+  .top-right{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+    width:100%;
+  }
+  .top-right .tag{
+    grid-column:1 / -1;
+    text-align:center;
+    justify-content:center;
+  }
+  .top-right .btn,
+  .top-right a.btn{
+    width:100%;
+    min-width:0;
+    justify-content:center;
+    white-space:nowrap;
+    padding-inline:10px;
+  }
+  .grid-main{
+    gap:12px;
+  }
+  .card .hd{
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .card .hd .row{
+    width:100%;
+  }
+  .card .hd .row > *{
+    flex:1 1 auto;
+  }
+  #txForm{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+  }
+  #txForm > div,
+  #txForm > button,
+  #txForm > .pill{
+    width:100% !important;
+    min-width:0;
+    margin:0;
+  }
+  #txForm .pill{
+    justify-content:space-between;
+  }
+  #txForm .pill input[type="number"]{
+    width:88px !important;
+  }
+  .row[style*="margin-bottom:10px"]{
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  .chips{
+    grid-template-columns:1fr;
+  }
+  .chip{
+    padding:12px 14px;
+  }
+  .tx-table-wrap{
+    overflow-x:auto !important;
+    overflow-y:auto !important;
+  }
+  .tx-table-wrap table{
+    min-width:720px;
+  }
+  dialog{
+    width:min(94vw,680px);
+    max-width:94vw;
+    max-height:86vh;
+    margin:auto;
+  }
+  dialog[open]{
+    inset:auto 0 0 0;
+    margin:0 auto;
+    border-radius:18px 18px 0 0;
+  }
+  .dlg-hd{
+    position:sticky;
+    top:0;
+    z-index:3;
+  }
+  .dlg-bd{
+    max-height:calc(86vh - 56px);
+    padding:12px;
+    overflow-y:auto;
+    overflow-x:hidden;
+  }
+  .grid2{
+    grid-template-columns:1fr !important;
+  }
+  #profileDialog input,
+  #profileDialog select,
+  #reportsDialog input,
+  #reportsDialog select,
+  #editDialog input,
+  #editDialog select,
+  #supportDialog input,
+  #supportDialog textarea{
+    width:100%;
+    min-width:0;
+  }
+}
+/* לבטל את מצב הכרטיסים הגנרי של טבלאות בדיאלוגים במובייל */
+@media (max-width: 520px) {
+  .dlg-bd table.keep-table,
+  .dlg-bd table.keep-table thead,
+  .dlg-bd table.keep-table tbody,
+  .dlg-bd table.keep-table th,
+  .dlg-bd table.keep-table td,
+  .dlg-bd table.keep-table tr{
+    display:revert !important;
+    width:auto !important;
+  }
+}
+
 </style>
 </head>
 <body>
@@ -359,7 +558,7 @@ dialog{
 <!-- האפליקציה עצמה (רק אחרי התחברות) -->
 <div id="appShell">
   <header class="app-header">
-    <div class="wrap" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <div class="wrap header-inner" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div>
         <h2 class="brand-title">עצמאי פלוס - הנהלת חשבונות עצמאית — מעקב הכנסות/הוצאות לעצמאיים</h2>
         <div class="hint" id="businessHint"></div>
@@ -495,7 +694,7 @@ dialog{
           <h3 style="margin:0;font-size:15px">תנועות</h3>
           <span class="muted" id="rowsCount">0 שורות</span>
         </div>
-        <div class="bd" style="max-height:60vh;overflow:auto">
+        <div class="bd tx-table-wrap" style="max-height:60vh;overflow:auto">
           <table>
             <thead>
               <tr>
@@ -602,8 +801,8 @@ dialog{
     <p class="hint">
       הטבלה מבוססת על פירוט ההוצאות/הכנסות המוכרות: אחוז הוצאה מוכרת למס הכנסה והאם ההוצאה מוכרת למע"מ.
     </p>
-    <div style="max-height:60vh;overflow:auto">
-      <table>
+    <div class="cat-table-wrap" style="max-height:60vh;overflow:auto">
+      <table class="keep-table">
         <thead>
           <tr>
             <th>תיאור</th>
