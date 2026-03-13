@@ -368,7 +368,7 @@ dialog{
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+                <a class="btn secondary small" id="btnVatLink" href="https://secapp.taxes.gov.il/taxes-login/login/general" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
@@ -1066,9 +1066,7 @@ btnReportsOpen.onclick    = () => {
   rFrom.value = "";
   rTo.value   = "";
   rType.value = "income";
-  if (ENABLE_DOCS) {
   reportsDialog.showModal();
-}
 };
 /* פנייה למפתח (נשלח ב-mailto) ---------------------------------------------------------- */
 // (removed stray text)
@@ -1667,28 +1665,25 @@ function render() {
       <div class="v income">${toMoney(sum.incGross)}</div>
     </div>
     <div class="chip">
-      <div class="k">סה"כ הוצאות (כולל)</div>
-      <div class="v expense">${toMoney(sum.expGross)}</div>
-    </div>
-    <div class="chip">
-      <div class="k">יתרה</div>
-      <div class="v" style="color:${sum.balance >= 0 ? 'var(--good)' : 'var(--bad)'}">
-        ${toMoney(sum.balance)}
-      </div>
+      <div class="k">סה"כ הכנסות (ללא מע"מ)</div>
+      <div class="v income">${toMoney(sum.incNet)}</div>
     </div>
     <div class="chip">
       <div class="k">מע"מ עסקאות</div>
       <div class="v">${toMoney(sum.incVat)}</div>
     </div>
     <div class="chip">
-      <div class="k">מס תשומות (משוער)</div>
+      <div class="k">סה"כ הוצאות (כולל)</div>
+      <div class="v expense">${toMoney(sum.expGross)}</div>
+    </div>
+    <div class="chip">
+      <div class="k">מס תשומות</div>
       <div class="v">${toMoney(sum.expVat)}</div>
     </div>
     <div class="chip">
       <div class="k">מע"מ לתשלום</div>
       <div class="v" style="color:${sum.vatNet >= 0 ? 'var(--warning)' : 'var(--accent-2)'}">
-        ${toMoney(sum.vatNet)}
-      </div>
+        ${toMoney(sum.vatNet)}</div>
     </div>
   `;
 
@@ -1899,11 +1894,12 @@ function exportPDF() {
       </thead>
       <tbody>
         <tr><td>סה"כ הכנסות (כולל)</td><td>${toMoney(sum.incGross)}</td></tr>
-        <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
-        <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
+        <tr><td>סה"כ הכנסות (ללא מע"מ)</td><td>${toMoney(sum.incNet)}</td></tr>
         <tr><td>מע"מ עסקאות</td><td>${toMoney(sum.incVat)}</td></tr>
-        <tr><td>מס תשומות (משוער)</td><td>${toMoney(sum.expVat)}</td></tr>
+        <tr><td>סה"כ הוצאות (כולל)</td><td>${toMoney(sum.expGross)}</td></tr>
+        <tr><td>מס תשומות</td><td>${toMoney(sum.expVat)}</td></tr>
         <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
+        <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
         <tr><td>בסיס רווח לצרכי מס (נטו, משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
       </tbody>
     </table>
@@ -2140,8 +2136,9 @@ btnReportPdf.onclick = () => {
           <tr><th>סעיף</th><th>בסיס</th><th>מע"מ</th><th>כולל</th></tr>
         </thead>
         <tbody>
-          <tr><td>עסקאות (הכנסות)</td><td>${toMoney(vat.incomeNet)}</td><td>${toMoney(vat.incomeVat)}</td><td>${toMoney(vat.incomeGross)}</td></tr>
-          <tr><td>תשומות (הוצאות)</td><td>${toMoney(vat.expenseNet)}</td><td>${toMoney(vat.expenseVat)}</td><td>${toMoney(vat.expenseGross)}</td></tr>
+          <tr><td>עסקאות (הכנסות ללא מע"מ)</td><td>${toMoney(vat.incomeNet)}</td><td>${toMoney(vat.incomeVat)}</td><td>${toMoney(vat.incomeGross)}</td></tr>
+          <tr><td>תשומות אחרות</td><td>${toMoney(vat.expenseNet)}</td><td>${toMoney(vat.expenseVat)}</td><td>${toMoney(vat.expenseGross)}</td></tr>
+          <tr><td><b>מס תשומות</b></td><td></td><td><b>${toMoney(vat.expenseVat)}</b></td><td></td></tr>
           <tr><td><b>מע"מ לתשלום / החזר</b></td><td></td><td><b>${toMoney(vat.vatToPay)}</b></td><td></td></tr>
         </tbody>
       </table>`);
