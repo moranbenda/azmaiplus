@@ -748,7 +748,7 @@ body{
               <button class="btn ghost small" id="btnExportCSV">ייצוא CSV</button>
               <button class="btn ghost small" id="btnExportJSON">גיבוי (JSON)</button>
               <button class="btn ghost small" id="btnExportPDF">הדפסה / PDF</button>
-              <button class="btn ghost small" id="btnImportIncome">ייבוא הכנסות</button>
+              <button class="btn small" id="btnImportIncome" style="font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,.18)">ייבוא הכנסות</button>
             </div>
             <button class="btn warn small" id="btnClear">איפוס כל הנתונים</button>
           </div>
@@ -946,17 +946,17 @@ body{
       <div style="grid-column:1 / -1">
         <label>בחרי קובץ</label>
         <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
-        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא.</div>
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
       </div>
     </div>
     <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
     <div class="tx-table-wrap" style="max-height:45vh;overflow:auto;margin-top:10px">
       <table>
         <thead>
-          <tr><th>ייבוא</th><th>תאריך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th></tr>
+          <tr><th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th></tr>
         </thead>
         <tbody id="importIncomePreviewBody">
-          <tr><td colspan="6" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>
+          <tr><td colspan="7" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>
         </tbody>
       </table>
     </div>
@@ -964,7 +964,7 @@ body{
       <div class="left">
         <button class="btn" type="button" id="btnImportIncomeConfirm">ייבוא לאפליקציה</button>
       </div>
-      <span class="hint">אפשר לערוך לפני הייבוא. כפילויות לפי מספר מסמך ידולגו.</span>
+      <span class="hint">אפשר לערוך לפני הייבוא. כפילויות לפי סוג מסמך + מספר מסמך ידולגו.</span>
     </div>
   </div>
 </dialog>
@@ -2544,28 +2544,35 @@ function parseImportDate(value) {
   return "";
 }
 
-function buildImportedIncomeDescription(docNumber, clientName, subject) {
+function buildImportedIncomeDescription(docNumber, clientName, subject, docType='') {
   const bits = [];
-  if (docNumber) bits.push(`חשבונית ${docNumber}`);
+  const docLabel = (docType || '').trim() || 'חשבונית';
+  if (docNumber) bits.push(`${docLabel} ${docNumber}`);
   if (clientName) bits.push(clientName);
   if (!bits.length && subject) bits.push(subject);
   return bits.join(" - ") || "הכנסה מיובאת";
 }
 
+function isCreditDocType(docType='') {
+  const s = String(docType || '').trim();
+  return /זיכוי/.test(s);
+}
+
 function renderImportIncomePreview() {
   if (!importIncomePreviewBody) return;
   if (!importIncomeRows.length) {
-    importIncomePreviewBody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>';
+    importIncomePreviewBody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>';
     return;
   }
   importIncomePreviewBody.innerHTML = importIncomeRows.map((row, idx) => `
     <tr data-idx="${idx}">
       <td style="text-align:center"><input type="checkbox" class="imp-include" ${row.include !== false ? 'checked' : ''}></td>
-      <td><input class="imp-date" type="date" value="${escapeHtml(row.date || '')}" style="min-width:140px"></td>
-      <td><input class="imp-doc" type="text" value="${escapeHtml(row.docNumber || '')}" style="min-width:90px"></td>
-      <td><input class="imp-client" type="text" value="${escapeHtml(row.clientName || '')}" style="min-width:180px"></td>
-      <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:260px"></td>
-      <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:120px"></td>
+      <td><input class="imp-date" type="date" value="${escapeHtml(row.date || '')}" style="min-width:132px"></td>
+      <td><input class="imp-doctype" type="text" value="${escapeHtml(row.docType || '')}" style="min-width:112px"></td>
+      <td><input class="imp-doc" type="text" value="${escapeHtml(row.docNumber || '')}" style="min-width:72px"></td>
+      <td><input class="imp-client" type="text" value="${escapeHtml(row.clientName || '')}" style="min-width:160px"></td>
+      <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:240px"></td>
+      <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:100px"></td>
     </tr>
   `).join('');
 }
@@ -2575,6 +2582,7 @@ function syncImportIncomeRowsFromPreview() {
   importIncomeRows = trs.map(tr => ({
     include: !!tr.querySelector('.imp-include')?.checked,
     date: tr.querySelector('.imp-date')?.value || '',
+    docType: (tr.querySelector('.imp-doctype')?.value || '').trim(),
     docNumber: (tr.querySelector('.imp-doc')?.value || '').trim(),
     clientName: (tr.querySelector('.imp-client')?.value || '').trim(),
     desc: (tr.querySelector('.imp-desc')?.value || '').trim(),
@@ -2595,17 +2603,21 @@ function rowsFromParsedImportData(rawRows = []) {
     const docNumber = String(src[cols.docNumber] ?? '').trim();
     const clientName = String(src[cols.client] ?? '').trim();
     const subject = String(src[cols.subject] ?? '').trim();
+    const docType = String(src[cols.docType] ?? '').trim();
+    let amount = parseImportNumber(src[totalKey]);
+    if (isCreditDocType(docType) && Number.isFinite(amount)) amount = -Math.abs(amount);
     return {
       include: true,
       date: parseImportDate(src[cols.date]),
+      docType,
       docNumber,
       clientName,
-      desc: buildImportedIncomeDescription(docNumber, clientName, subject),
-      amount: parseImportNumber(src[totalKey]),
+      desc: buildImportedIncomeDescription(docNumber, clientName, subject, docType),
+      amount,
       incVat: true,
       type: 'income'
     };
-  }).filter(r => r.date && Number.isFinite(r.amount) && r.amount > 0);
+  }).filter(r => r.date && Number.isFinite(r.amount) && r.amount !== 0);
 }
 
 async function parseIncomeImportFile(file) {
@@ -2667,16 +2679,17 @@ function confirmIncomeImport() {
   }
   let imported = 0, skipped = 0;
   for (const item of selected) {
-    if (!item.date || !Number.isFinite(item.amount) || item.amount <= 0) { skipped++; continue; }
-    const duplicate = item.docNumber && rows.some(r => r.type === 'income' && String(r.docNumber || '').trim() === item.docNumber);
+    if (!item.date || !Number.isFinite(item.amount) || item.amount === 0) { skipped++; continue; }
+    const duplicate = item.docNumber && rows.some(r => r.type === 'income' && String(r.docNumber || '').trim() === item.docNumber && String(r.docType || '').trim() === String(item.docType || '').trim());
     if (duplicate) { skipped++; continue; }
     rows.push({
       id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
       date: item.date,
       type: 'income',
       category: '',
-      desc: item.desc || buildImportedIncomeDescription(item.docNumber, item.clientName, ''),
+      desc: item.desc || buildImportedIncomeDescription(item.docNumber, item.clientName, '', item.docType || ''),
       docNumber: item.docNumber || '',
+      docType: item.docType || '',
       amount: item.amount,
       incVat: true,
       deductPct: 100,
