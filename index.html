@@ -1072,6 +1072,18 @@ let lastDocHtml = "";
 
 /* יציאה */
 const btnLogout = document.getElementById("btnLogout");
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      setAuthInfo("התנתקת בהצלחה.");
+      authPassword.value = "";
+    } catch (err) {
+      console.error("Logout error:", err);
+      alert("לא ניתן היה להתנתק כרגע. נסי שוב.");
+    }
+  });
+}
 
 /* ----------------------------------------------------------
    3) מעבר בין "התחברות" ↔ "הרשמה"
