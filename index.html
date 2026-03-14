@@ -2423,7 +2423,9 @@ function uniqueCategories() {
 function updateFiltersUI() {
   const dl = document.getElementById("catsList");
   if (dl) {
-    dl.innerHTML = uniqueCategories()
+    const staticCats = Array.from(new Set(EXPENSE_ITEMS.map(i => i.category).filter(Boolean)))
+      .sort((a,b)=>a.localeCompare(b,"he"));
+    dl.innerHTML = staticCats
       .map(c => `<option value="${escapeHtml(c)}"></option>`)
       .join("");
   }
