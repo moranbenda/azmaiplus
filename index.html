@@ -943,19 +943,10 @@ body{
   </div>
   <div class="dlg-bd">
     <div class="grid2">
-      <div>
-        <label>ייבוא מקובץ CSV / Excel</label>
-        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
-      </div>
-      <div>
-        <label>ייבוא נתונים מצילום מסך</label>
-        <div class="row" style="gap:8px;align-items:center">
-          <input type="file" id="importIncomeImageFile" accept="image/*" />
-          <button class="btn secondary small" type="button" id="btnImportIncomeOCR">ייבוא מצילום מסך</button>
-        </div>
-      </div>
       <div style="grid-column:1 / -1">
-        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. אפשר גם להעלות צילום מסך של טבלת הכנסות ולתקן ידנית לפני הייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
+        <label>בחרי קובץ</label>
+        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
       </div>
     </div>
     <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
@@ -1009,7 +1000,6 @@ body{
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -1555,8 +1545,6 @@ const btnClear       = document.getElementById("btnClear");
 const importIncomeDialog = document.getElementById("importIncomeDialog");
 const btnImportIncomeClose = document.getElementById("btnImportIncomeClose");
 const importIncomeFile = document.getElementById("importIncomeFile");
-const importIncomeImageFile = document.getElementById("importIncomeImageFile");
-const btnImportIncomeOCR = document.getElementById("btnImportIncomeOCR");
 const importIncomeStatus = document.getElementById("importIncomeStatus");
 const importIncomePreviewBody = document.getElementById("importIncomePreviewBody");
 const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
@@ -2691,183 +2679,6 @@ async function parseIncomeImportFile(file) {
   throw new Error('סוג הקובץ לא נתמך. העלי CSV או Excel.');
 }
 
-
-function parseDateFromText(s='') {
-  const m = String(s || '').match(/(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/);
-  if (!m) return '';
-  let [, d, mo, y] = m;
-  if (y.length === 2) y = `20${y}`;
-  return `${y.padStart(4,'0')}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
-}
-
-function parseAmountFromText(s='') {
-  const cleaned = String(s || '').replace(/\s/g,'').replace(/₪/g,'');
-  const m = cleaned.match(/-?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})|-?\d+(?:\.\d{1,2})/g);
-  if (!m || !m.length) return NaN;
-  const val = parseFloat(m[m.length - 1].replace(/,/g,''));
-  return Number.isFinite(val) ? val : NaN;
-}
-
-function textLooksLikeClient(s='') {
-  const t = String(s || '').trim();
-  if (!t) return false;
-  if (/^(תאריך|סוג|מס|מסמך|לקוח|נושא|סה|סכום|קישור)/.test(t)) return false;
-  if (/^https?:/i.test(t)) return false;
-  return /[A-Za-zא-ת]/.test(t) && t.length > 1;
-}
-
-function classifyHeaderWord(word='') {
-  const t = String(word || '').replace(/["׳״”“']/g,'').trim();
-  if (!t) return '';
-  if (t.includes('תאריך')) return 'date';
-  if ((t.includes('סוג') && t.includes('מס')) || t === 'סוג') return 'docType';
-  if ((t.includes('מס') && t.includes('מסמך')) || t === 'מספר') return 'docNumber';
-  if (t.includes('לקוח')) return 'client';
-  if (t.includes('סה') || t.includes('סכום')) return 'total';
-  return '';
-}
-
-function rowsFromOCRResult(result) {
-  const words = (result && result.data && result.data.words) ? result.data.words.filter(w => String(w.text || '').trim()) : [];
-  if (!words.length) throw new Error('לא זוהה טקסט ברור בתמונה. נסי צילום חד יותר של הטבלה.');
-
-  const groups = new Map();
-  for (const w of words) {
-    const key = `${w.block_num||0}-${w.par_num||0}-${w.line_num||0}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(w);
-  }
-  const lines = [...groups.values()].map(arr => {
-    arr.sort((a,b)=> (a.bbox?.x0||0) - (b.bbox?.x0||0));
-    return {
-      words: arr,
-      text: arr.map(x=>String(x.text||'').trim()).join(' ').replace(/\s+/g,' ').trim(),
-      y: Math.min(...arr.map(x=>x.bbox?.y0||0))
-    };
-  }).sort((a,b)=>a.y-b.y);
-
-  let header = null;
-  for (const line of lines) {
-    const classes = line.words.map(w => classifyHeaderWord(w.text)).filter(Boolean);
-    if (new Set(classes).size >= 3) { header = line; break; }
-  }
-
-  let colX = [];
-  if (header) {
-    for (const w of header.words) {
-      const field = classifyHeaderWord(w.text);
-      if (!field) continue;
-      const x = ((w.bbox?.x0||0) + (w.bbox?.x1||0)) / 2;
-      const existing = colX.find(c => c.field === field);
-      if (!existing) colX.push({field, x});
-    }
-    colX.sort((a,b)=>a.x-b.x);
-  }
-
-  const dataLines = lines.filter(line => !header || line.y > header.y + 5);
-  let rows = [];
-
-  if (colX.length >= 3) {
-    for (const line of dataLines) {
-      const fields = { date:'', docType:'', docNumber:'', client:'', total:'' };
-      for (const w of line.words) {
-        const x = ((w.bbox?.x0||0) + (w.bbox?.x1||0)) / 2;
-        let nearest = colX[0];
-        for (const c of colX) if (Math.abs(c.x - x) < Math.abs(nearest.x - x)) nearest = c;
-        fields[nearest.field] = `${fields[nearest.field]} ${String(w.text||'').trim()}`.trim();
-      }
-      const date = parseDateFromText(fields.date || line.text);
-      const amount = parseAmountFromText(fields.total || line.text);
-      const docType = String(fields.docType || '').trim();
-      const docNumber = String(fields.docNumber || '').replace(/[^\d\-\/]/g,'').trim();
-      const clientName = String(fields.client || '').trim();
-      if (date && Number.isFinite(amount)) {
-        rows.push({
-          include: true,
-          date,
-          docType,
-          docNumber,
-          clientName,
-          desc: buildImportedIncomeDescription(docNumber, clientName, '', docType),
-          amount: isCreditDocType(docType) ? -Math.abs(amount) : amount,
-          incVat: true,
-          type: 'income'
-        });
-      }
-    }
-  }
-
-  if (!rows.length) {
-    const rawText = result?.data?.text || '';
-    const rawLines = String(rawText).split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-    for (let i=0; i<rawLines.length; i++) {
-      const date = parseDateFromText(rawLines[i]);
-      if (!date) continue;
-      const windowLines = rawLines.slice(i, i+6);
-      const docType = windowLines.find(x => /(חשבונית|קבלה|זיכוי)/.test(x)) || '';
-      const docNumberLine = windowLines.find(x => /^\d{1,6}$/.test(x.replace(/\s/g,''))) || '';
-      const clientName = windowLines.find(x => textLooksLikeClient(x) && x !== docType && x !== docNumberLine) || '';
-      const amountLine = [...windowLines].reverse().find(x => Number.isFinite(parseAmountFromText(x))) || '';
-      const amount = parseAmountFromText(amountLine);
-      if (!Number.isFinite(amount)) continue;
-      const docNumber = docNumberLine.replace(/\s/g,'');
-      rows.push({
-        include: true,
-        date,
-        docType,
-        docNumber,
-        clientName,
-        desc: buildImportedIncomeDescription(docNumber, clientName, '', docType),
-        amount: isCreditDocType(docType) ? -Math.abs(amount) : amount,
-        incVat: true,
-        type: 'income'
-      });
-    }
-  }
-
-  const deduped = [];
-  const seen = new Set();
-  for (const r of rows) {
-    const key = `${r.date}|${normalizeDocTypeForCompare(r.docType)}|${normalizeDocNumberForCompare(r.docNumber)}|${Number(r.amount).toFixed(2)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    deduped.push(r);
-  }
-  if (!deduped.length) throw new Error('לא זוהו שורות הכנסה מהצילום. נסי צילום חד יותר או חתך ממוקד של הטבלה.');
-  return deduped;
-}
-
-async function handleIncomeImportOCR() {
-  const file = importIncomeImageFile?.files?.[0];
-  if (!file) {
-    showToast('צריך לבחור קודם צילום מסך', true);
-    return;
-  }
-  if (!window.Tesseract) {
-    showToast('מנוע OCR לא נטען. נסי לרענן את הדף.', true);
-    return;
-  }
-  importIncomeStatus.textContent = 'קוראת את הטקסט מהצילום…';
-  try {
-    const result = await Tesseract.recognize(file, 'heb+eng', {
-      logger: m => {
-        if (m?.status === 'recognizing text' && Number.isFinite(m.progress)) {
-          importIncomeStatus.textContent = `קוראת את הטקסט מהצילום… ${Math.round(m.progress * 100)}%`;
-        }
-      }
-    });
-    importIncomeRows = rowsFromOCRResult(result);
-    renderImportIncomePreview();
-    importIncomeStatus.textContent = `זוהו ${importIncomeRows.length} שורות מהצילום. אפשר לערוך לפני אישור.`;
-  } catch (e) {
-    console.error(e);
-    importIncomeRows = [];
-    renderImportIncomePreview();
-    importIncomeStatus.textContent = e?.message || 'שגיאה בקריאת צילום המסך.';
-    showToast(importIncomeStatus.textContent, true);
-  }
-}
-
 async function handleIncomeImportFileChange() {
   const file = importIncomeFile?.files?.[0];
   if (!file) return;
@@ -2892,7 +2703,6 @@ async function handleIncomeImportFileChange() {
 function openIncomeImportDialog() {
   importIncomeRows = [];
   if (importIncomeFile) importIncomeFile.value = '';
-  if (importIncomeImageFile) importIncomeImageFile.value = '';
   if (importIncomeStatus) importIncomeStatus.textContent = '';
   renderImportIncomePreview();
   importIncomeDialog?.showModal();
@@ -3780,7 +3590,6 @@ function initAppLogic(uid) {
     if (btnImportIncome) btnImportIncome.onclick = openIncomeImportDialog;
     if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
-    if (btnImportIncomeOCR) btnImportIncomeOCR.onclick = handleIncomeImportOCR;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
     btnClear.onclick = () => {
