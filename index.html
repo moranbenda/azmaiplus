@@ -660,7 +660,7 @@ body{
               <label>סוג</label>
               <select id="fType">
                 <option value="income">הכנסה</option>
-                <option value="expense">הוצאה</option>
+                <option value="expense" selected>הוצאה</option>
               </select>
             </div>
             <div style="flex:3 1 250px">
@@ -817,6 +817,59 @@ body{
         <button class="btn warn" id="btnDelete">מחיקה</button>
       </div>
     </form>
+  </div>
+</dialog>
+
+
+
+<!-- דיאלוג ברוכים הבאים / הדרכה -->
+<dialog id="onboardingDialog">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <button class="btn secondary small" type="button" id="btnOnboardingClose">סגירה</button>
+      <div id="onboardingTitle">ברוכים הבאים</div>
+    </div>
+    <div class="dlg-bd">
+      <div id="onboardingWelcomeView">
+        <div class="onboard-hero">
+          <h3>ברוכים הבאים ל־עצמאי פלוס 👋</h3>
+          <p>שמחים שהצטרפת. לפני שמתחילים מומלץ להשלים את פרטי העסק ולעבור היכרות קצרה עם המערכת.</p>
+        </div>
+        <div class="onboard-box">
+          <strong>איך מתחילים?</strong>
+          <div>1. ממלאים פרופיל משתמש ופרטי עסק</div>
+          <div>2. מזינים הוצאות והכנסות או מייבאים הכנסות</div>
+          <div>3. מפיקים דוחות למע״מ ולמס הכנסה</div>
+        </div>
+        <div class="onboard-box">
+          <strong>טיפ קטן</strong>
+          <div>אפשר להזין הוצאות ידנית בכל יום, ואת ההכנסות לייבא בהמשך מקובץ מסודר.</div>
+        </div>
+        <div class="onboard-actions">
+          <button class="btn" type="button" id="btnOnboardingProfile">השלמת פרופיל משתמש</button>
+          <button class="btn secondary" type="button" id="btnOnboardingGuide">הדרכה קצרה</button>
+          <button class="btn secondary" type="button" id="btnOnboardingSkip">דלגי בינתיים</button>
+        </div>
+        <label class="onboard-check">
+          <input type="checkbox" id="onboardingDontShowAgain" />
+          <span>אל תציג שוב</span>
+        </label>
+      </div>
+
+      <div id="onboardingGuideView" hidden>
+        <div class="guide-step">
+          <h4 id="onboardingStepTitle"></h4>
+          <p id="onboardingStepText"></p>
+        </div>
+        <div class="guide-dots" id="onboardingDots"></div>
+        <div class="onboard-actions">
+          <button class="btn secondary" type="button" id="btnOnboardingPrev">הקודם</button>
+          <button class="btn secondary" type="button" id="btnOnboardingBack">חזרה</button>
+          <button class="btn" type="button" id="btnOnboardingNext">הבא</button>
+          <button class="btn" type="button" id="btnOnboardingDone" hidden>סיום והתחלה</button>
+        </div>
+      </div>
+    </div>
   </div>
 </dialog>
 
@@ -1077,6 +1130,22 @@ const pBusinessType = document.getElementById("pBusinessType");
 const pVatRate = document.getElementById("pVatRate");
 const btnSaveProfile = document.getElementById("btnSaveProfile");
 const profileStatus = document.getElementById("profileStatus");
+const onboardingDialog = document.getElementById("onboardingDialog");
+const btnOnboardingClose = document.getElementById("btnOnboardingClose");
+const btnOnboardingProfile = document.getElementById("btnOnboardingProfile");
+const btnOnboardingGuide = document.getElementById("btnOnboardingGuide");
+const btnOnboardingSkip = document.getElementById("btnOnboardingSkip");
+const btnOnboardingPrev = document.getElementById("btnOnboardingPrev");
+const btnOnboardingBack = document.getElementById("btnOnboardingBack");
+const btnOnboardingNext = document.getElementById("btnOnboardingNext");
+const btnOnboardingDone = document.getElementById("btnOnboardingDone");
+const onboardingTitle = document.getElementById("onboardingTitle");
+const onboardingWelcomeView = document.getElementById("onboardingWelcomeView");
+const onboardingGuideView = document.getElementById("onboardingGuideView");
+const onboardingStepTitle = document.getElementById("onboardingStepTitle");
+const onboardingStepText = document.getElementById("onboardingStepText");
+const onboardingDots = document.getElementById("onboardingDots");
+const onboardingDontShowAgain = document.getElementById("onboardingDontShowAgain");
 const businessHint = document.getElementById("businessHint");
 const userEmailTag = document.getElementById("userEmailTag");
 const accountFlags = document.getElementById("accountFlags");
@@ -1232,6 +1301,77 @@ function daysBetweenCeil(fromIso, toIso) {
   const diff = Date.parse(toIso || 0) - Date.parse(fromIso || 0);
   return Math.ceil(diff / 86400000);
 }
+
+const ONBOARDING_STEPS = [
+  { title: "הוספת תנועות", text: "במסך הראשי מזינים הוצאות והכנסות. ברירת המחדל היא הוצאה, ועדיין אפשר לשנות להכנסה בכל רגע." },
+  { title: "טבלת קטגוריות", text: "בטבלת הקטגוריות אפשר לבדוק אחוז הכרה למס והאם ההוצאה מוכרת למע״מ. החישובים במערכת נשענים על ההגדרות האלה." },
+  { title: "דוחות וייבוא", text: "אפשר להפיק דוחות, לייצא קבצים, ולייבא הכנסות מקובץ מסודר. כך העבודה היומיומית נשארת קצרה ונוחה." }
+];
+let onboardingStepIndex = 0;
+
+function setOnboardingMode(mode = "welcome") {
+  const guide = mode === "guide";
+  if (onboardingTitle) onboardingTitle.textContent = guide ? "הדרכה קצרה" : "ברוכים הבאים";
+  if (onboardingWelcomeView) onboardingWelcomeView.hidden = guide;
+  if (onboardingGuideView) onboardingGuideView.hidden = !guide;
+}
+
+function renderOnboardingStep() {
+  if (!onboardingStepTitle || !onboardingStepText || !onboardingDots) return;
+  const step = ONBOARDING_STEPS[onboardingStepIndex] || ONBOARDING_STEPS[0];
+  onboardingStepTitle.textContent = step.title;
+  onboardingStepText.textContent = step.text;
+  onboardingDots.innerHTML = ONBOARDING_STEPS.map((_, i) => `<span class="${i === onboardingStepIndex ? 'active' : ''}"></span>`).join('');
+  if (btnOnboardingPrev) btnOnboardingPrev.disabled = onboardingStepIndex === 0;
+  if (btnOnboardingNext) btnOnboardingNext.hidden = onboardingStepIndex >= ONBOARDING_STEPS.length - 1;
+  if (btnOnboardingDone) btnOnboardingDone.hidden = onboardingStepIndex < ONBOARDING_STEPS.length - 1;
+}
+
+async function persistOnboardingState(payload = {}) {
+  if (!currentUid || !payload || !Object.keys(payload).length) return;
+  const ref = doc(db, "users", currentUid);
+  await setDoc(ref, payload, { merge: true });
+  userProfile = { ...(userProfile || {}), ...payload };
+}
+
+function shouldShowOnboarding() {
+  if (!userProfile) return false;
+  return !(userProfile.onboardingCompleted === true || userProfile.onboardingDontShowAgain === true);
+}
+
+async function finishOnboarding(completed = false) {
+  const payload = {};
+  if (completed) {
+    payload.onboardingCompleted = true;
+    payload.onboardingCompletedAt = new Date().toISOString();
+  }
+  if (onboardingDontShowAgain?.checked) {
+    payload.onboardingDontShowAgain = true;
+  }
+  await persistOnboardingState(payload);
+  onboardingDialog?.close();
+  if (!isProfileComplete(userProfile)) {
+    enforceProfileRequired();
+  }
+}
+
+function showOnboardingWelcome() {
+  if (!onboardingDialog) return;
+  onboardingStepIndex = 0;
+  if (onboardingDontShowAgain) onboardingDontShowAgain.checked = false;
+  setOnboardingMode("welcome");
+  renderOnboardingStep();
+  if (!onboardingDialog.open) onboardingDialog.showModal();
+}
+
+function maybeShowOnboarding() {
+  if (!shouldShowOnboarding()) {
+    if (!isProfileComplete(userProfile)) enforceProfileRequired();
+    return;
+  }
+  showOnboardingWelcome();
+}
+
 
 function computeAccessState(profile, user) {
   const state = { blocked: false, reason: "", flags: [] };
@@ -1481,6 +1621,7 @@ onAuthStateChanged(auth, async (user) => {
     if (btnResendVerification) btnResendVerification.hidden = true;
     renderAccountFlags();
     initAppLogic(user.uid);
+    setTimeout(() => { maybeShowOnboarding(); }, 250);
 
   } catch (err) {
     console.error("onAuthStateChanged error:", err);
@@ -1584,6 +1725,36 @@ btnEditClose.onclick      = () => editDialog.close();
 profileDialog.addEventListener("cancel", (ev) => {
   if (profileDialog.dataset.required === "1") ev.preventDefault();
 });
+// דיאלוג ברוכים הבאים
+btnOnboardingClose && (btnOnboardingClose.onclick = () => {
+  if (onboardingDialog?.open) finishOnboarding(false);
+});
+onboardingDialog?.addEventListener("cancel", (ev) => {
+  ev.preventDefault();
+  finishOnboarding(false);
+});
+btnOnboardingProfile && (btnOnboardingProfile.onclick = () => {
+  onboardingDialog?.close();
+  profileStatus.textContent = isProfileComplete(userProfile) ? "" : "כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).";
+  profileDialog.dataset.required = isProfileComplete(userProfile) ? "0" : "1";
+  profileDialog.showModal();
+});
+btnOnboardingGuide && (btnOnboardingGuide.onclick = () => {
+  onboardingStepIndex = 0;
+  setOnboardingMode("guide");
+  renderOnboardingStep();
+});
+btnOnboardingBack && (btnOnboardingBack.onclick = () => setOnboardingMode("welcome"));
+btnOnboardingPrev && (btnOnboardingPrev.onclick = () => {
+  onboardingStepIndex = Math.max(0, onboardingStepIndex - 1);
+  renderOnboardingStep();
+});
+btnOnboardingNext && (btnOnboardingNext.onclick = () => {
+  onboardingStepIndex = Math.min(ONBOARDING_STEPS.length - 1, onboardingStepIndex + 1);
+  renderOnboardingStep();
+});
+btnOnboardingDone && (btnOnboardingDone.onclick = () => finishOnboarding(true));
+btnOnboardingSkip && (btnOnboardingSkip.onclick = () => finishOnboarding(false));
 
 /* פתיחת דיאלוגים */
 btnProfileOpen.onclick    = () => {
@@ -3659,6 +3830,7 @@ renderItemsDatalist();
   (async () => {
     await loadFromCloudFirst();
     if (!fDate.value) fDate.value = todayStr();
+    if (fType) fType.value = "expense";
     if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
     if (qPeriod && !qPeriod.value) qPeriod.value = "1";
     render();
