@@ -2372,8 +2372,6 @@ async function maybeRecoverLegacyLedger(uid, localSnapshot, cloudObj) {
   const cfg = LEGACY_LEDGER_RECOVERY[email];
   if (!cfg) return null;
   if (uid !== cfg.targetUid) return null;
-  if ((cloudObj?.rows || []).length) return null;
-  if ((localSnapshot.rows || []).length) return null;
 
   const recoveryFlag = ledgerRecoveryFlagKey(uid, cfg.sourceUid);
   if (localStorage.getItem(recoveryFlag) === "1") return null;
@@ -2385,12 +2383,34 @@ async function maybeRecoverLegacyLedger(uid, localSnapshot, cloudObj) {
   const sourceObj = sourceSnap.data() || {};
   if (!(sourceObj.rows || []).length) return null;
 
+  const targetRows = Array.isArray(cloudObj?.rows) ? cloudObj.rows : [];
+  const sourceRows = Array.isArray(sourceObj.rows) ? sourceObj.rows : [];
+
+  const shouldForceRecover = !targetRows.length || sourceRows.length > targetRows.length;
+  if (!shouldForceRecover) return null;
+
+  const backupPayload = cloudObj ? {
+    rows: deepCloneRows(targetRows || []),
+    settings: cloudObj.settings || localSnapshot.settings || getSettings(),
+    updatedAt: cloudObj.updatedAt || new Date().toISOString(),
+    backupBeforeRecoveryAt: new Date().toISOString()
+  } : null;
+
+  if (backupPayload) {
+    try {
+      await setDoc(doc(db, "ledgers_backup", `${uid}_${Date.now()}`), backupPayload);
+    } catch (e) {
+      console.warn("backup before recovery failed", e);
+    }
+  }
+
   const recoveredPayload = {
-    rows: deepCloneRows(sourceObj.rows || []),
-    settings: sourceObj.settings || localSnapshot.settings || getSettings(),
+    rows: deepCloneRows(sourceRows),
+    settings: sourceObj.settings || cloudObj?.settings || localSnapshot.settings || getSettings(),
     updatedAt: sourceObj.updatedAt || new Date().toISOString(),
     recoveredFromUid: cfg.sourceUid,
-    recoveredAt: new Date().toISOString()
+    recoveredAt: new Date().toISOString(),
+    previousTargetRowsCount: targetRows.length
   };
 
   await savePayloadToCloud(uid, recoveredPayload);
