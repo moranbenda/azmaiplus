@@ -529,6 +529,36 @@ body{
   }
 }
 
+
+/* --- תיקוני ייבוא הכנסות ותצוגת שדות --- */
+#importIncomeDialog{
+  width:min(1120px,98vw);
+  max-width:98vw;
+}
+#importIncomeDialog .dlg-bd{
+  padding:12px 14px;
+}
+#importIncomeDialog .tx-table-wrap{
+  overflow:auto !important;
+}
+#importIncomeDialog table{
+  min-width:980px;
+  font-size:12px;
+}
+#importIncomeDialog th,
+#importIncomeDialog td{
+  white-space:nowrap;
+}
+#importIncomeDialog input{
+  font-size:12px;
+  padding:8px 10px;
+}
+@media(max-width:700px){
+  #importIncomeDialog{width:98vw;max-width:98vw;}
+  #importIncomeDialog table{min-width:900px;font-size:11px;}
+  #importIncomeDialog input{font-size:11px;}
+}
+
 </style>
 </head>
 <body>
@@ -633,22 +663,22 @@ body{
                 <option value="expense">הוצאה</option>
               </select>
             </div>
+            <div style="flex:3 1 250px">
+              <label>תיאור</label>
+              <input
+                type="text"
+                id="fDesc"
+                placeholder="דלק, CANVA, רב מסר…"
+                autocomplete="off"
+                list="itemsList"
+              />
+              <datalist id="itemsList"></datalist>
+            </div>
             <div style="flex:2 1 210px">
               <label>קטגוריה</label>
               <input type="text" id="fCategory" list="catsList" placeholder="למשל: רכב, ציוד, כיבוד קל" />
               <datalist id="catsList"></datalist>
             </div>
-<div style="flex:3 1 250px">
-  <label>תיאור</label>
-  <input
-    type="text"
-    id="fDesc"
-    placeholder="דלק, CANVA, רב מסר…"
-    autocomplete="off"
-    list="itemsList"
-  />
-  <datalist id="itemsList"></datalist>
-</div>
 
             <div style="flex:1 1 120px">
               <label>סכום (₪)</label>
@@ -770,8 +800,8 @@ body{
             <option value="expense">הוצאה</option>
           </select>
         </div>
-        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
         <div><label>תיאור</label><input type="text" id="eDesc" /></div>
+        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -2266,8 +2296,8 @@ function render() {
         <td><span class="badge ${r.type === "income" ? "income" : "expense"}">
           ${r.type === "income" ? "הכנסה" : "הוצאה"}
         </span></td>
-        <td>${escapeHtml(r.category || "")}</td>
         <td>${escapeHtml(r.desc || "")}</td>
+        <td>${escapeHtml(r.category || "")}</td>
         <td class="money">${toMoney(net)}</td>
         <td class="money">${toMoney(vatDisplay)}</td>
         <td class="money">${toMoney(gross)}</td>
@@ -2434,15 +2464,55 @@ function normalizeImportHeader(h = "") {
 }
 
 function detectImportColumns(headers = []) {
-  const normalized = headers.map(h => ({ raw: h, norm: normalizeImportHeader(h) }));
-  const pick = fn => (normalized.find(x => fn(x.norm)) || {}).raw || "";
+  const normalized = headers.map(raw => {
+    const clean = String(raw || '').replace(/^\ufeff/, '').trim();
+    return {
+      raw,
+      clean,
+      norm: clean.replace(/["׳״”“']/g, '').replace(/\s+/g, ' ').trim()
+    };
+  });
+  const findByPriority = (...predicates) => {
+    for (const predicate of predicates) {
+      const found = normalized.find(x => predicate(x.norm, x.clean));
+      if (found) return found.raw || found.clean;
+    }
+    return '';
+  };
   return {
-    date: pick(h => h.includes("תאריך")),
-    docNumber: pick(h => h.includes("מס") && h.includes("מסמך")),
-    client: pick(h => h.includes("לקוח")),
-    total: pick(h => h === 'סה"כ' || (h.includes('סה') && !h.includes('לפני') && !h.includes('מע"מ')) || h.replace(/[״”]/g,'"') === 'סה"כ'),
-    totalAlt: pick(h => h.includes("סה") && !h.includes("לפני")),
-    subject: pick(h => h.includes("נושא"))
+    date: findByPriority(
+      h => h === 'הופק בתאריך',
+      h => h === 'תאריך מסמך',
+      h => h === 'תאריך',
+      h => h.includes('תאריך')
+    ),
+    docNumber: findByPriority(
+      h => h === 'מס מסמך',
+      h => h === 'מספר מסמך',
+      h => h.includes('מסמך') && !h.includes('סוג'),
+      h => h.includes('מס') && h.includes('מסמך') && !h.includes('סוג')
+    ),
+    client: findByPriority(
+      h => h === 'לקוח',
+      h => h.includes('לקוח')
+    ),
+    total: findByPriority(
+      h => h === 'סהכ',
+      h => h === 'סה"כ',
+      h => h === 'סה״כ',
+      h => h.includes('סה') && !h.includes('לפני') && !h.includes('מעמ') && !h.includes('מע"מ') && !h.includes('מע״מ')
+    ),
+    totalAlt: findByPriority(
+      h => h.includes('סה') && !h.includes('לפני')
+    ),
+    subject: findByPriority(
+      h => h === 'נושא',
+      h => h.includes('נושא')
+    ),
+    docType: findByPriority(
+      h => h === 'סוג מסמך',
+      h => h.includes('סוג מסמך')
+    )
   };
 }
 
