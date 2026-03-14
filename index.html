@@ -670,7 +670,6 @@ body{
                 id="fDesc"
                 placeholder="דלק, CANVA, רב מסר…"
                 autocomplete="off"
-                
               />
               <datalist id="itemsList"></datalist>
             </div>
@@ -2441,9 +2440,9 @@ function uniqueCategories() {
 function updateFiltersUI() {
   const dl = document.getElementById("catsList");
   if (dl) {
-    const staticCats = Array.from(new Set(EXPENSE_ITEMS.map(i => i.category).filter(Boolean)))
+    const fullExpenseList = Array.from(new Set(EXPENSE_ITEMS.map(i => i.item).filter(Boolean)))
       .sort((a,b)=>a.localeCompare(b,"he"));
-    dl.innerHTML = staticCats
+    dl.innerHTML = fullExpenseList
       .map(c => `<option value="${escapeHtml(c)}"></option>`)
       .join("");
   }
