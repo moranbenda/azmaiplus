@@ -553,6 +553,28 @@ body{
         <label for="authPassword">סיסמה</label>
         <input type="password" id="authPassword" minlength="6" required />
       </div>
+      <div id="registerFields" hidden>
+        <div class="auth-row">
+          <label for="authPhone">טלפון נייד</label>
+          <input type="tel" id="authPhone" inputmode="tel" autocomplete="tel" />
+        </div>
+        <div class="auth-row">
+          <label for="authBusinessName">שם העסק</label>
+          <input type="text" id="authBusinessName" autocomplete="organization" />
+        </div>
+        <div class="auth-row">
+          <label for="authBusinessId">מספר עוסק / ח.פ</label>
+          <input type="text" id="authBusinessId" inputmode="numeric" />
+        </div>
+        <div class="auth-row">
+          <label for="authBusinessType">סוג עוסק</label>
+          <select id="authBusinessType">
+            <option value="ptor">עוסק פטור</option>
+            <option value="morasha">עוסק מורשה</option>
+            <option value="company">חברה</option>
+          </select>
+        </div>
+      </div>
       <div class="auth-actions">
         <button type="button" class="link-btn" id="btnForgotPassword">שכחתי סיסמה</button>
         <button type="button" class="link-btn" id="btnResendVerification" hidden>שליחה מחדש של אימות מייל</button>
@@ -948,6 +970,11 @@ const appShell = document.getElementById("appShell");
 const authForm = document.getElementById("authForm");
 const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
+const registerFields = document.getElementById("registerFields");
+const authPhone = document.getElementById("authPhone");
+const authBusinessName = document.getElementById("authBusinessName");
+const authBusinessId = document.getElementById("authBusinessId");
+const authBusinessType = document.getElementById("authBusinessType");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
 const authError = document.getElementById("authError");
 const authInfo = document.getElementById("authInfo");
@@ -1100,6 +1127,12 @@ function setAuthInfo(message = "", mode = "info") {
 
 function updateAuthAuxUI() {
   if (btnForgotPassword) btnForgotPassword.hidden = authMode !== "login";
+  if (registerFields) registerFields.hidden = authMode !== "register";
+  const isRegister = authMode === "register";
+  if (authPhone) authPhone.required = isRegister;
+  if (authBusinessName) authBusinessName.required = isRegister;
+  if (authBusinessId) authBusinessId.required = isRegister;
+  if (authBusinessType) authBusinessType.required = isRegister;
 }
 
 function daysBetweenCeil(fromIso, toIso) {
@@ -1166,7 +1199,7 @@ tabRegister.onclick = () => {
   tabLogin.classList.remove("active");
   authSubmitBtn.textContent = "הרשמה";
   authError.textContent = "";
-  setAuthInfo("בהרשמה נשלח מייל אימות, וייפתחו 14 ימי ניסיון לאחר אישור המייל.");
+  setAuthInfo("בהרשמה נשלח מייל אימות, וייפתחו 14 ימי ניסיון לאחר אישור המייל. נא למלא גם טלפון, שם עסק, מספר עוסק וסוג עוסק.");
   updateAuthAuxUI();
 };
 
@@ -1185,6 +1218,10 @@ async function handleAuth(e) {
 
   const email = authEmail.value.trim();
   const pass  = authPassword.value.trim();
+  const phone = authPhone?.value.trim() || "";
+  const businessName = authBusinessName?.value.trim() || "";
+  const businessId = authBusinessId?.value.trim() || "";
+  const businessType = authBusinessType?.value || "ptor";
 
   if (!email || !pass) {
     authError.textContent = "נא להזין אימייל וסיסמה";
@@ -1197,10 +1234,22 @@ async function handleAuth(e) {
     if (authMode === "login") {
       await signInWithEmailAndPassword(auth, email, pass);
     } else {
+      if (!phone || !businessName || !businessId || !businessType) {
+        throw new Error("נא למלא טלפון נייד, שם העסק, מספר עוסק וסוג עוסק.");
+      }
       const userCred = await createUserWithEmailAndPassword(auth, email, pass);
-      await createDefaultProfile(userCred.user.uid, email, { newTrial: true, requireEmailVerification: true });
-      await sendEmailVerification(userCred.user);
-      setAuthInfo("נשלח מייל אימות לכתובת שהזנת. אחרי אישור המייל אפשר להתחבר ולהתחיל את תקופת הניסיון.");
+      await createDefaultProfile(userCred.user.uid, email, {
+        newTrial: true,
+        requireEmailVerification: true,
+        phone,
+        businessName,
+        businessId,
+        businessType
+      });
+      await sendEmailVerification(userCred.user, authActionCodeSettings);
+      setAuthInfo("נשלח מייל אימות לכתובת שהזנת. בדקי גם ספאם/קידומי מכירות. אחרי האישור אפשר להתחבר ולהתחיל את תקופת הניסיון.");
+      authForm.reset();
+      authBusinessType.value = "ptor";
       await signOut(auth);
       authMode = "login";
       tabLogin.classList.add("active");
@@ -1217,8 +1266,14 @@ async function handleAuth(e) {
       authError.textContent = "פרטי התחברות שגויים. בדקי את המייל והסיסמה.";
     } else if (err.code === 'auth/invalid-email') {
       authError.textContent = "כתובת האימייל אינה תקינה.";
+    } else if (err.code === 'auth/email-already-in-use') {
+      authError.textContent = "כתובת האימייל הזו כבר רשומה במערכת.";
+    } else if (err.code === 'auth/too-many-requests') {
+      authError.textContent = "בוצעו יותר מדי ניסיונות. נסי שוב בעוד כמה דקות.";
     } else {
-      authError.textContent = "שגיאה: " + err.message;
+      authError.textContent = err.message?.startsWith("נא למלא")
+        ? err.message
+        : "שגיאה: " + err.message;
     }
   } finally {
     authSubmitBtn.disabled = false;
@@ -1239,7 +1294,7 @@ btnForgotPassword?.addEventListener("click", async () => {
     return;
   }
   try {
-    await sendPasswordResetEmail(auth, email);
+    await sendPasswordResetEmail(auth, email, authActionCodeSettings);
     setAuthInfo("שלחנו קישור לאיפוס סיסמה למייל שהוזן.");
   } catch (err) {
     console.error("password reset error", err);
@@ -1254,7 +1309,7 @@ btnResendVerification?.addEventListener("click", async () => {
     return;
   }
   try {
-    await sendEmailVerification(user);
+    await sendEmailVerification(user, authActionCodeSettings);
     setAuthInfo("שלחנו שוב מייל אימות. אחרי האישור אפשר להתחבר ולהמשיך.");
   } catch (err) {
     console.error("resend verification error", err);
@@ -1273,12 +1328,12 @@ async function createDefaultProfile(uid, email, opts = {}) {
 
   const payload = {
     email: email,
-    displayName: "",
-    businessName: "",
-    businessId: "",
-    phone: "",
-    businessType: "ptor",
-    vatRate: 0,
+    displayName: opts.displayName || "",
+    businessName: opts.businessName || "",
+    businessId: opts.businessId || "",
+    phone: opts.phone || "",
+    businessType: opts.businessType || "ptor",
+    vatRate: opts.businessType === "ptor" ? 0 : DEFAULT_VAT,
     createdAt
   };
 
@@ -1349,6 +1404,10 @@ let currentUid = null;
 let appInitialized = false;
 
 const DEFAULT_VAT = 18;
+const authActionCodeSettings = {
+  url: window.location.origin + "/",
+  handleCodeInApp: false
+};
 
 /* אלמנטים של הגדרות מע״מ ותנועות */
 const vatRateInput      = document.getElementById("vatRate");
