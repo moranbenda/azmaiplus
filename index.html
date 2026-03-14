@@ -873,11 +873,25 @@ body{
         <label>סוג דוח</label>
         <select id="rType">
           <option value="income">דוח הכנסות</option>
-          <option value="expense">דוח הוצאות</option>
+          <option value="expense">דוח רשימת הוצאות</option>
           <option value="both">דוח הכנסות והוצאות</option>
           <option value="pnl">דוח רווח והפסד</option>
           <option value="vat">דוח מע״מ</option>
         </select>
+      </div>
+      <div id="expenseReportColumnsWrap" style="grid-column:1 / -1" hidden>
+        <label style="display:block;margin-bottom:8px">עמודות לדוח ההוצאות</label>
+        <div class="row" id="expenseReportColumns">
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="date" checked /> תאריך</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="category" checked /> קטגוריה</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="desc" checked /> תיאור</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="vatAllowed" checked /> מוכר למע״מ</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="recognition" checked /> אחוז הכרה</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="net" checked /> סכום ללא מע״מ</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="vat" checked /> מע״מ</label>
+          <label class="pill"><input type="checkbox" name="expenseReportCols" value="gross" checked /> סכום כולל</label>
+        </div>
+        <div class="hint" style="margin-top:8px">אפשר לבחור אילו עמודות ייכללו בדוח רשימת ההוצאות לפני הייצוא.</div>
       </div>
     </div>
     <div class="footer" style="margin-top:12px">
@@ -885,7 +899,7 @@ body{
         <button class="btn small" id="btnReportCsv">ייצוא לאקסל (CSV)</button>
         <button class="btn secondary small" id="btnReportPdf">ייצוא ל-PDF</button>
       </div>
-      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים, כולל הכנסות+הוצאות, רווח והפסד ודוח מע״מ.</span>
+      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים, כולל הכנסות+הוצאות, רווח והפסד, דוח מע״מ ורשימת הוצאות עם בחירת עמודות.</span>
     </div>
   </div>
 </dialog>
@@ -1117,6 +1131,18 @@ if (btnLogout) {
 ---------------------------------------------------------- */
 let authMode = "login"; // login/register
 const TRIAL_DAYS = 14;
+const BILLING_EXEMPT_EMAILS = new Set([
+  "moranbenda@gmail.com",
+  "liorbendavid2005@gmail.com"
+].map(v => v.toLowerCase()));
+
+function normalizeEmail(email = "") {
+  return String(email || "").trim().toLowerCase();
+}
+
+function isBillingExemptEmail(email = "") {
+  return BILLING_EXEMPT_EMAILS.has(normalizeEmail(email));
+}
 
 function setAuthInfo(message = "", mode = "info") {
   if (!authInfo) return;
@@ -1241,6 +1267,7 @@ async function handleAuth(e) {
       await createDefaultProfile(userCred.user.uid, email, {
         newTrial: true,
         requireEmailVerification: true,
+        isExemptFromBilling: isBillingExemptEmail(email),
         phone,
         businessName,
         businessId,
@@ -1343,7 +1370,7 @@ async function createDefaultProfile(uid, email, opts = {}) {
       trialEndsAt,
       plan: "trial",
       isPaid: false,
-      isExemptFromBilling: false,
+      isExemptFromBilling: opts.isExemptFromBilling === true || isBillingExemptEmail(email),
       requireEmailVerification: opts.requireEmailVerification === true
     });
   }
@@ -1465,6 +1492,8 @@ const rTo          = document.getElementById("rTo");
 const rType        = document.getElementById("rType");
 const btnReportCsv = document.getElementById("btnReportCsv");
 const btnReportPdf = document.getElementById("btnReportPdf");
+const expenseReportColumnsWrap = document.getElementById("expenseReportColumnsWrap");
+const expenseReportCols = () => Array.from(document.querySelectorAll('input[name="expenseReportCols"]'));
 
 /* סגירת דיאלוגים */
 btnProfileClose.onclick   = () => {
@@ -1488,12 +1517,20 @@ btnProfileOpen.onclick    = () => {
 btnCategoriesOpen.onclick = () => {
   categoriesDialog.showModal();
 };
+function updateReportDialogUI() {
+  const showExpenseCols = rType.value === "expense";
+  if (expenseReportColumnsWrap) expenseReportColumnsWrap.hidden = !showExpenseCols;
+}
+
 btnReportsOpen.onclick    = () => {
   rFrom.value = "";
   rTo.value   = "";
   rType.value = "income";
+  expenseReportCols().forEach(cb => cb.checked = true);
+  updateReportDialogUI();
   reportsDialog.showModal();
 };
+rType.addEventListener("change", updateReportDialogUI);
 /* פנייה למפתח (נשלח ב-mailto) ---------------------------------------------------------- */
 // (removed stray text)
 // (removed stray text)
@@ -1678,6 +1715,74 @@ function renderItemsDatalist() {
   });
 }
 
+function normalizeExpenseText(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/["'׳״]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function getExpenseMeta(row) {
+  if (!row) return null;
+  const categoryKey = normalizeExpenseText(row.category || "");
+  const descKey = normalizeExpenseText(row.desc || "");
+
+  let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.category) === categoryKey);
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => categoryKey && categoryKey.includes(normalizeExpenseText(item.item)));
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => descKey && descKey.includes(normalizeExpenseText(item.item)));
+  if (match) return match;
+
+  return null;
+}
+
+const EXPENSE_REPORT_COLUMN_DEFS = [
+  { key: "date", label: "תאריך" },
+  { key: "category", label: "קטגוריה" },
+  { key: "desc", label: "תיאור" },
+  { key: "vatAllowed", label: "מוכר למע״מ" },
+  { key: "recognition", label: "אחוז הכרה" },
+  { key: "net", label: "סכום ללא מע״מ" },
+  { key: "vat", label: "מע״מ" },
+  { key: "gross", label: "סכום כולל" }
+];
+
+function getSelectedExpenseReportColumns() {
+  const selected = expenseReportCols()
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+  if (selected.length) return selected;
+  return ["date", "category", "desc", "vatAllowed", "recognition", "net", "vat", "gross"];
+}
+
+function buildExpenseRowsForReport(from, to) {
+  const list = filterByDateAndType("expense", from, to);
+  const { rows: withAmounts, totals } = addVatInfo(list);
+  const formattedRows = withAmounts.map(r => {
+    const meta = getExpenseMeta(r);
+    return {
+      ...r,
+      vatAllowed: meta ? (meta.vatAllowed ? "כן" : "לא") : "-",
+      recognition: meta && typeof meta.incomeTaxPct === "number" ? `${meta.incomeTaxPct}%` : "-"
+    };
+  });
+  return { rows: formattedRows, totals };
+}
+
+function valueForExpenseReportCell(row, colKey, formatMoney = false) {
+  if (["net", "vat", "gross"].includes(colKey)) {
+    return formatMoney ? toMoney(row[colKey] || 0) : (row[colKey] || 0);
+  }
+  return row[colKey] ?? "";
+}
+
 /* ----------------------------------------------------------
    9) עזרי תאריכים וכסף
 ---------------------------------------------------------- */
@@ -1811,6 +1916,10 @@ async function loadUserProfile(uid) {
   const syncPayload = {};
   const currentEmail = auth.currentUser?.email || userProfile.email || "";
   if ((userProfile.email || "") !== currentEmail) syncPayload.email = currentEmail;
+  if (isBillingExemptEmail(currentEmail) && userProfile.isExemptFromBilling !== true) {
+    syncPayload.isExemptFromBilling = true;
+    if (!userProfile.plan) syncPayload.plan = "internal";
+  }
   if (userProfile.requireEmailVerification === true && auth.currentUser?.emailVerified && userProfile.emailVerified !== true) {
     syncPayload.emailVerified = true;
     syncPayload.emailVerifiedAt = new Date().toISOString();
@@ -2614,6 +2723,39 @@ btnReportPdf.onclick = () => {
           <tr><td colspan="4"><b>סה"כ הכנסות</b></td><td><b>${toMoney(incTotals.net)}</b></td><td><b>${toMoney(incTotals.vat)}</b></td><td><b>${toMoney(incTotals.gross)}</b></td></tr>
           <tr><td colspan="4"><b>סה"כ הוצאות</b></td><td><b>${toMoney(expTotals.net)}</b></td><td><b>${toMoney(expTotals.vat)}</b></td><td><b>${toMoney(expTotals.gross)}</b></td></tr>
           <tr><td colspan="4"><b>יתרה</b></td><td><b>${toMoney(incTotals.net - expTotals.net)}</b></td><td></td><td><b>${toMoney(incTotals.gross - expTotals.gross)}</b></td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
+
+  if (type === "expense") {
+    const { rows: rowsWithAmounts, totals } = buildExpenseRowsForReport(from, to);
+    if (!rowsWithAmounts.length) {
+      alert("אין נתונים לטווח שנבחר");
+      return;
+    }
+    const selectedCols = getSelectedExpenseReportColumns();
+    const defs = EXPENSE_REPORT_COLUMN_DEFS.filter(col => selectedCols.includes(col.key));
+    const headerRow = defs.map(col => `<th>${escapeHtml(col.label)}</th>`).join("");
+    const bodyRows = rowsWithAmounts.map(r => `
+      <tr>
+        ${defs.map(col => `<td>${escapeHtml(String(valueForExpenseReportCell(r, col.key, true)))}</td>`).join("")}
+      </tr>`).join("");
+    const totalsRow = defs.map(col => {
+      if (col.key === "date") return `<td><b>סה״כ</b></td>`;
+      if (col.key === "net") return `<td><b>${toMoney(totals.net)}</b></td>`;
+      if (col.key === "vat") return `<td><b>${toMoney(totals.vat)}</b></td>`;
+      if (col.key === "gross") return `<td><b>${toMoney(totals.gross)}</b></td>`;
+      return `<td></td>`;
+    }).join("");
+    openReportWindow('דוח רשימת הוצאות', `
+      <table>
+        <thead>
+          <tr>${headerRow}</tr>
+        </thead>
+        <tbody>
+          ${bodyRows}
+          <tr>${totalsRow}</tr>
         </tbody>
       </table>`);
     return;
