@@ -670,7 +670,7 @@ body{
                 id="fDesc"
                 placeholder="דלק, CANVA, רב מסר…"
                 autocomplete="off"
-                list="itemsList"
+                
               />
               <datalist id="itemsList"></datalist>
             </div>
@@ -2117,6 +2117,20 @@ function splitVAT(amount, incVat, rate) {
    10) הגדרות מע״מ לפי סוג עוסק
 ---------------------------------------------------------- */
 
+function normalizeBusinessType(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return 'morasha';
+  if (v === 'ptor') return 'ptor';
+  if (v === 'morasha' || v === 'osek' || v === 'osek_morshe' || v === 'osek_murashe') return 'morasha';
+  if (v === 'hevra' || v === 'company') return 'hevra';
+  return 'morasha';
+}
+
+function getEffectiveVatRate(baseRate) {
+  const n = parseFloat(baseRate);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_VAT;
+}
+
 function applyProfileToUI() {
   if (!userProfile) return;
 
@@ -2124,10 +2138,10 @@ function applyProfileToUI() {
   pBusinessName.value = userProfile.businessName || "";
   pBusinessId.value   = userProfile.businessId || "";
   pPhone.value        = userProfile.phone || "";
-  pBusinessType.value = userProfile.businessType || "osek";
-  pVatRate.value      = userProfile.vatRate ?? 0;
+  pBusinessType.value = normalizeBusinessType(userProfile.businessType);
+  pVatRate.value      = normalizeBusinessType(userProfile.businessType) === "ptor" ? 0 : getEffectiveVatRate(userProfile.vatRate);
 
-  const type = userProfile.businessType || "osek";
+  const type = normalizeBusinessType(userProfile.businessType);
 
   if (type === "ptor") {
     businessHint.textContent = "מצב: עוסק פטור — מע\"מ לא מחושב במערכת.";
@@ -2139,7 +2153,7 @@ function applyProfileToUI() {
     vatIncludedPill.style.display = "none";
   } else {
     businessHint.textContent = "מצב: עוסק מורשה / חברה — מע\"מ פעיל לפי ההגדרה בפרופיל.";
-    vatRateInput.value = userProfile.vatRate ?? DEFAULT_VAT;
+    vatRateInput.value = getEffectiveVatRate(userProfile.vatRate);
     vatEnabledCheckbox.disabled = false;
     vatEnabledCheckbox.checked = true;
     vatSettingsPanel.style.opacity = 1;
@@ -2181,8 +2195,8 @@ async function loadUserProfile(uid) {
       businessName: "",
       businessId: "",
       phone: "",
-      businessType: "ptor",
-      vatRate: 0,
+      businessType: "morasha",
+      vatRate: DEFAULT_VAT,
       plan: "legacy"
     };
   } else {
@@ -2278,8 +2292,8 @@ function ledgerKey(uid) {
 }
 
 function getSettings() {
-  const type = userProfile?.businessType || "osek";
-  const effectiveRate = parseFloat(vatRateInput.value || userProfile?.vatRate || DEFAULT_VAT || 0);
+  const type = normalizeBusinessType(userProfile?.businessType);
+  const effectiveRate = getEffectiveVatRate(vatRateInput.value || userProfile?.vatRate || DEFAULT_VAT);
   const vatEnabled = type === "ptor" ? false : (!!vatEnabledCheckbox.checked || effectiveRate > 0);
   const vatRate = type === "ptor" ? 0 : effectiveRate;
   return { vatEnabled, vatRate };
@@ -2291,9 +2305,14 @@ function applyLedgerPayload(obj = {}) {
     deductPct: typeof r.deductPct === "number" ? r.deductPct : 100
   }));
   localLedgerMeta.updatedAt = obj.updatedAt || null;
-  if (obj.settings && userProfile?.businessType !== "ptor") {
-    vatRateInput.value = obj.settings.vatRate ?? (userProfile?.vatRate ?? DEFAULT_VAT);
-    vatEnabledCheckbox.checked = !!obj.settings.vatEnabled;
+  const type = normalizeBusinessType(userProfile?.businessType);
+  if (type !== "ptor") {
+    const settingsRate = obj?.settings?.vatRate;
+    vatRateInput.value = getEffectiveVatRate(settingsRate || userProfile?.vatRate || DEFAULT_VAT);
+    vatEnabledCheckbox.checked = obj?.settings?.vatEnabled !== false;
+  } else {
+    vatRateInput.value = 0;
+    vatEnabledCheckbox.checked = false;
   }
 }
 
@@ -3415,7 +3434,7 @@ function docTypeLabel(t){
 }
 
 function canIssueTaxInvoice(){
-  return (userProfile?.businessType || "osek") !== "ptor";
+  return normalizeBusinessType(userProfile?.businessType) !== "ptor";
 }
 
 function buildDocHtml(payload){
