@@ -938,24 +938,15 @@ body{
 
 <dialog id="importIncomeDialog">
   <div class="dlg-hd">
-    <div>ייבוא הכנסות</div>
+    <div>ייבוא הכנסות מ-CSV / Excel</div>
     <button class="btn secondary small" type="button" id="btnImportIncomeClose">סגירה</button>
   </div>
   <div class="dlg-bd">
     <div class="grid2">
-      <div>
-        <label>ייבוא מקובץ CSV / Excel</label>
-        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
-      </div>
-      <div>
-        <label>ייבא נתונים מצילום מסך</label>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-          <input type="file" id="importIncomeImageFile" accept="image/*" style="flex:1;min-width:220px" />
-          <button class="btn secondary small" type="button" id="btnImportIncomeImage">ייבוא מצילום מסך</button>
-        </div>
-      </div>
       <div style="grid-column:1 / -1">
-        <div class="hint" style="margin-top:8px">אפשר להעלות קובץ CSV / Excel או צילום מסך של טבלת הכנסות מהגלריה או מקבצים. המערכת תחפש אוטומטית תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
+        <label>בחרי קובץ</label>
+        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
       </div>
     </div>
     <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
@@ -1009,7 +1000,6 @@ body{
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -1555,8 +1545,6 @@ const btnClear       = document.getElementById("btnClear");
 const importIncomeDialog = document.getElementById("importIncomeDialog");
 const btnImportIncomeClose = document.getElementById("btnImportIncomeClose");
 const importIncomeFile = document.getElementById("importIncomeFile");
-const importIncomeImageFile = document.getElementById("importIncomeImageFile");
-const btnImportIncomeImage = document.getElementById("btnImportIncomeImage");
 const importIncomeStatus = document.getElementById("importIncomeStatus");
 const importIncomePreviewBody = document.getElementById("importIncomePreviewBody");
 const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
@@ -2670,225 +2658,6 @@ function rowsFromParsedImportData(rawRows = []) {
   }).filter(r => r.date && Number.isFinite(r.amount) && r.amount !== 0);
 }
 
-function cleanOcrValue(v = '') {
-  return String(v || '')
-    .replace(/https?:\/\/\S+/gi, ' ')
-    .replace(/www\.\S+/gi, ' ')
-    .replace(/[|]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function normalizeOcrCellText(v = '') {
-  return cleanOcrValue(v)
-    .replace(/[“”"׳״']/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function getWordText(word) {
-  return normalizeOcrCellText(word?.text || '');
-}
-
-function clusterWordsToLines(words = []) {
-  const sorted = [...words].sort((a, b) => (a.bbox?.y0 || 0) - (b.bbox?.y0 || 0) || (a.bbox?.x0 || 0) - (b.bbox?.x0 || 0));
-  const lines = [];
-  for (const w of sorted) {
-    const txt = getWordText(w);
-    if (!txt) continue;
-    const y = ((w.bbox?.y0 || 0) + (w.bbox?.y1 || 0)) / 2;
-    let line = lines.find(line => Math.abs(line.y - y) < Math.max(12, (w.bbox?.y1 || 0) - (w.bbox?.y0 || 0)));
-    if (!line) {
-      line = { y, words: [] };
-      lines.push(line);
-    }
-    line.words.push(w);
-  }
-  lines.forEach(line => {
-    line.words.sort((a,b)=> (a.bbox?.x0||0)-(b.bbox?.x0||0));
-    line.text = line.words.map(getWordText).join(' ').replace(/\s+/g,' ').trim();
-    line.minY = Math.min(...line.words.map(w=>w.bbox?.y0||0));
-    line.maxY = Math.max(...line.words.map(w=>w.bbox?.y1||0));
-  });
-  return lines.sort((a,b)=>a.y-b.y);
-}
-
-function findHeaderCentersFromLines(lines = []) {
-  const headerLine = lines.find(line => /לקוח/.test(line.text) && /מסמך/.test(line.text) && (/תאריך/.test(line.text) || /הופק/.test(line.text)));
-  if (!headerLine) return null;
-  const words = headerLine.words.map(w => ({ text: getWordText(w), x: ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2 }));
-  const findX = (re) => {
-    const hit = words.find(w => re.test(w.text));
-    return hit ? hit.x : null;
-  };
-  return {
-    docType: findX(/סוג/),
-    docNumber: findX(/מסמך|מס/),
-    date: findX(/תאריך|הופק/),
-    subject: findX(/נושא/),
-    client: findX(/לקוח/),
-    totalBeforeVat: findX(/לפני/),
-    total: findX(/סהכ|סה"כ|סה״כ/)
-  };
-}
-
-function assignWordToNearestColumn(word, centers) {
-  const x = ((word.bbox?.x0 || 0) + (word.bbox?.x1 || 0)) / 2;
-  let bestKey = null, bestDist = Infinity;
-  Object.entries(centers || {}).forEach(([key, cx]) => {
-    if (cx == null) return;
-    const dist = Math.abs(cx - x);
-    if (dist < bestDist) { bestDist = dist; bestKey = key; }
-  });
-  return bestKey;
-}
-
-function extractRowsFromOcrWords(words = []) {
-  const usefulWords = words.filter(w => {
-    const t = getWordText(w);
-    if (!t) return false;
-    if (/^https?:/i.test(t)) return false;
-    return true;
-  });
-  const lines = clusterWordsToLines(usefulWords);
-  const centers = findHeaderCentersFromLines(lines);
-  const rowLines = lines.filter(line => /\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}/.test(line.text));
-  const rows = [];
-  for (const line of rowLines) {
-    const cells = { docType: [], docNumber: [], date: [], subject: [], client: [], total: [], totalBeforeVat: [] };
-    if (centers) {
-      line.words.forEach(w => {
-        const key = assignWordToNearestColumn(w, centers) || 'subject';
-        if (cells[key]) cells[key].push(getWordText(w));
-      });
-    }
-    const lineText = cleanOcrValue(line.text);
-    const dateMatch = lineText.match(/\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}/);
-    const nums = [...lineText.matchAll(/-?\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?/g)].map(m => m[0]);
-    let totalText = cells.total.join(' ').trim();
-    if (!totalText) {
-      const decimalNums = nums.filter(n => /\.\d{1,2}$/.test(n));
-      totalText = decimalNums.length ? decimalNums[decimalNums.length - 1] : (nums[nums.length - 1] || '');
-    }
-    let docNumberText = cells.docNumber.join(' ').trim();
-    if (!docNumberText) {
-      const ints = nums.filter(n => !/\.\d{1,2}$/.test(n));
-      docNumberText = ints.length ? ints[0] : '';
-    }
-    let docTypeText = cells.docType.join(' ').trim();
-    if (!docTypeText) {
-      const m = lineText.match(/(חשבונית\s*מס\s*קבלה|חשבונית\s*מס|חשבונית\s*זיכוי|זיכוי|קבלה|חשבונית)/);
-      docTypeText = m ? m[1] : 'חשבונית';
-    }
-    let clientText = cells.client.join(' ').trim();
-    if (!clientText && centers) {
-      clientText = line.words
-        .filter(w => {
-          const x = ((w.bbox?.x0 || 0) + (w.bbox?.x1 || 0)) / 2;
-          return centers.client != null && centers.subject != null && x >= Math.min(centers.client, centers.subject) - 80 && x <= Math.max(centers.client, centers.subject) + 80;
-        })
-        .map(getWordText).join(' ').trim();
-    }
-    let subjectText = cells.subject.join(' ').trim();
-    if (!subjectText) subjectText = lineText;
-    const parsedDate = parseImportDate(dateMatch ? dateMatch[0] : '');
-    let amount = parseImportNumber(totalText);
-    if (isCreditDocType(docTypeText) && Number.isFinite(amount)) amount = -Math.abs(amount);
-    const docNumber = cleanOcrValue(docNumberText).replace(/[^\dA-Za-z\-]/g, ' ').replace(/\s+/g,' ').trim();
-    const clientName = cleanOcrValue(clientText || subjectText.replace(/\b\d+[\d,\.]*\b/g,' ').replace(/חשבונית|זיכוי|קבלה|מס/gi,' ')).trim();
-    if (!parsedDate || !Number.isFinite(amount) || !clientName) continue;
-    rows.push({
-      include: true,
-      date: parsedDate,
-      docType: cleanOcrValue(docTypeText),
-      docNumber,
-      clientName,
-      desc: buildImportedIncomeDescription(docNumber, clientName, cleanOcrValue(subjectText), cleanOcrValue(docTypeText)),
-      amount,
-      incVat: true,
-      type: 'income'
-    });
-  }
-  const dedup = [];
-  const seen = new Set();
-  for (const row of rows) {
-    const key = [row.date, normalizeDocTypeForCompare(row.docType), normalizeDocNumberForCompare(row.docNumber), Number(row.amount).toFixed(2)].join('|');
-    if (seen.has(key)) continue;
-    seen.add(key);
-    dedup.push(row);
-  }
-  return dedup;
-}
-
-async function preprocessImageForOcr(file) {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const image = new Image();
-      image.onload = () => resolve(image);
-      image.onerror = reject;
-      image.src = url;
-    });
-    const scale = Math.max(2, 1800 / Math.max(img.width, 1));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-      const v = gray > 210 ? 255 : gray < 120 ? 0 : gray;
-      data[i] = data[i + 1] = data[i + 2] = v;
-    }
-    ctx.putImageData(imageData, 0, 0);
-    return canvas.toDataURL('image/png');
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-async function handleIncomeImportImage() {
-  const file = importIncomeImageFile?.files?.[0];
-  if (!file) {
-    showToast('נא לבחור צילום מסך', true);
-    return;
-  }
-  if (!window.Tesseract) {
-    showToast('ספריית OCR לא נטענה', true);
-    return;
-  }
-  importIncomeStatus.textContent = 'מפענחת את צילום המסך… זה יכול לקחת כחצי דקה.';
-  btnImportIncomeImage && (btnImportIncomeImage.disabled = true);
-  try {
-    const processed = await preprocessImageForOcr(file);
-    const result = await Tesseract.recognize(processed, 'heb+eng', {
-      logger: m => {
-        if (m.status === 'recognizing text' && importIncomeStatus) {
-          importIncomeStatus.textContent = `מפענחת את צילום המסך… ${Math.round((m.progress || 0) * 100)}%`;
-        }
-      },
-      tessedit_pageseg_mode: '11',
-      preserve_interword_spaces: '1'
-    });
-    const words = result?.data?.words || [];
-    importIncomeRows = extractRowsFromOcrWords(words);
-    renderImportIncomePreview();
-    importIncomeStatus.textContent = importIncomeRows.length
-      ? `זוהו ${importIncomeRows.length} שורות מהצילום. אפשר לערוך לפני אישור.`
-      : 'לא זוהו שורות ברורות מהצילום. נסי צילום חד יותר או קובץ CSV / Excel.';
-  } catch (e) {
-    console.error(e);
-    importIncomeRows = [];
-    renderImportIncomePreview();
-    importIncomeStatus.textContent = 'לא הצלחנו לפענח את צילום המסך.';
-    showToast(importIncomeStatus.textContent, true);
-  } finally {
-    btnImportIncomeImage && (btnImportIncomeImage.disabled = false);
-  }
-}
-
 async function parseIncomeImportFile(file) {
   const name = (file?.name || '').toLowerCase();
   if (name.endsWith('.csv')) {
@@ -2934,7 +2703,6 @@ async function handleIncomeImportFileChange() {
 function openIncomeImportDialog() {
   importIncomeRows = [];
   if (importIncomeFile) importIncomeFile.value = '';
-  if (importIncomeImageFile) importIncomeImageFile.value = '';
   if (importIncomeStatus) importIncomeStatus.textContent = '';
   renderImportIncomePreview();
   importIncomeDialog?.showModal();
@@ -3822,7 +3590,6 @@ function initAppLogic(uid) {
     if (btnImportIncome) btnImportIncome.onclick = openIncomeImportDialog;
     if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
-    if (btnImportIncomeImage) btnImportIncomeImage.onclick = handleIncomeImportImage;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
     btnClear.onclick = () => {
