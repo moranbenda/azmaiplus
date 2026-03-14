@@ -1735,7 +1735,7 @@ onboardingDialog?.addEventListener("cancel", (ev) => {
 });
 btnOnboardingProfile && (btnOnboardingProfile.onclick = () => {
   onboardingDialog?.close();
-  profileStatus.textContent = isProfileComplete(userProfile) ? "" : "כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).";
+  profileStatus.textContent = isProfileComplete(userProfile) ? '' : 'כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).';
   profileDialog.dataset.required = isProfileComplete(userProfile) ? "0" : "1";
   profileDialog.showModal();
 });
