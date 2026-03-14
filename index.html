@@ -2558,6 +2558,44 @@ function isCreditDocType(docType='') {
   return /זיכוי/.test(s);
 }
 
+
+function normalizeDocTypeForCompare(v='') {
+  return String(v || '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeDocNumberForCompare(v='') {
+  return String(v || '').trim().replace(/[\s\-_/\\]+/g, '');
+}
+
+function normalizeDescForCompare(v='') {
+  return String(v || '').trim().replace(/\s+/g, ' ');
+}
+
+function isImportedIncomeDuplicate(item, existingRows = []) {
+  const itemDoc = normalizeDocNumberForCompare(item.docNumber);
+  const itemType = normalizeDocTypeForCompare(item.docType);
+  const itemDate = String(item.date || '').trim();
+  const itemAmount = Number(item.amount || 0).toFixed(2);
+  const itemDesc = normalizeDescForCompare(item.desc || buildImportedIncomeDescription(item.docNumber, item.clientName, '', item.docType || ''));
+
+  return existingRows.some(r => {
+    if (r.type !== 'income') return false;
+    const rowDoc = normalizeDocNumberForCompare(r.docNumber);
+    const rowType = normalizeDocTypeForCompare(r.docType);
+    const rowDate = String(r.date || '').trim();
+    const rowAmount = Number(r.amount || 0).toFixed(2);
+    const rowDesc = normalizeDescForCompare(r.desc || '');
+
+    if (itemDoc && rowDoc && itemDoc === rowDoc) {
+      if (!itemType || !rowType || itemType === rowType) return true;
+    }
+
+    if (itemDoc && rowDoc && itemDoc === rowDoc && itemDate && rowDate && itemDate === rowDate) return true;
+
+    return itemDate && rowDate && itemDate === rowDate && itemAmount === rowAmount && itemDesc && rowDesc && itemDesc === rowDesc;
+  });
+}
+
 function renderImportIncomePreview() {
   if (!importIncomePreviewBody) return;
   if (!importIncomeRows.length) {
@@ -2678,11 +2716,12 @@ function confirmIncomeImport() {
     return;
   }
   let imported = 0, skipped = 0;
+  const existingRows = rows.slice();
   for (const item of selected) {
     if (!item.date || !Number.isFinite(item.amount) || item.amount === 0) { skipped++; continue; }
-    const duplicate = item.docNumber && rows.some(r => r.type === 'income' && String(r.docNumber || '').trim() === item.docNumber && String(r.docType || '').trim() === String(item.docType || '').trim());
+    const duplicate = isImportedIncomeDuplicate(item, existingRows);
     if (duplicate) { skipped++; continue; }
-    rows.push({
+    const newRow = {
       id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
       date: item.date,
       type: 'income',
