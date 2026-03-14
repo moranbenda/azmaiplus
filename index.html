@@ -250,6 +250,14 @@
     .auth-tab.active{background:#fff;color:var(--accent);box-shadow:0 2px 6px rgba(15,23,42,.12)}
     .auth-row{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
     .auth-footer{margin-top:8px;font-size:11px;color:var(--text-dim);text-align:center}
+    .auth-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:4px 0 2px;flex-wrap:wrap}
+    .link-btn{border:none;background:transparent;color:var(--accent);padding:0;cursor:pointer;font:inherit;text-decoration:underline}
+    .link-btn[hidden]{display:none !important}
+    .auth-notice{margin-top:10px;padding:10px 12px;border-radius:14px;background:#eff6ff;border:1px solid #bfdbfe;color:#1e3a8a;font-size:12px;line-height:1.45}
+    .auth-notice.err{background:#fef2f2;border-color:#fecaca;color:#991b1b}
+    .account-flags{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .tag.warn{background:#fff7ed;border-color:#fdba74;color:#9a3412}
+    .tag.ok{background:#ecfdf5;border-color:#86efac;color:#166534}
 
     /* shell של האפליקציה */    
 #appShell{display:none;min-height:100vh}
@@ -545,9 +553,14 @@ body{
         <label for="authPassword">סיסמה</label>
         <input type="password" id="authPassword" minlength="6" required />
       </div>
+      <div class="auth-actions">
+        <button type="button" class="link-btn" id="btnForgotPassword">שכחתי סיסמה</button>
+        <button type="button" class="link-btn" id="btnResendVerification" hidden>שליחה מחדש של אימות מייל</button>
+      </div>
       <button type="submit" class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
     </form>
 
+    <div class="auth-notice" id="authInfo" hidden></div>
     <div class="auth-footer">
       אפשר להשתמש בכתובת מייל רגילה. לשמירת הסיסמה מומלץ להשתמש במנהל סיסמאות.
     </div>
@@ -562,6 +575,7 @@ body{
       <div>
         <h2 class="brand-title">עצמאי פלוס - הנהלת חשבונות עצמאית — מעקב הכנסות/הוצאות לעצמאיים</h2>
         <div class="hint" id="businessHint"></div>
+        <div class="account-flags" id="accountFlags"></div>
       </div>
       <div class="top-right">
         <span class="tag" id="userEmailTag">מחובר/ת</span>
@@ -894,7 +908,9 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  sendPasswordResetEmail,
+  sendEmailVerification
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 import {
@@ -934,6 +950,9 @@ const authEmail = document.getElementById("authEmail");
 const authPassword = document.getElementById("authPassword");
 const authSubmitBtn = document.getElementById("authSubmitBtn");
 const authError = document.getElementById("authError");
+const authInfo = document.getElementById("authInfo");
+const btnForgotPassword = document.getElementById("btnForgotPassword");
+const btnResendVerification = document.getElementById("btnResendVerification");
 
 const tabLogin = document.getElementById("tabLogin");
 const tabRegister = document.getElementById("tabRegister");
@@ -952,6 +971,7 @@ const btnSaveProfile = document.getElementById("btnSaveProfile");
 const profileStatus = document.getElementById("profileStatus");
 const businessHint = document.getElementById("businessHint");
 const userEmailTag = document.getElementById("userEmailTag");
+const accountFlags = document.getElementById("accountFlags");
 
 /* כפתור קטגוריות */
 const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
@@ -1057,6 +1077,66 @@ const btnLogout = document.getElementById("btnLogout");
    3) מעבר בין "התחברות" ↔ "הרשמה"
 ---------------------------------------------------------- */
 let authMode = "login"; // login/register
+const TRIAL_DAYS = 14;
+
+function setAuthInfo(message = "", mode = "info") {
+  if (!authInfo) return;
+  authInfo.hidden = !message;
+  authInfo.textContent = message || "";
+  authInfo.classList.toggle("err", mode === "error");
+}
+
+function updateAuthAuxUI() {
+  if (btnForgotPassword) btnForgotPassword.hidden = authMode !== "login";
+}
+
+function daysBetweenCeil(fromIso, toIso) {
+  const diff = Date.parse(toIso || 0) - Date.parse(fromIso || 0);
+  return Math.ceil(diff / 86400000);
+}
+
+function computeAccessState(profile, user) {
+  const state = { blocked: false, reason: "", flags: [] };
+  if (!profile) return state;
+
+  if (profile.requireEmailVerification === true) {
+    if (user?.emailVerified) {
+      state.flags.push({ text: "אימייל מאומת", cls: "ok" });
+    } else {
+      state.blocked = true;
+      state.reason = "כדי להפעיל את החשבון צריך לאמת את כתובת המייל. שלחנו מייל אימות — אחרי האישור אפשר להתחבר כרגיל.";
+      return state;
+    }
+  }
+
+  if (profile.isExemptFromBilling === true) {
+    state.flags.push({ text: "גישה מלאה", cls: "ok" });
+    return state;
+  }
+
+  if (profile.isPaid === true) {
+    state.flags.push({ text: "מנוי פעיל", cls: "ok" });
+    return state;
+  }
+
+  if (profile.trialEndsAt) {
+    const daysLeft = daysBetweenCeil(new Date().toISOString(), profile.trialEndsAt);
+    if (daysLeft <= 0) {
+      state.blocked = true;
+      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. כדי להמשיך להשתמש במערכת צריך להפעיל מנוי.";
+      return state;
+    }
+    state.flags.push({ text: `ניסיון: ${daysLeft} ימים`, cls: "warn" });
+  }
+
+  return state;
+}
+
+function renderAccountFlags() {
+  if (!accountFlags) return;
+  const state = computeAccessState(userProfile, auth.currentUser);
+  accountFlags.innerHTML = (state.flags || []).map(f => `<span class="tag ${f.cls || ''}">${escapeHtml(f.text)}</span>`).join("");
+}
 
 tabLogin.onclick = () => {
   authMode = "login";
@@ -1064,6 +1144,8 @@ tabLogin.onclick = () => {
   tabRegister.classList.remove("active");
   authSubmitBtn.textContent = "התחברות";
   authError.textContent = "";
+  setAuthInfo("");
+  updateAuthAuxUI();
 };
 
 tabRegister.onclick = () => {
@@ -1072,6 +1154,8 @@ tabRegister.onclick = () => {
   tabLogin.classList.remove("active");
   authSubmitBtn.textContent = "הרשמה";
   authError.textContent = "";
+  setAuthInfo("בהרשמה נשלח מייל אימות, וייפתחו 14 ימי ניסיון לאחר אישור המייל.");
+  updateAuthAuxUI();
 };
 
 /* ----------------------------------------------------------
@@ -1102,7 +1186,16 @@ async function handleAuth(e) {
       await signInWithEmailAndPassword(auth, email, pass);
     } else {
       const userCred = await createUserWithEmailAndPassword(auth, email, pass);
-      await createDefaultProfile(userCred.user.uid, email);
+      await createDefaultProfile(userCred.user.uid, email, { newTrial: true, requireEmailVerification: true });
+      await sendEmailVerification(userCred.user);
+      setAuthInfo("נשלח מייל אימות לכתובת שהזנת. אחרי אישור המייל אפשר להתחבר ולהתחיל את תקופת הניסיון.");
+      await signOut(auth);
+      authMode = "login";
+      tabLogin.classList.add("active");
+      tabRegister.classList.remove("active");
+      authSubmitBtn.textContent = "התחברות";
+      updateAuthAuxUI();
+      return;
     }
     // onAuthStateChanged יטפל במעבר למסך האפליקציה
   } catch (err) {
@@ -1124,22 +1217,71 @@ async function handleAuth(e) {
 // עדכון ה-Listeners בצורה בטוחה יותר:
 authForm.onsubmit = handleAuth; // זה יתפוס גם לחיצה על כפתור וגם Enter
 authSubmitBtn.onclick = handleAuth;
+updateAuthAuxUI();
+
+btnForgotPassword?.addEventListener("click", async () => {
+  const email = authEmail.value.trim();
+  authError.textContent = "";
+  if (!email) {
+    setAuthInfo("כדי לאפס סיסמה צריך להזין קודם כתובת מייל.", "error");
+    return;
+  }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    setAuthInfo("שלחנו קישור לאיפוס סיסמה למייל שהוזן.");
+  } catch (err) {
+    console.error("password reset error", err);
+    setAuthInfo("לא הצלחנו לשלוח מייל איפוס. בדקי שהמייל נכון ונסי שוב.", "error");
+  }
+});
+
+btnResendVerification?.addEventListener("click", async () => {
+  const user = auth.currentUser;
+  if (!user) {
+    setAuthInfo("צריך להתחבר כדי לשלוח מחדש מייל אימות.", "error");
+    return;
+  }
+  try {
+    await sendEmailVerification(user);
+    setAuthInfo("שלחנו שוב מייל אימות. אחרי האישור אפשר להתחבר ולהמשיך.");
+  } catch (err) {
+    console.error("resend verification error", err);
+    setAuthInfo("לא הצלחנו לשלוח שוב את מייל האימות כרגע. נסי שוב בעוד רגע.", "error");
+  }
+});
 
 /* ----------------------------------------------------------
    5) יצירת פרופיל ברירת מחדל למשתמש חדש
 ---------------------------------------------------------- */
-async function createDefaultProfile(uid, email) {
+async function createDefaultProfile(uid, email, opts = {}) {
   const profileRef = doc(db, "users", uid);
+  const now = new Date();
+  const createdAt = now.toISOString();
+  const trialEndsAt = new Date(now.getTime() + TRIAL_DAYS * 86400000).toISOString();
 
-  await setDoc(profileRef, {
+  const payload = {
     email: email,
     displayName: "",
     businessName: "",
     businessId: "",
     phone: "",
-    businessType: "ptor",      // עוסק פטור כברירת מחדל
-    vatRate: 0                 // מע"מ כבוי
-  });
+    businessType: "ptor",
+    vatRate: 0,
+    createdAt
+  };
+
+  if (opts.newTrial) {
+    Object.assign(payload, {
+      trialStart: createdAt,
+      trialEndsAt,
+      plan: "trial",
+      isPaid: false,
+      isExemptFromBilling: false,
+      requireEmailVerification: opts.requireEmailVerification === true
+    });
+  }
+
+  await setDoc(profileRef, payload, { merge: true });
 }
 
 /* ----------------------------------------------------------
@@ -1163,6 +1305,20 @@ onAuthStateChanged(auth, async (user) => {
 
     // ואז לטעון נתונים
     await loadUserProfile(user.uid);
+    const accessState = computeAccessState(userProfile, user);
+
+    if (accessState.blocked) {
+      document.body.classList.remove("logged-in");
+      authPassword.value = "";
+      authError.textContent = "";
+      setAuthInfo(accessState.reason, "error");
+      if (btnResendVerification) btnResendVerification.hidden = !(userProfile?.requireEmailVerification === true && !user.emailVerified);
+      return;
+    }
+
+    setAuthInfo("");
+    if (btnResendVerification) btnResendVerification.hidden = true;
+    renderAccountFlags();
     initAppLogic(user.uid);
 
   } catch (err) {
@@ -1566,7 +1722,7 @@ async function loadUserProfile(uid) {
   const snap = await getDoc(ref);
 
   if (!snap.exists()) {
-    await createDefaultProfile(uid, auth.currentUser?.email || "");
+    await createDefaultProfile(uid, auth.currentUser?.email || "", { newTrial: false });
     userProfile = {
       email: auth.currentUser?.email || "",
       displayName: "",
@@ -1574,14 +1730,28 @@ async function loadUserProfile(uid) {
       businessId: "",
       phone: "",
       businessType: "ptor",
-      vatRate: 0
+      vatRate: 0,
+      plan: "legacy"
     };
   } else {
     userProfile = snap.data();
   }
 
+  const syncPayload = {};
+  const currentEmail = auth.currentUser?.email || userProfile.email || "";
+  if ((userProfile.email || "") !== currentEmail) syncPayload.email = currentEmail;
+  if (userProfile.requireEmailVerification === true && auth.currentUser?.emailVerified && userProfile.emailVerified !== true) {
+    syncPayload.emailVerified = true;
+    syncPayload.emailVerifiedAt = new Date().toISOString();
+  }
+  if (Object.keys(syncPayload).length) {
+    await setDoc(ref, syncPayload, { merge: true });
+    userProfile = { ...(userProfile || {}), ...syncPayload };
+  }
+
   userEmailTag.textContent = userProfile.email || auth.currentUser?.email || "";
   applyProfileToUI();
+  renderAccountFlags();
 }
 
 btnSaveProfile.onclick = async () => {
