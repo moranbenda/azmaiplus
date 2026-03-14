@@ -2734,7 +2734,9 @@ function confirmIncomeImport() {
       deductPct: 100,
       source: 'csvImport',
       createdAt: Date.now()
-    });
+    };
+    rows.push(newRow);
+    existingRows.push(newRow);
     imported++;
   }
   saveToLocal();
