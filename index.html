@@ -1595,11 +1595,13 @@ document.body.classList.remove("logged-in");
 onAuthStateChanged(auth, async (user) => {
   try {
     if (!user) {
-      clearPendingCloudSaves();
       document.body.classList.remove("logged-in");
+      clearPendingSaves();
       currentUid = null;
-      resetLedgerState();
-      render();
+      cloudLoadedForUid = null;
+      isHydratingLedger = false;
+      rows = [];
+      localLedgerMeta = { updatedAt: null };
       return;
     }
 
@@ -2245,42 +2247,34 @@ btnSaveProfile.onclick = async () => {
 
 let rows = [];
 let localLedgerMeta = { updatedAt: null };
-let _cloudSaveTimer = null;
-let cloudSaveTimer = null;
+let cloudLoadedForUid = null;
+let isHydratingLedger = false;
+let lastCloudSavedAt = null;
 
-const LEGACY_LEDGER_RECOVERY = {
-  "moranbenda@gmail.com": {
-    sourceUid: "d8pKZ9QYvNTqeO1dnClGhgvFpxE2",
-    targetUid: "sCHiPiyGNmM4lzMpdI1fqoEOL4g1"
+function clearPendingSaves(){
+  try { if (_cloudSaveTimer) clearTimeout(_cloudSaveTimer); } catch {}
+  try { if (cloudSaveTimer) clearTimeout(cloudSaveTimer); } catch {}
+  _cloudSaveTimer = null;
+  cloudSaveTimer = null;
+}
+
+function ledgerBackupKey(uid){
+  return `ledgerBackupV1_${uid}`;
+}
+
+function writeLocalBackup(uid, payload){
+  if (!uid) return;
+  try {
+    const backups = JSON.parse(localStorage.getItem(ledgerBackupKey(uid)) || "[]");
+    backups.unshift({ savedAt: new Date().toISOString(), payload });
+    localStorage.setItem(ledgerBackupKey(uid), JSON.stringify(backups.slice(0,5)));
+  } catch (e) {
+    console.error("backup local save fail", e);
   }
-};
+}
 
 function ledgerKey(uid) {
   return `ledgerDataV3_${uid}`;
-}
-
-function ledgerRecoveryFlagKey(uid, sourceUid) {
-  return `ledgerRecoveryDone_${uid}_from_${sourceUid}`;
-}
-
-function deepCloneRows(list) {
-  return JSON.parse(JSON.stringify(list || []));
-}
-
-function resetLedgerState() {
-  rows = [];
-  localLedgerMeta = { updatedAt: null };
-}
-
-function clearPendingCloudSaves() {
-  if (_cloudSaveTimer) {
-    clearTimeout(_cloudSaveTimer);
-    _cloudSaveTimer = null;
-  }
-  if (cloudSaveTimer) {
-    clearTimeout(cloudSaveTimer);
-    cloudSaveTimer = null;
-  }
 }
 
 function getSettings() {
@@ -2290,14 +2284,6 @@ function getSettings() {
     ? 0
     : parseFloat(vatRateInput.value || userProfile?.vatRate || DEFAULT_VAT);
   return { vatEnabled, vatRate };
-}
-
-function buildLedgerPayload(updatedAt = null) {
-  return {
-    rows: deepCloneRows(rows),
-    settings: { ...getSettings() },
-    updatedAt: updatedAt || localLedgerMeta.updatedAt || new Date().toISOString()
-  };
 }
 
 function applyLedgerPayload(obj = {}) {
@@ -2312,164 +2298,116 @@ function applyLedgerPayload(obj = {}) {
   }
 }
 
-function loadFromLocal(uid = currentUid) {
-  if (!uid) { resetLedgerState(); return; }
-  const raw = localStorage.getItem(ledgerKey(uid));
-  if (!raw) { resetLedgerState(); return; }
+function loadFromLocal() {
+  if (!currentUid) { rows = []; localLedgerMeta = { updatedAt: null }; return; }
+  const raw = localStorage.getItem(ledgerKey(currentUid));
+  if (!raw) { rows = []; localLedgerMeta = { updatedAt: null }; return; }
   try {
     const obj = JSON.parse(raw);
     applyLedgerPayload(obj);
   } catch (e) {
     console.error("parse local ledger fail", e);
-    resetLedgerState();
+    rows = [];
+    localLedgerMeta = { updatedAt: null };
   }
 }
 
-function saveToLocal(uid = currentUid, payload = null) {
-  if (!uid) return;
-  const finalPayload = payload || buildLedgerPayload(new Date().toISOString());
-  localLedgerMeta.updatedAt = finalPayload.updatedAt;
-  localStorage.setItem(ledgerKey(uid), JSON.stringify(finalPayload));
+function saveToLocal() {
+  if (!currentUid) return;
+  const updatedAt = new Date().toISOString();
+  const payload = { rows, settings: getSettings(), updatedAt };
+  localLedgerMeta.updatedAt = updatedAt;
+  try {
+    localStorage.setItem(ledgerKey(currentUid), JSON.stringify(payload));
+    writeLocalBackup(currentUid, payload);
+  } catch (e) {
+    console.error("local save error", e);
+  }
 }
 
-async function savePayloadToCloud(uid, payload) {
-  if (!uid || !payload) return;
+async function saveToCloud() {
+  if (!currentUid || isHydratingLedger || cloudLoadedForUid !== currentUid) return;
   try {
-    const ref = doc(db, "ledgers", uid);
-    await setDoc(ref, payload, { merge: true });
+    const updatedAt = new Date().toISOString();
+    localLedgerMeta.updatedAt = updatedAt;
+    const ref = doc(db, "ledgers", currentUid);
+    await setDoc(ref, {
+      rows,
+      settings: getSettings(),
+      updatedAt
+    }, { merge: true });
+    lastCloudSavedAt = updatedAt;
   } catch (e) {
     console.error("cloud save error", e);
   }
 }
 
-async function saveToCloud() {
-  if (!currentUid) return;
-  const payload = buildLedgerPayload(new Date().toISOString());
-  localLedgerMeta.updatedAt = payload.updatedAt;
-  await savePayloadToCloud(currentUid, payload);
-}
-
-function scheduleCloudSave() {
-  const uidAtSchedule = currentUid;
-  if (!uidAtSchedule) return;
-  const payload = buildLedgerPayload(new Date().toISOString());
-  localLedgerMeta.updatedAt = payload.updatedAt;
-
-  clearPendingCloudSaves();
-
+let _cloudSaveTimer = null;
+function scheduleCloudSave(){
+  if (!_cloudSaveTimer) {
+    // no-op, just here so clearTimeout below is safe
+  }
+  clearTimeout(_cloudSaveTimer);
   _cloudSaveTimer = setTimeout(() => {
     _cloudSaveTimer = null;
-    cloudSaveTimer = setTimeout(async () => {
-      cloudSaveTimer = null;
-      if (currentUid !== uidAtSchedule) return;
-      await savePayloadToCloud(uidAtSchedule, payload);
-    }, 400);
+    saveToCloudDebounced();
   }, 800);
 }
 
-async function maybeRecoverLegacyLedger(uid, localSnapshot, cloudObj) {
-  const email = (auth.currentUser?.email || userProfile?.email || "").trim().toLowerCase();
-  const cfg = LEGACY_LEDGER_RECOVERY[email];
-  if (!cfg) return null;
-  if (uid !== cfg.targetUid) return null;
 
-  const recoveryFlag = ledgerRecoveryFlagKey(uid, cfg.sourceUid);
-  if (localStorage.getItem(recoveryFlag) === "1") return null;
-
-  const sourceRef = doc(db, "ledgers", cfg.sourceUid);
-  const sourceSnap = await getDoc(sourceRef);
-  if (!sourceSnap.exists()) return null;
-
-  const sourceObj = sourceSnap.data() || {};
-  if (!(sourceObj.rows || []).length) return null;
-
-  const targetRows = Array.isArray(cloudObj?.rows) ? cloudObj.rows : [];
-  const sourceRows = Array.isArray(sourceObj.rows) ? sourceObj.rows : [];
-
-  const shouldForceRecover = !targetRows.length || sourceRows.length > targetRows.length;
-  if (!shouldForceRecover) return null;
-
-  const backupPayload = cloudObj ? {
-    rows: deepCloneRows(targetRows || []),
-    settings: cloudObj.settings || localSnapshot.settings || getSettings(),
-    updatedAt: cloudObj.updatedAt || new Date().toISOString(),
-    backupBeforeRecoveryAt: new Date().toISOString()
-  } : null;
-
-  if (backupPayload) {
-    try {
-      await setDoc(doc(db, "ledgers_backup", `${uid}_${Date.now()}`), backupPayload);
-    } catch (e) {
-      console.warn("backup before recovery failed", e);
-    }
-  }
-
-  const recoveredPayload = {
-    rows: deepCloneRows(sourceRows),
-    settings: sourceObj.settings || cloudObj?.settings || localSnapshot.settings || getSettings(),
-    updatedAt: sourceObj.updatedAt || new Date().toISOString(),
-    recoveredFromUid: cfg.sourceUid,
-    recoveredAt: new Date().toISOString(),
-    previousTargetRowsCount: targetRows.length
-  };
-
-  await savePayloadToCloud(uid, recoveredPayload);
-  saveToLocal(uid, recoveredPayload);
-  localStorage.setItem(recoveryFlag, "1");
-  return recoveredPayload;
+let cloudSaveTimer = null;
+function saveToCloudDebounced() {
+  if (cloudSaveTimer) clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(() => { saveToCloud(); }, 400);
 }
+async function loadFromCloudFirst() {
+  if (!currentUid) { rows = []; localLedgerMeta = { updatedAt: null }; cloudLoadedForUid = null; return; }
 
-async function loadFromCloudFirst(uid = currentUid) {
-  if (!uid) { resetLedgerState(); return; }
-
-  clearPendingCloudSaves();
-  resetLedgerState();
-  loadFromLocal(uid);
-
+  const uid = currentUid;
+  clearPendingSaves();
+  isHydratingLedger = true;
+  cloudLoadedForUid = null;
+  loadFromLocal();
   const localSnapshot = {
-    rows: deepCloneRows(rows),
-    settings: { ...getSettings() },
+    rows: rows.slice(),
+    settings: getSettings(),
     updatedAt: localLedgerMeta.updatedAt
   };
 
   try {
     const ref = doc(db, "ledgers", uid);
     const snap = await getDoc(ref);
-    const cloudObj = snap.exists() ? (snap.data() || {}) : null;
 
-    const recoveredPayload = await maybeRecoverLegacyLedger(uid, localSnapshot, cloudObj);
-    if (recoveredPayload) {
-      applyLedgerPayload(recoveredPayload);
-      showToast("שוחזרו הנתונים מהגיבוי בענן.");
-      return;
-    }
+    if (currentUid !== uid) return;
 
-    if (cloudObj) {
-      const cloudTs = Date.parse(cloudObj.updatedAt || 0) || 0;
-      const localTs = Date.parse(localSnapshot.updatedAt || 0) || 0;
-
-      if (cloudTs >= localTs) {
-        applyLedgerPayload(cloudObj);
-        saveToLocal(uid, cloudObj);
-      } else {
-        rows = localSnapshot.rows;
-        localLedgerMeta.updatedAt = localSnapshot.updatedAt;
-        await savePayloadToCloud(uid, buildLedgerPayload(localSnapshot.updatedAt || new Date().toISOString()));
-      }
+    if (snap.exists()) {
+      const cloudObj = snap.data() || {};
+      applyLedgerPayload(cloudObj);
+      cloudLoadedForUid = uid;
+      lastCloudSavedAt = cloudObj.updatedAt || null;
+      saveToLocal();
       return;
     }
 
     if (localSnapshot.rows.length) {
       rows = localSnapshot.rows;
       localLedgerMeta.updatedAt = localSnapshot.updatedAt || new Date().toISOString();
-      await savePayloadToCloud(uid, buildLedgerPayload(localLedgerMeta.updatedAt));
+      cloudLoadedForUid = uid;
+      await saveToCloud();
       return;
     }
+
+    rows = [];
+    localLedgerMeta = { updatedAt: null };
+    cloudLoadedForUid = uid;
   } catch (e) {
     console.error("cloud load error", e);
+    if (currentUid !== uid) return;
     rows = localSnapshot.rows;
     localLedgerMeta.updatedAt = localSnapshot.updatedAt;
-    return;
+    cloudLoadedForUid = uid;
+  } finally {
+    if (currentUid === uid) isHydratingLedger = false;
   }
 }
 
@@ -3851,10 +3789,13 @@ if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE
 };
 
 function initAppLogic(uid) {
-  const switchingUser = !!currentUid && currentUid !== uid;
+  const switchingUser = currentUid && currentUid !== uid;
   if (switchingUser) {
-    clearPendingCloudSaves();
-    resetLedgerState();
+    clearPendingSaves();
+    rows = [];
+    localLedgerMeta = { updatedAt: null };
+    cloudLoadedForUid = null;
+    isHydratingLedger = false;
   }
   currentUid = uid;
 
@@ -3940,7 +3881,7 @@ renderItemsDatalist();
 
   // לבסוף, לטעון נתונים ולרנדר
   (async () => {
-    await loadFromCloudFirst(uid);
+    await loadFromCloudFirst();
     if (!fDate.value) fDate.value = todayStr();
     if (fType) fType.value = "expense";
     if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
@@ -3951,8 +3892,9 @@ renderItemsDatalist();
 
 window.addEventListener("beforeunload", () => {
   try {
+    if (!currentUid) return;
     saveToLocal();
-    saveToCloud();
+    if (!isHydratingLedger && cloudLoadedForUid === currentUid) saveToCloud();
   } catch (e) {
     console.error("beforeunload save failed", e);
   }
