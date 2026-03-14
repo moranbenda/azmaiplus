@@ -2124,10 +2124,10 @@ function applyProfileToUI() {
   pBusinessName.value = userProfile.businessName || "";
   pBusinessId.value   = userProfile.businessId || "";
   pPhone.value        = userProfile.phone || "";
-  pBusinessType.value = userProfile.businessType || "ptor";
+  pBusinessType.value = userProfile.businessType || "osek";
   pVatRate.value      = userProfile.vatRate ?? 0;
 
-  const type = userProfile.businessType || "ptor";
+  const type = userProfile.businessType || "osek";
 
   if (type === "ptor") {
     businessHint.textContent = "מצב: עוסק פטור — מע\"מ לא מחושב במערכת.";
@@ -2278,11 +2278,10 @@ function ledgerKey(uid) {
 }
 
 function getSettings() {
-  const type = userProfile?.businessType || "ptor";
-  const vatEnabled = type === "ptor" ? false : !!vatEnabledCheckbox.checked;
-  const vatRate = type === "ptor"
-    ? 0
-    : parseFloat(vatRateInput.value || userProfile?.vatRate || DEFAULT_VAT);
+  const type = userProfile?.businessType || "osek";
+  const effectiveRate = parseFloat(vatRateInput.value || userProfile?.vatRate || DEFAULT_VAT || 0);
+  const vatEnabled = type === "ptor" ? false : (!!vatEnabledCheckbox.checked || effectiveRate > 0);
+  const vatRate = type === "ptor" ? 0 : effectiveRate;
   return { vatEnabled, vatRate };
 }
 
@@ -3416,7 +3415,7 @@ function docTypeLabel(t){
 }
 
 function canIssueTaxInvoice(){
-  return (userProfile?.businessType || "ptor") !== "ptor";
+  return (userProfile?.businessType || "osek") !== "ptor";
 }
 
 function buildDocHtml(payload){
