@@ -1743,12 +1743,36 @@ function getExpenseMeta(row) {
   return null;
 }
 
+function getRecognitionPctForRow(row) {
+  const meta = getExpenseMeta(row);
+  const pct = meta ? meta.incomeTaxPct : (row?.deductPct ?? 100);
+  return Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
+}
+
+function getVatDeductibleFactorForRow(row) {
+  const meta = getExpenseMeta(row);
+  if (meta) {
+    return meta.vatAllowed ? Math.max(0, Math.min(100, Number(meta.incomeTaxPct) || 0)) / 100 : 0;
+  }
+  return Math.max(0, Math.min(100, Number(row?.deductPct ?? 100) || 0)) / 100;
+}
+
+function getTaxDeductibleExpenseAmount(row, amounts) {
+  if (!row || row.type !== "expense") return 0;
+  const settings = getSettings();
+  const resolved = amounts || splitVAT(row.amount, row.incVat, settings.vatEnabled ? settings.vatRate : 0);
+  const meta = getExpenseMeta(row);
+  const pct = getRecognitionPctForRow(row);
+  const base = meta ? (meta.vatAllowed ? resolved.net : resolved.gross) : resolved.net;
+  return base * pct;
+}
+
 const EXPENSE_REPORT_COLUMN_DEFS = [
   { key: "date", label: "תאריך" },
   { key: "category", label: "קטגוריה" },
   { key: "desc", label: "תיאור" },
   { key: "vatAllowed", label: "מוכר למע״מ" },
-  { key: "recognition", label: "אחוז הכרה" },
+  { key: "recognition", label: "אחוז הכרה למס" },
   { key: "net", label: "סכום ללא מע״מ" },
   { key: "vat", label: "מע״מ" },
   { key: "gross", label: "סכום כולל" }
@@ -2152,10 +2176,11 @@ function queryRows() {
 
 function summarize(list) {
   const { vatEnabled, vatRate } = getSettings();
-  let incGross = 0, expGross = 0, incVat = 0, expVat = 0, incNet = 0, expNet = 0;
+  let incGross = 0, expGross = 0, incVat = 0, expVat = 0, incNet = 0, expNet = 0, expTaxDeductible = 0;
 
   for (const r of list) {
-    const { net, vat, gross } = splitVAT(r.amount, r.incVat, vatEnabled ? vatRate : 0);
+    const amounts = splitVAT(r.amount, r.incVat, vatEnabled ? vatRate : 0);
+    const { net, vat, gross } = amounts;
     if (r.type === "income") {
       incGross += gross;
       incVat   += vat;
@@ -2163,16 +2188,16 @@ function summarize(list) {
     } else {
       expGross += gross;
       expNet   += net;
-      const pct = Math.max(0, Math.min(100, r.deductPct ?? 100)) / 100;
-      expVat += vat * pct;
+      expVat += vat * getVatDeductibleFactorForRow(r);
+      expTaxDeductible += getTaxDeductibleExpenseAmount(r, amounts);
     }
   }
 
   const balance = incGross - expGross;
   const vatNet = incVat - expVat;
-  const taxProfitBase = incNet - expNet; // בסיס פשוט
+  const taxProfitBase = incNet - expTaxDeductible;
 
-  return { incGross, expGross, incVat, expVat, balance, vatNet, incNet, expNet, taxProfitBase };
+  return { incGross, expGross, incVat, expVat, balance, vatNet, incNet, expNet, expTaxDeductible, taxProfitBase };
 }
 
 function render() {
@@ -2185,10 +2210,9 @@ function render() {
 
   tbody.innerHTML = list.map(r => {
     const { net, vat, gross } = splitVAT(r.amount, r.incVat, vatEnabled ? vatRate : 0);
-    const pct = r.type === "expense"
-      ? Math.max(0, Math.min(100, r.deductPct ?? 100)) / 100
-      : 1;
-    const vatDisplay = r.type === "expense" ? vat * pct : vat;
+    const vatDisplay = r.type === "expense"
+      ? vat * getVatDeductibleFactorForRow(r)
+      : vat;
 
     return `
       <tr data-id="${r.id}">
@@ -2449,7 +2473,8 @@ function exportPDF() {
         <tr><td>מס תשומות</td><td>${toMoney(sum.expVat)}</td></tr>
         <tr><td>מע"מ לתשלום</td><td>${toMoney(sum.vatNet)}</td></tr>
         <tr><td>יתרה</td><td>${toMoney(sum.balance)}</td></tr>
-        <tr><td>בסיס רווח לצרכי מס (נטו, משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
+        <tr><td>הוצאות מוכרות למס (משוער)</td><td>${toMoney(sum.expTaxDeductible)}</td></tr>
+        <tr><td>בסיס רווח לצרכי מס (משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
       </tbody>
     </table>
 
@@ -2491,15 +2516,12 @@ function addVatInfo(list) {
       vatEnabled ? vatRate : 0
     );
 
-    const pct = r.type === "expense"
-      ? Math.max(0, Math.min(100, r.deductPct ?? 100)) / 100
-      : 1;
-
     return {
       ...r,
       net,
-      vat: r.type === "expense" ? vat * pct : vat,
-      gross
+      vat: r.type === "expense" ? vat * getVatDeductibleFactorForRow(r) : vat,
+      gross,
+      deductibleExpense: r.type === "expense" ? getTaxDeductibleExpenseAmount(r, { net, gross }) : 0
     };
   });
 
