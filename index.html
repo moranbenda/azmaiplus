@@ -639,7 +639,7 @@ body{
               <datalist id="catsList"></datalist>
             </div>
 <div style="flex:3 1 250px">
-  <label>קטגוריה</label>
+  <label>תיאור</label>
   <input
     type="text"
     id="fDesc"
@@ -718,6 +718,7 @@ body{
               <button class="btn ghost small" id="btnExportCSV">ייצוא CSV</button>
               <button class="btn ghost small" id="btnExportJSON">גיבוי (JSON)</button>
               <button class="btn ghost small" id="btnExportPDF">הדפסה / PDF</button>
+              <button class="btn ghost small" id="btnImportIncome">ייבוא הכנסות</button>
             </div>
             <button class="btn warn small" id="btnClear">איפוס כל הנתונים</button>
           </div>
@@ -769,8 +770,8 @@ body{
             <option value="expense">הוצאה</option>
           </select>
         </div>
-        <div><label>תיאור</label><input type="text" id="eCategory" list="catsList" /></div>
-        <div><label>קטגוריה</label><input type="text" id="eDesc" /></div>
+        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
+        <div><label>תיאור</label><input type="text" id="eDesc" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -904,6 +905,40 @@ body{
   </div>
 </dialog>
 
+
+<dialog id="importIncomeDialog">
+  <div class="dlg-hd">
+    <div>ייבוא הכנסות מ-CSV / Excel</div>
+    <button class="btn secondary small" type="button" id="btnImportIncomeClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <div class="grid2">
+      <div style="grid-column:1 / -1">
+        <label>בחרי קובץ</label>
+        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא.</div>
+      </div>
+    </div>
+    <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
+    <div class="tx-table-wrap" style="max-height:45vh;overflow:auto;margin-top:10px">
+      <table>
+        <thead>
+          <tr><th>ייבוא</th><th>תאריך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th></tr>
+        </thead>
+        <tbody id="importIncomePreviewBody">
+          <tr><td colspan="6" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="footer" style="margin-top:12px">
+      <div class="left">
+        <button class="btn" type="button" id="btnImportIncomeConfirm">ייבוא לאפליקציה</button>
+      </div>
+      <span class="hint">אפשר לערוך לפני הייבוא. כפילויות לפי מספר מסמך ידולגו.</span>
+    </div>
+  </div>
+</dialog>
+
 <!-- דיאלוג פנייה למפתח -->
 <dialog id="supportDialog">
   <div class="dlg-hd">
@@ -933,6 +968,8 @@ body{
 <!-- דיאלוג מסמכים -->
 
 
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -1471,7 +1508,16 @@ const periodLabel= document.getElementById("periodLabel");
 const btnExportCSV   = document.getElementById("btnExportCSV");
 const btnExportJSON  = document.getElementById("btnExportJSON");
 const btnExportPDF   = document.getElementById("btnExportPDF");
+const btnImportIncome= document.getElementById("btnImportIncome");
 const btnClear       = document.getElementById("btnClear");
+
+/* דיאלוג ייבוא הכנסות */
+const importIncomeDialog = document.getElementById("importIncomeDialog");
+const btnImportIncomeClose = document.getElementById("btnImportIncomeClose");
+const importIncomeFile = document.getElementById("importIncomeFile");
+const importIncomeStatus = document.getElementById("importIncomeStatus");
+const importIncomePreviewBody = document.getElementById("importIncomePreviewBody");
+const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
 
 /* דיאלוג עריכה */
 const editDialog   = document.getElementById("editDialog");
@@ -2294,7 +2340,7 @@ function addRow() {
     if (type !== "income" && type !== "expense") { showToast("בחרי סוג (הכנסה/הוצאה)", true); return; }
 
     const safeDesc = desc ? desc : (type === "income" ? "הכנסה" : "הוצאה");
-    const safeCategory = category ? category : "כללי";
+    const safeCategory = type === "income" ? "" : (category ? category : "כללי");
     const amount = parseFloat(amountRaw);
     if (!Number.isFinite(amount) || amount <= 0) { showToast("חסר סכום תקין", true); return; }
 
@@ -2304,6 +2350,7 @@ function addRow() {
       type,
       category: safeCategory,
       desc: safeDesc,
+      docNumber: "",
       amount,
       incVat,
       deductPct: type === "expense" ? deductPct : 100,
@@ -2380,6 +2427,201 @@ function deleteRow() {
   editDialog.close();
 }
 
+let importIncomeRows = [];
+
+function normalizeImportHeader(h = "") {
+  return String(h || "").replace(/﻿/g, "").trim().toLowerCase();
+}
+
+function detectImportColumns(headers = []) {
+  const normalized = headers.map(h => ({ raw: h, norm: normalizeImportHeader(h) }));
+  const pick = fn => (normalized.find(x => fn(x.norm)) || {}).raw || "";
+  return {
+    date: pick(h => h.includes("תאריך")),
+    docNumber: pick(h => h.includes("מס") && h.includes("מסמך")),
+    client: pick(h => h.includes("לקוח")),
+    total: pick(h => h === 'סה"כ' || (h.includes('סה') && !h.includes('לפני') && !h.includes('מע"מ')) || h.replace(/[״”]/g,'"') === 'סה"כ'),
+    totalAlt: pick(h => h.includes("סה") && !h.includes("לפני")),
+    subject: pick(h => h.includes("נושא"))
+  };
+}
+
+function parseImportNumber(v) {
+  if (typeof v === "number") return v;
+  const s = String(v ?? "").replace(/[₪,\s]/g, "").trim();
+  const n = parseFloat(s);
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function parseImportDate(value) {
+  if (value == null || value === "") return "";
+  if (typeof value === "number" && window.XLSX && XLSX.SSF) {
+    const parsed = XLSX.SSF.parse_date_code(value);
+    if (parsed && parsed.y && parsed.m && parsed.d) {
+      return `${parsed.y}-${String(parsed.m).padStart(2, "0")}-${String(parsed.d).padStart(2, "0")}`;
+    }
+  }
+  const s = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if (m) {
+    let [, d, mo, y] = m;
+    if (y.length === 2) y = `20${y}`;
+    return `${y.padStart(4, "0")}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  const dt = new Date(s);
+  if (!Number.isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+  return "";
+}
+
+function buildImportedIncomeDescription(docNumber, clientName, subject) {
+  const bits = [];
+  if (docNumber) bits.push(`חשבונית ${docNumber}`);
+  if (clientName) bits.push(clientName);
+  if (!bits.length && subject) bits.push(subject);
+  return bits.join(" - ") || "הכנסה מיובאת";
+}
+
+function renderImportIncomePreview() {
+  if (!importIncomePreviewBody) return;
+  if (!importIncomeRows.length) {
+    importIncomePreviewBody.innerHTML = '<tr><td colspan="6" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>';
+    return;
+  }
+  importIncomePreviewBody.innerHTML = importIncomeRows.map((row, idx) => `
+    <tr data-idx="${idx}">
+      <td style="text-align:center"><input type="checkbox" class="imp-include" ${row.include !== false ? 'checked' : ''}></td>
+      <td><input class="imp-date" type="date" value="${escapeHtml(row.date || '')}" style="min-width:140px"></td>
+      <td><input class="imp-doc" type="text" value="${escapeHtml(row.docNumber || '')}" style="min-width:90px"></td>
+      <td><input class="imp-client" type="text" value="${escapeHtml(row.clientName || '')}" style="min-width:180px"></td>
+      <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:260px"></td>
+      <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:120px"></td>
+    </tr>
+  `).join('');
+}
+
+function syncImportIncomeRowsFromPreview() {
+  const trs = [...(importIncomePreviewBody?.querySelectorAll('tr[data-idx]') || [])];
+  importIncomeRows = trs.map(tr => ({
+    include: !!tr.querySelector('.imp-include')?.checked,
+    date: tr.querySelector('.imp-date')?.value || '',
+    docNumber: (tr.querySelector('.imp-doc')?.value || '').trim(),
+    clientName: (tr.querySelector('.imp-client')?.value || '').trim(),
+    desc: (tr.querySelector('.imp-desc')?.value || '').trim(),
+    amount: parseFloat(tr.querySelector('.imp-amount')?.value || '0') || 0,
+    incVat: true,
+    type: 'income'
+  }));
+}
+
+function rowsFromParsedImportData(rawRows = []) {
+  const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
+  const cols = detectImportColumns(headers);
+  const totalKey = cols.total || cols.totalAlt;
+  if (!cols.date || !cols.docNumber || !cols.client || !totalKey) {
+    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח, סה״כ).');
+  }
+  return rawRows.map(src => {
+    const docNumber = String(src[cols.docNumber] ?? '').trim();
+    const clientName = String(src[cols.client] ?? '').trim();
+    const subject = String(src[cols.subject] ?? '').trim();
+    return {
+      include: true,
+      date: parseImportDate(src[cols.date]),
+      docNumber,
+      clientName,
+      desc: buildImportedIncomeDescription(docNumber, clientName, subject),
+      amount: parseImportNumber(src[totalKey]),
+      incVat: true,
+      type: 'income'
+    };
+  }).filter(r => r.date && Number.isFinite(r.amount) && r.amount > 0);
+}
+
+async function parseIncomeImportFile(file) {
+  const name = (file?.name || '').toLowerCase();
+  if (name.endsWith('.csv')) {
+    return await new Promise((resolve, reject) => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: results => resolve(results.data || []),
+        error: err => reject(err)
+      });
+    });
+  }
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws, { defval: '' });
+  }
+  throw new Error('סוג הקובץ לא נתמך. העלי CSV או Excel.');
+}
+
+async function handleIncomeImportFileChange() {
+  const file = importIncomeFile?.files?.[0];
+  if (!file) return;
+  importIncomeStatus.textContent = 'קוראת את הקובץ…';
+  try {
+    const rawRows = await parseIncomeImportFile(file);
+    importIncomeRows = rowsFromParsedImportData(rawRows);
+    renderImportIncomePreview();
+    importIncomeStatus.textContent = `זוהו ${importIncomeRows.length} שורות לייבוא. אפשר לערוך לפני אישור.`;
+    if (!importIncomeRows.length) {
+      importIncomeStatus.textContent = 'לא נמצאו שורות תקינות לייבוא בקובץ.';
+    }
+  } catch (e) {
+    console.error(e);
+    importIncomeRows = [];
+    renderImportIncomePreview();
+    importIncomeStatus.textContent = e?.message || 'שגיאה בקריאת הקובץ.';
+    showToast(importIncomeStatus.textContent, true);
+  }
+}
+
+function openIncomeImportDialog() {
+  importIncomeRows = [];
+  if (importIncomeFile) importIncomeFile.value = '';
+  if (importIncomeStatus) importIncomeStatus.textContent = '';
+  renderImportIncomePreview();
+  importIncomeDialog?.showModal();
+}
+
+function confirmIncomeImport() {
+  syncImportIncomeRowsFromPreview();
+  const selected = importIncomeRows.filter(r => r.include);
+  if (!selected.length) {
+    showToast('אין שורות מסומנות לייבוא', true);
+    return;
+  }
+  let imported = 0, skipped = 0;
+  for (const item of selected) {
+    if (!item.date || !Number.isFinite(item.amount) || item.amount <= 0) { skipped++; continue; }
+    const duplicate = item.docNumber && rows.some(r => r.type === 'income' && String(r.docNumber || '').trim() === item.docNumber);
+    if (duplicate) { skipped++; continue; }
+    rows.push({
+      id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
+      date: item.date,
+      type: 'income',
+      category: '',
+      desc: item.desc || buildImportedIncomeDescription(item.docNumber, item.clientName, ''),
+      docNumber: item.docNumber || '',
+      amount: item.amount,
+      incVat: true,
+      deductPct: 100,
+      source: 'csvImport',
+      createdAt: Date.now()
+    });
+    imported++;
+  }
+  saveToLocal();
+  scheduleCloudSave();
+  render();
+  importIncomeDialog?.close();
+  showToast(imported ? `יובאו ${imported} הכנסות${skipped ? `, דולגו ${skipped}` : ''}` : 'לא יובאו שורות חדשות', !imported);
+}
+
 /* ----------------------------------------------------------
    14) יצוא CSV / JSON / PDF לכלל התנועות
 ---------------------------------------------------------- */
@@ -2393,7 +2635,7 @@ function downloadFile(filename, text) {
 }
 
 function exportCSV(list = rows, fileName = "ledger.csv") {
-  const headers = ["date", "type", "category", "desc", "amount", "incVat", "deductPct"];
+  const headers = ["date", "type", "category", "desc", "docNumber", "amount", "incVat", "deductPct"];
   const lines = [headers.join(",")].concat(
     list.map(r =>
       headers.map(h => {
@@ -3221,6 +3463,10 @@ function initAppLogic(uid) {
     btnExportCSV.onclick  = () => exportCSV(rows);
     btnExportJSON.onclick = exportJSON;
     btnExportPDF.onclick  = exportPDF;
+    if (btnImportIncome) btnImportIncome.onclick = openIncomeImportDialog;
+    if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
+    if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
+    if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
     btnClear.onclick = () => {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
