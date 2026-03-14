@@ -848,7 +848,7 @@ body{
         <div class="onboard-actions">
           <button class="btn" type="button" id="btnOnboardingProfile">השלמת פרופיל משתמש</button>
           <button class="btn secondary" type="button" id="btnOnboardingGuide">הדרכה קצרה</button>
-          <button class="btn secondary" type="button" id="btnOnboardingSkip">דל/ג</button>
+          <button class="btn secondary" type="button" id="btnOnboardingSkip">דלגי בינתיים</button>
         </div>
         <label class="onboard-check">
           <input type="checkbox" id="onboardingDontShowAgain" />
@@ -866,7 +866,7 @@ body{
           <button class="btn secondary" type="button" id="btnOnboardingPrev">הקודם</button>
           <button class="btn secondary" type="button" id="btnOnboardingBack">חזרה</button>
           <button class="btn" type="button" id="btnOnboardingNext">הבא</button>
-          <button class="btn" type="button" id="btnOnboardingDone" hidden>סיום והתחלת עבודה</button>
+          <button class="btn" type="button" id="btnOnboardingDone" hidden>סיום והתחלה</button>
         </div>
       </div>
     </div>
@@ -1735,7 +1735,7 @@ onboardingDialog?.addEventListener("cancel", (ev) => {
 });
 btnOnboardingProfile && (btnOnboardingProfile.onclick = () => {
   onboardingDialog?.close();
-  profileStatus.textContent = isProfileComplete(userProfile) ? "" : "כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).";
+  profileStatus.textContent = isProfileComplete(userProfile) ? '' : 'כדי להתחיל לעבוד, צריך למלא פרטי פרופיל (שם עסק ומספר עוסק/ח"פ).';
   profileDialog.dataset.required = isProfileComplete(userProfile) ? "0" : "1";
   profileDialog.showModal();
 });
