@@ -2090,8 +2090,12 @@ function getRecognitionPctForRow(row) {
 function getVatDeductibleFactorForRow(row) {
   const meta = getExpenseMeta(row);
   if (meta) {
-    return meta.vatAllowed ? Math.max(0, Math.min(100, Number(meta.incomeTaxPct) || 0)) / 100 : 0;
+    // מע״מ תשומות לא אמור להיחתך לפי אחוז ההכרה למס הכנסה.
+    // אם הקטגוריה מוגדרת כמוכרת למע״מ — מקזזים 100% מהמע״מ.
+    // אם אינה מוכרת למע״מ — מקזזים 0%.
+    return meta.vatAllowed ? 1 : 0;
   }
+  // כשאין התאמה לטבלת הקטגוריות, נשארים עם התנהגות שמרנית לפי השדה הידני.
   return Math.max(0, Math.min(100, Number(row?.deductPct ?? 100) || 0)) / 100;
 }
 
