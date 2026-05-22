@@ -262,7 +262,7 @@
     /* shell של האפליקציה */    
 #appShell{display:none;min-height:100vh}
     header.app-header{
-      position:sticky;top:0;z-index:10;
+      position:relative;z-index:10;
       backdrop-filter:saturate(1.1) blur(10px);
       background:rgba(255,255,255,.9);
       border-bottom:1px solid var(--line);
@@ -530,156 +530,6 @@ body{
 }
 
 
-
-/* --- Phase 1: Dashboard + Mobile-first navigation --- */
-header.app-header{
-  position:relative !important;
-  top:auto !important;
-}
-.home-dashboard{
-  margin:18px 0 18px;
-  display:grid;
-  gap:14px;
-}
-.dashboard-hero{
-  background:linear-gradient(135deg,#eff6ff,#f8fafc);
-  border:1px solid #dbeafe;
-  border-radius:24px;
-  padding:20px;
-  box-shadow:0 12px 35px rgba(37,99,235,.08);
-}
-.dashboard-hero h1{
-  margin:0 0 6px;
-  font-size:24px;
-  line-height:1.2;
-}
-.dashboard-hero p{
-  margin:0;
-  color:var(--text-dim);
-  line-height:1.55;
-}
-.dashboard-hero-actions{
-  display:flex;
-  gap:10px;
-  flex-wrap:wrap;
-  margin-top:14px;
-}
-.dashboard-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:12px;
-}
-.dash-card{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:22px;
-  padding:16px;
-  min-height:112px;
-  display:flex;
-  flex-direction:column;
-  align-items:flex-start;
-  gap:8px;
-  cursor:pointer;
-  box-shadow:0 10px 28px rgba(15,23,42,.06);
-  transition:.16s transform,.16s box-shadow,.16s border-color;
-  text-align:right;
-}
-.dash-card:hover{
-  transform:translateY(-2px);
-  box-shadow:0 14px 34px rgba(15,23,42,.1);
-  border-color:#bfdbfe;
-}
-.dash-card .ico{
-  font-size:26px;
-  line-height:1;
-}
-.dash-card .ttl{
-  font-weight:800;
-  color:var(--text);
-}
-.dash-card .txt{
-  color:var(--text-dim);
-  font-size:12px;
-  line-height:1.45;
-}
-.dash-card.soon{
-  opacity:.68;
-  cursor:not-allowed;
-  background:#f8fafc;
-}
-.dashboard-kpis{
-  display:grid;
-  grid-template-columns:repeat(4,minmax(0,1fr));
-  gap:10px;
-}
-.dashboard-kpi{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:18px;
-  padding:12px;
-  box-shadow:0 8px 22px rgba(15,23,42,.05);
-}
-.dashboard-kpi .k{
-  color:var(--text-dim);
-  font-size:12px;
-}
-.dashboard-kpi .v{
-  font-size:18px;
-  font-weight:800;
-  margin-top:4px;
-}
-.dashboard-range{
-  display:flex;
-  gap:8px;
-  align-items:center;
-  justify-content:space-between;
-  flex-wrap:wrap;
-  color:var(--text-dim);
-  font-size:13px;
-}
-@media(max-width:700px){
-  header.app-header{
-    position:relative !important;
-    top:auto !important;
-  }
-  .home-dashboard{
-    margin-top:12px;
-  }
-  .dashboard-hero{
-    padding:16px;
-    border-radius:20px;
-  }
-  .dashboard-hero h1{
-    font-size:21px;
-  }
-  .dashboard-grid{
-    grid-template-columns:1fr 1fr;
-    gap:10px;
-  }
-  .dash-card{
-    min-height:118px;
-    padding:13px;
-    border-radius:18px;
-  }
-  .dash-card .ttl{
-    font-size:14px;
-  }
-  .dash-card .txt{
-    font-size:11px;
-  }
-  .dashboard-kpis{
-    grid-template-columns:1fr 1fr;
-  }
-  .dashboard-kpi .v{
-    font-size:16px;
-  }
-}
-@media(max-width:390px){
-  .dashboard-grid{
-    grid-template-columns:1fr;
-  }
-}
-
 /* --- תיקוני ייבוא הכנסות ותצוגת שדות --- */
 #importIncomeDialog{
   width:min(1120px,98vw);
@@ -707,6 +557,77 @@ header.app-header{
   #importIncomeDialog{width:98vw;max-width:98vw;}
   #importIncomeDialog table{min-width:900px;font-size:11px;}
   #importIncomeDialog input{font-size:11px;}
+}
+
+
+/* ----------------------------------------------------------
+   Phase 1 - מסך בית / Dashboard מובייל-פרסט
+---------------------------------------------------------- */
+.home-dashboard{
+  margin-bottom:18px;
+}
+.home-hero{
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:linear-gradient(135deg,#ffffff,#f4f7ff);
+  box-shadow:var(--card-shadow);
+  padding:18px;
+  margin-bottom:14px;
+}
+.home-hero h2{margin:0 0 6px;font-size:22px}
+.home-hero .hint{font-size:13px}
+.home-summary{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:14px;
+}
+.home-summary .metric{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:16px;
+  padding:12px;
+}
+.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
+.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
+.home-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.home-card{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  border-radius:20px;
+  padding:16px;
+  min-height:112px;
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
+.home-card:active{transform:translateY(0)}
+.home-card.disabled{opacity:.58;cursor:default}
+.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+.home-card .ico{font-size:26px;line-height:1}
+.home-card .title{font-weight:750;font-size:15px}
+.home-card .desc{font-size:12px;color:var(--text-dim)}
+.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
+@media(max-width:900px){
+  .home-summary{grid-template-columns:repeat(2,1fr)}
+  .home-actions{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .home-hero{padding:15px;border-radius:18px}
+  .home-hero h2{font-size:20px}
+  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
+  .home-summary .metric{padding:10px}
+  .home-summary .metric .v{font-size:16px}
+  .home-actions{grid-template-columns:1fr;gap:10px}
+  .home-card{min-height:96px;border-radius:18px;padding:14px}
 }
 
 </style>
@@ -781,10 +702,10 @@ header.app-header{
       </div>
       <div class="top-right">
         <span class="tag" id="userEmailTag">מחובר/ת</span>
-        <button class="btn secondary small" id="btnHomeTop">בית</button>
+        <button class="btn secondary small" id="btnHomeOpen">בית</button>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-                <a class="btn secondary small" id="btnVatLink" href="https://secapp.taxes.gov.il/taxes-login/login/general" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
@@ -794,86 +715,68 @@ header.app-header{
   </header>
 
   <main class="wrap" id="app">
-
-    <section id="homeDashboard" class="home-dashboard">
-      <div class="dashboard-hero">
-        <div class="dashboard-range">
-          <span id="homeRangeLabel">תקופה נבחרת</span>
-          <span>הטווח נשמר עד שתשני אותו</span>
+    <section class="home-dashboard" id="homeDashboard">
+      <div class="home-hero">
+        <h2>מה עושים היום?</h2>
+        <div class="hint">
+          מרכז עבודה מהיר לעצמאים — הזנת הוצאות, ייבוא הכנסות, דוחות, מע״מ והמשך פיתוח מודולים מתקדמים.
+          <span id="homeRangeLabel">הטווח נשמר עד שינוי ידני.</span>
         </div>
-        <h1>מה תרצי לעשות היום?</h1>
-        <p>מסך הבית מרכז את הפעולות החשובות — הזנת הוצאות, ייבוא הכנסות, דוחות, מע״מ והגדרות — בצורה נוחה יותר גם מהמובייל.</p>
-        <div class="dashboard-hero-actions">
-          <button class="btn" type="button" id="btnDashboardAdd">הוספת הוצאה</button>
-          <button class="btn secondary" type="button" id="btnDashboardImport">ייבוא הכנסות</button>
-          <button class="btn secondary" type="button" id="btnDashboardReports">דוחות</button>
-        </div>
-      </div>
-
-      <div class="dashboard-kpis">
-        <div class="dashboard-kpi">
-          <div class="k">הכנסות כולל</div>
-          <div class="v income" id="homeIncome">₪0.00</div>
-        </div>
-        <div class="dashboard-kpi">
-          <div class="k">הוצאות כולל</div>
-          <div class="v expense" id="homeExpenses">₪0.00</div>
-        </div>
-        <div class="dashboard-kpi">
-          <div class="k">מע״מ לתשלום</div>
-          <div class="v" id="homeVat">₪0.00</div>
-        </div>
-        <div class="dashboard-kpi">
-          <div class="k">רווח משוער</div>
-          <div class="v" id="homeProfit">₪0.00</div>
+        <div class="home-summary" id="homeSummaryCards">
+          <div class="metric"><div class="k">הכנסות בתקופה</div><div class="v income" id="homeIncGross">₪ 0.00</div></div>
+          <div class="metric"><div class="k">הוצאות בתקופה</div><div class="v expense" id="homeExpGross">₪ 0.00</div></div>
+          <div class="metric"><div class="k">מע״מ לתשלום</div><div class="v" id="homeVatNet">₪ 0.00</div></div>
+          <div class="metric"><div class="k">רווח משוער</div><div class="v" id="homeProfit">₪ 0.00</div></div>
         </div>
       </div>
 
-      <div class="dashboard-grid">
-        <button class="dash-card" type="button" data-dash-action="work">
-          <span class="ico">💰</span>
-          <span class="ttl">הכנסות והוצאות</span>
-          <span class="txt">הזנה ידנית של הוצאות וצפייה בתנועות.</span>
+      <div class="home-actions">
+        <button type="button" class="home-card" id="homeGoLedger">
+          <div class="ico">💰</div>
+          <div class="title">הכנסות והוצאות</div>
+          <div class="desc">הזנה ידנית של הוצאות וצפייה בתנועות.</div>
         </button>
-        <button class="dash-card" type="button" data-dash-action="import">
-          <span class="ico">📥</span>
-          <span class="ttl">ייבוא הכנסות</span>
-          <span class="txt">קליטת דוח הכנסות מ־Excel או CSV.</span>
+        <button type="button" class="home-card" id="homeGoImport">
+          <div class="ico">📥</div>
+          <div class="title">ייבוא הכנסות</div>
+          <div class="desc">קליטת דוח הכנסות מקובץ Excel או CSV.</div>
         </button>
-        <button class="dash-card" type="button" data-dash-action="reports">
-          <span class="ico">📊</span>
-          <span class="ttl">דוחות</span>
-          <span class="txt">דוחות הכנסות, הוצאות, רווח והפסד ומע״מ.</span>
+        <button type="button" class="home-card" id="homeGoReports">
+          <div class="ico">📊</div>
+          <div class="title">דוחות</div>
+          <div class="desc">דוחות הכנסות, הוצאות, רווח והפסד ומע״מ.</div>
         </button>
-        <button class="dash-card" type="button" data-dash-action="vat">
-          <span class="ico">🧾</span>
-          <span class="ttl">דיווח מע״מ</span>
-          <span class="txt">מעבר לאתר רשות המסים לדיווח.</span>
+        <button type="button" class="home-card" id="homeGoVat">
+          <div class="ico">🧾</div>
+          <div class="title">דיווח מע״מ</div>
+          <div class="desc">מעבר לעמוד הדיווח באתר רשות המסים.</div>
         </button>
-        <button class="dash-card" type="button" data-dash-action="categories">
-          <span class="ico">🏷️</span>
-          <span class="ttl">טבלת קטגוריות</span>
-          <span class="txt">בדיקת הכרה למס ומע״מ לפי סוג הוצאה.</span>
+        <button type="button" class="home-card" id="homeGoCategories">
+          <div class="ico">🏷️</div>
+          <div class="title">טבלת קטגוריות</div>
+          <div class="desc">בדיקת הכרה למס והאם הוצאה מוכרת למע״מ.</div>
         </button>
-        <button class="dash-card" type="button" data-dash-action="profile">
-          <span class="ico">⚙️</span>
-          <span class="ttl">פרופיל עסק</span>
-          <span class="txt">פרטי העסק, סוג עוסק ואחוז מע״מ.</span>
+        <button type="button" class="home-card" id="homeGoProfile">
+          <div class="ico">⚙️</div>
+          <div class="title">פרופיל עסק</div>
+          <div class="desc">פרטי העסק, סוג עוסק ואחוז מע״מ.</div>
         </button>
-        <button class="dash-card soon" type="button" data-dash-action="year-end" title="בקרוב">
-          <span class="ico">📉</span>
-          <span class="ttl">סגירת שנה</span>
-          <span class="txt">מודול פחת, התאמות וסימולטור מס — בקרוב.</span>
+        <button type="button" class="home-card disabled" id="homeGoYearEnd" disabled>
+          <div class="ico">📉</div>
+          <div class="title">סגירת שנה</div>
+          <div class="desc">פחת, התאמות וסימולטור מס.</div>
+          <span class="soon">בקרוב</span>
         </button>
-        <button class="dash-card soon" type="button" data-dash-action="documents" title="בקרוב">
-          <span class="ico">📄</span>
-          <span class="ttl">מסמכים</span>
-          <span class="txt">הפקת מסמכים חשבונאיים — מתוכנן להמשך.</span>
+        <button type="button" class="home-card disabled" id="homeGoDocs" disabled>
+          <div class="ico">📄</div>
+          <div class="title">מסמכים</div>
+          <div class="desc">הפקת מסמכים חשבונאיים וחיבור עתידי לחשבוניות ישראל.</div>
+          <span class="soon">בקרוב</span>
         </button>
       </div>
     </section>
 
-    <div class="grid-main" id="workArea">
+    <div class="grid-main">
       <!-- צד ימין: תנועות חדשות -->
       <section class="card">
         <div class="hd">
@@ -906,7 +809,7 @@ header.app-header{
             <div style="flex:2 1 210px">
               <label>קטגוריה</label>
               <select id="fCategory">
-                <option value="">בחר/י קטגוריה</option>
+                <option value="">בחירת קטגוריה</option>
               </select>
             </div>
 
@@ -921,6 +824,12 @@ header.app-header{
             <div class="pill" title="אחוז מס תשומות בהוצאה">
               <label for="fDeduct">ניכוי מע"מ %</label>
               <input type="number" id="fDeduct" min="0" max="100" step="1" value="100" style="width:80px" />
+            </div>
+            <div style="flex:2 1 240px" id="receiptUploadBox">
+              <label>חשבונית / קבלה (אופציונלי)</label>
+              <input type="file" id="fReceiptFile" accept="image/*,.pdf" />
+              <div class="hint">הקובץ יישמר ב־Google Drive של המשתמש בתיקייה חודשית. בתמונה המערכת תנסה לקרוא סכום/תאריך/ספק אוטומטית.</div>
+              <div class="hint" id="receiptOcrStatus"></div>
             </div>
 <button type="button" class="btn" id="btnAdd">הוספה</button>
           </form>
@@ -1002,6 +911,7 @@ header.app-header{
                 <th>סכום נטו</th>
                 <th>מע"מ</th>
                 <th>סכום כולל</th>
+                <th>חשבונית</th>
                 <th></th>
               </tr>
             </thead>
@@ -1031,7 +941,7 @@ header.app-header{
           </select>
         </div>
         <div><label>תיאור</label><input type="text" id="eDesc" /></div>
-        <div><label>קטגוריה</label><select id="eCategory"><option value="">בחר/י קטגוריה</option></select></div>
+        <div><label>קטגוריה</label><select id="eCategory"><option value="">בחירת קטגוריה</option></select></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -1040,6 +950,10 @@ header.app-header{
         <div class="pill" style="align-self:end">
           <label for="eDeduct">ניכוי מע"מ %</label>
           <input type="number" id="eDeduct" min="0" max="100" step="1" value="100" style="width:80px" />
+        </div>
+        <div style="grid-column:1 / -1">
+          <label>חשבונית שמורה</label>
+          <div id="eReceiptPreview" class="hint">אין חשבונית מצורפת</div>
         </div>
       </div>
       <div class="footer" style="margin-top:14px">
@@ -1227,9 +1141,9 @@ header.app-header{
   <div class="dlg-bd">
     <div class="grid2">
       <div style="grid-column:1 / -1">
-        <label>בחרי קובץ</label>
+        <label>בחירת קובץ</label>
         <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
-        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסכום כולל. אם אין סה״כ, היא תנסה לזהות גם חובה/זכות. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
       </div>
     </div>
     <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
@@ -1248,6 +1162,54 @@ header.app-header{
         <button class="btn" type="button" id="btnImportIncomeConfirm">ייבוא לאפליקציה</button>
       </div>
       <span class="hint">אפשר לערוך לפני הייבוא. כפילויות לפי סוג מסמך + מספר מסמך ידולגו.</span>
+    </div>
+  </div>
+</dialog>
+
+
+
+<dialog id="receiptReviewDialog">
+  <div class="dlg-hd">
+    <div>בדיקת חשבונית לפני קליטה</div>
+    <button class="btn secondary small" type="button" id="btnReceiptReviewClose">סגירה</button>
+  </div>
+  <div class="dlg-bd">
+    <p class="hint" style="margin-top:0">המערכת קראה את החשבונית. בדקי ותקני לפני שההוצאה נשמרת. זה עובד כמו ייבוא ההכנסות — קודם תצוגה מקדימה, אחר כך קליטה.</p>
+    <div class="grid2">
+      <div>
+        <label>תאריך</label>
+        <input type="date" id="rrDate" />
+      </div>
+      <div>
+        <label>ספק / תיאור</label>
+        <input type="text" id="rrDesc" />
+      </div>
+      <div>
+        <label>קטגוריה</label>
+        <select id="rrCategory"><option value="">בחירת קטגוריה</option></select>
+      </div>
+      <div>
+        <label>סכום כולל (₪)</label>
+        <input type="number" step="0.01" id="rrAmount" />
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>סכומים אפשריים שנמצאו</label>
+      <div id="rrAmountCandidates" class="row" style="gap:6px;margin-top:6px"></div>
+      <div class="hint" style="margin-top:6px">אם הסכום הנכון לא מופיע, פשוט הקלידי אותו בשדה הסכום.</div>
+    </div>
+
+    <details style="margin-top:12px">
+      <summary>הצגת הטקסט שזוהה מהחשבונית</summary>
+      <pre id="rrRawText" style="white-space:pre-wrap;direction:rtl;text-align:right;max-height:220px;overflow:auto;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:8px"></pre>
+    </details>
+
+    <div class="footer" style="margin-top:12px">
+      <div class="left">
+        <button class="btn" type="button" id="btnReceiptReviewApply">אישור והעברה לטופס</button>
+      </div>
+      <span class="hint">לא נשמרת הוצאה עד שלוחצים על הוספה בטופס הראשי.</span>
     </div>
   </div>
 </dialog>
@@ -1283,6 +1245,9 @@ header.app-header{
 
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 <script type="module">
 /* ----------------------------------------------------------
    1) חיבור ל-Firebase
@@ -1323,6 +1288,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+/* ----------------------------------------------------------
+   Google Drive receipts
+   החליפי את הערך הבא ב-Client ID שקיבלת מ-Google Cloud Console.
+   בפיתוח מקומי הוסיפי גם את http://localhost:5173 או את הכתובת המקומית שלך
+   ל-Authorized JavaScript origins של אותו OAuth Client.
+---------------------------------------------------------- */
+const GOOGLE_DRIVE_CLIENT_ID = "103908453238-gdvj8utn95a9rbc2fhlj7ofntruef0ph.apps.googleusercontent.com";
+const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 /* ----------------------------------------------------------
    2) בחירת אלמנטים מה־DOM
@@ -1400,7 +1374,6 @@ const supportStatus  = document.getElementById("supportStatus");
 
 /* כפתור דוחות */
 const btnReportsOpen = document.getElementById("btnReportsOpen");
-const btnHomeTop = document.getElementById("btnHomeTop");
 const reportsDialog = document.getElementById("reportsDialog");
 const btnReportsClose = document.getElementById("btnReportsClose");
 /* כפתור מע"מ */
@@ -1488,7 +1461,7 @@ if (btnLogout) {
       authPassword.value = "";
     } catch (err) {
       console.error("Logout error:", err);
-      alert("לא ניתן היה להתנתק כרגע. נסי שוב.");
+      alert("לא ניתן היה להתנתק כרגע. יש לנסות שוב.");
     }
   });
 }
@@ -1734,7 +1707,7 @@ async function handleAuth(e) {
     } else if (err.code === 'auth/email-already-in-use') {
       authError.textContent = "כתובת האימייל הזו כבר רשומה במערכת.";
     } else if (err.code === 'auth/too-many-requests') {
-      authError.textContent = "בוצעו יותר מדי ניסיונות. נסי שוב בעוד כמה דקות.";
+      authError.textContent = "בוצעו יותר מדי ניסיונות. יש לנסות שוב בעוד כמה דקות.";
     } else {
       authError.textContent = err.message?.startsWith("נא למלא")
         ? err.message
@@ -1763,7 +1736,7 @@ btnForgotPassword?.addEventListener("click", async () => {
     setAuthInfo("שלחנו קישור לאיפוס סיסמה למייל שהוזן.");
   } catch (err) {
     console.error("password reset error", err);
-    setAuthInfo("לא הצלחנו לשלוח מייל איפוס. בדקי שהמייל נכון ונסי שוב.", "error");
+    setAuthInfo("לא הצלחנו לשלוח מייל איפוס. בדקי שהמייל נכון ויש לנסות שוב.", "error");
   }
 });
 
@@ -1778,7 +1751,7 @@ btnResendVerification?.addEventListener("click", async () => {
     setAuthInfo("שלחנו שוב מייל אימות. אחרי האישור אפשר להתחבר ולהמשיך.");
   } catch (err) {
     console.error("resend verification error", err);
-    setAuthInfo("לא הצלחנו לשלוח שוב את מייל האימות כרגע. נסי שוב בעוד רגע.", "error");
+    setAuthInfo("לא הצלחנו לשלוח שוב את מייל האימות כרגע. יש לנסות שוב בעוד רגע.", "error");
   }
 });
 
@@ -1894,6 +1867,21 @@ const fDesc      = document.getElementById("fDesc");
 const fAmount    = document.getElementById("fAmount");
 const fIncVAT    = document.getElementById("fIncVAT");
 const fDeduct    = document.getElementById("fDeduct");
+const fReceiptFile = document.getElementById("fReceiptFile");
+const receiptOcrStatus = document.getElementById("receiptOcrStatus");
+let lastReceiptOcr = null;
+
+/* דיאלוג בדיקת חשבונית לפני קליטה */
+const receiptReviewDialog = document.getElementById("receiptReviewDialog");
+const btnReceiptReviewClose = document.getElementById("btnReceiptReviewClose");
+const btnReceiptReviewApply = document.getElementById("btnReceiptReviewApply");
+const rrDate = document.getElementById("rrDate");
+const rrDesc = document.getElementById("rrDesc");
+const rrCategory = document.getElementById("rrCategory");
+const rrAmount = document.getElementById("rrAmount");
+const rrAmountCandidates = document.getElementById("rrAmountCandidates");
+const rrRawText = document.getElementById("rrRawText");
+
 const btnAdd     = document.getElementById("btnAdd");
 const btnQuickToday = document.getElementById("btnQuickToday");
 
@@ -1911,6 +1899,21 @@ const tbody      = document.getElementById("tbody");
 const rowsCount  = document.getElementById("rowsCount");
 const periodLabel= document.getElementById("periodLabel");
 
+/* מסך בית */
+const btnHomeOpen = document.getElementById("btnHomeOpen");
+const homeDashboard = document.getElementById("homeDashboard");
+const homeRangeLabel = document.getElementById("homeRangeLabel");
+const homeIncGross = document.getElementById("homeIncGross");
+const homeExpGross = document.getElementById("homeExpGross");
+const homeVatNet = document.getElementById("homeVatNet");
+const homeProfit = document.getElementById("homeProfit");
+const homeGoLedger = document.getElementById("homeGoLedger");
+const homeGoImport = document.getElementById("homeGoImport");
+const homeGoReports = document.getElementById("homeGoReports");
+const homeGoVat = document.getElementById("homeGoVat");
+const homeGoCategories = document.getElementById("homeGoCategories");
+const homeGoProfile = document.getElementById("homeGoProfile");
+
 /* כפתורי יצוא וגיבוי */
 const btnExportCSV   = document.getElementById("btnExportCSV");
 const btnExportJSON  = document.getElementById("btnExportJSON");
@@ -1926,18 +1929,6 @@ const importIncomeStatus = document.getElementById("importIncomeStatus");
 const importIncomePreviewBody = document.getElementById("importIncomePreviewBody");
 const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
 
-/* מסך בית / Dashboard */
-const homeDashboard = document.getElementById("homeDashboard");
-const workArea = document.getElementById("workArea");
-const btnDashboardAdd = document.getElementById("btnDashboardAdd");
-const btnDashboardImport = document.getElementById("btnDashboardImport");
-const btnDashboardReports = document.getElementById("btnDashboardReports");
-const homeRangeLabel = document.getElementById("homeRangeLabel");
-const homeIncome = document.getElementById("homeIncome");
-const homeExpenses = document.getElementById("homeExpenses");
-const homeVat = document.getElementById("homeVat");
-const homeProfit = document.getElementById("homeProfit");
-
 /* דיאלוג עריכה */
 const editDialog   = document.getElementById("editDialog");
 const btnEditClose = document.getElementById("btnEditClose");
@@ -1948,6 +1939,7 @@ const eDesc      = document.getElementById("eDesc");
 const eAmount    = document.getElementById("eAmount");
 const eIncVAT    = document.getElementById("eIncVAT");
 const eDeduct    = document.getElementById("eDeduct");
+const eReceiptPreview = document.getElementById("eReceiptPreview");
 const btnSaveEdit= document.getElementById("btnSaveEdit");
 const btnDelete  = document.getElementById("btnDelete");
 
@@ -2109,7 +2101,7 @@ ${msg}
     supportModal?.classList.remove("open");
   } catch (err) {
     console.error("Support send failed:", err);
-    alert("לא הצלחנו לשלוח כרגע. נסי שוב בעוד רגע.");
+    alert("לא הצלחנו לשלוח כרגע. יש לנסות שוב בעוד רגע.");
   }
 });
 /* ----------------------------------------------------------
@@ -2198,108 +2190,9 @@ function renderCategoriesTable() {
 const itemsList = document.getElementById("itemsList");
 
 function renderItemsDatalist() {
+  // שדה התיאור נשאר חופשי. הקטגוריות מופיעות רק בשדה קטגוריה.
   if (!itemsList) return;
-  const seen = new Set();
   itemsList.innerHTML = "";
-  EXPENSE_ITEMS.forEach(item => {
-    if (seen.has(item.item)) return;
-    seen.add(item.item);
-    const opt = document.createElement("option");
-    opt.value = item.item;
-    itemsList.appendChild(opt);
-  });
-}
-
-function normalizeExpenseText(value = "") {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/["'׳״]/g, "")
-    .replace(/\s+/g, " ");
-}
-
-function getExpenseMeta(row) {
-  if (!row) return null;
-  const categoryKey = normalizeExpenseText(row.category || "");
-  const descKey = normalizeExpenseText(row.desc || "");
-
-  let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
-  if (match) return match;
-
-  match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.category) === categoryKey);
-  if (match) return match;
-
-  match = EXPENSE_ITEMS.find(item => categoryKey && categoryKey.includes(normalizeExpenseText(item.item)));
-  if (match) return match;
-
-  match = EXPENSE_ITEMS.find(item => descKey && descKey.includes(normalizeExpenseText(item.item)));
-  if (match) return match;
-
-  return null;
-}
-
-function getRecognitionPctForRow(row) {
-  const meta = getExpenseMeta(row);
-  const pct = meta ? meta.incomeTaxPct : (row?.deductPct ?? 100);
-  return Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
-}
-
-function getVatDeductibleFactorForRow(row) {
-  const meta = getExpenseMeta(row);
-  if (meta) {
-    return meta.vatAllowed ? Math.max(0, Math.min(100, Number(meta.incomeTaxPct) || 0)) / 100 : 0;
-  }
-  return Math.max(0, Math.min(100, Number(row?.deductPct ?? 100) || 0)) / 100;
-}
-
-function getTaxDeductibleExpenseAmount(row, amounts) {
-  if (!row || row.type !== "expense") return 0;
-  const settings = getSettings();
-  const resolved = amounts || splitVAT(row.amount, row.incVat, settings.vatEnabled ? settings.vatRate : 0);
-  const meta = getExpenseMeta(row);
-  const pct = getRecognitionPctForRow(row);
-  const base = meta ? (meta.vatAllowed ? resolved.net : resolved.gross) : resolved.net;
-  return base * pct;
-}
-
-const EXPENSE_REPORT_COLUMN_DEFS = [
-  { key: "date", label: "תאריך" },
-  { key: "category", label: "קטגוריה" },
-  { key: "desc", label: "תיאור" },
-  { key: "vatAllowed", label: "מוכר למע״מ" },
-  { key: "recognition", label: "אחוז הכרה למס" },
-  { key: "net", label: "סכום ללא מע״מ" },
-  { key: "vat", label: "מע״מ" },
-  { key: "gross", label: "סכום כולל" }
-];
-
-function getSelectedExpenseReportColumns() {
-  const selected = expenseReportCols()
-    .filter(cb => cb.checked)
-    .map(cb => cb.value);
-  if (selected.length) return selected;
-  return ["date", "category", "desc", "vatAllowed", "recognition", "net", "vat", "gross"];
-}
-
-function buildExpenseRowsForReport(from, to) {
-  const list = filterByDateAndType("expense", from, to);
-  const { rows: withAmounts, totals } = addVatInfo(list);
-  const formattedRows = withAmounts.map(r => {
-    const meta = getExpenseMeta(r);
-    return {
-      ...r,
-      vatAllowed: meta ? (meta.vatAllowed ? "כן" : "לא") : "-",
-      recognition: meta && typeof meta.incomeTaxPct === "number" ? `${meta.incomeTaxPct}%` : "-"
-    };
-  });
-  return { rows: formattedRows, totals };
-}
-
-function valueForExpenseReportCell(row, colKey, formatMoney = false) {
-  if (["net", "vat", "gross"].includes(colKey)) {
-    return formatMoney ? toMoney(row[colKey] || 0) : (row[colKey] || 0);
-  }
-  return row[colKey] ?? "";
 }
 
 /* ----------------------------------------------------------
@@ -2681,25 +2574,32 @@ function uniqueCategories() {
   return Array.from(s).sort((a, b) => a.localeCompare(b, "he"));
 }
 
-function updateFiltersUI() {
+function fillExpenseCategorySelect(selectEl) {
+  if (!selectEl) return;
+  const current = selectEl.value || "";
   const fullExpenseList = Array.from(new Set(EXPENSE_ITEMS.map(i => i.item).filter(Boolean)))
     .sort((a,b)=>a.localeCompare(b,"he"));
 
-  const fCatEl = document.getElementById("fCategory");
-  const eCatEl = document.getElementById("eCategory");
-  const selectedNew = fCatEl?.value || "";
-  const selectedEdit = eCatEl?.value || "";
+  selectEl.innerHTML = `<option value="">בחירת קטגוריה</option>` +
+    fullExpenseList.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
 
-  if (fCatEl) {
-    fCatEl.innerHTML = `<option value="">בחר/י קטגוריה</option>` +
-      fullExpenseList.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-    if (selectedNew) fCatEl.value = selectedNew;
+  if (current && !fullExpenseList.includes(current)) {
+    const opt = document.createElement("option");
+    opt.value = current;
+    opt.textContent = current;
+    selectEl.appendChild(opt);
   }
-  if (eCatEl) {
-    eCatEl.innerHTML = `<option value="">בחר/י קטגוריה</option>` +
-      fullExpenseList.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-    if (selectedEdit) eCatEl.value = selectedEdit;
-  }
+  selectEl.value = current;
+}
+
+function updateFiltersUI() {
+  // שדות קטגוריה בטפסים — רשימת הפריטים המלאה מטבלת הקטגוריות
+  fillExpenseCategorySelect(fCategory);
+  fillExpenseCategorySelect(eCategory);
+  fillExpenseCategorySelect(rrCategory);
+
+  // שדה תיאור נשאר חופשי בלבד; אין בו קטגוריות.
+  if (itemsList) itemsList.innerHTML = "";
 
   const current = qCategory.value;
   qCategory.innerHTML = `<option value="">כל הקטגוריות</option>` +
@@ -2707,6 +2607,73 @@ function updateFiltersUI() {
       `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
     ).join("");
   if (current) qCategory.value = current;
+}
+
+
+function rangeStorageKey() {
+  return currentUid ? `azmai_range_${currentUid}` : "azmai_range";
+}
+
+function getRangeState() {
+  return {
+    month: qMonth?.value || monthFromDateStr(todayStr()),
+    period: qPeriod?.value || "1"
+  };
+}
+
+function saveRangeState() {
+  try {
+    if (!qMonth || !qPeriod) return;
+    localStorage.setItem(rangeStorageKey(), JSON.stringify(getRangeState()));
+  } catch (e) {
+    console.warn("range save failed", e);
+  }
+}
+
+function loadRangeState() {
+  try {
+    const raw = localStorage.getItem(rangeStorageKey());
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (state?.month && qMonth) qMonth.value = state.month;
+    if (state?.period && qPeriod) qPeriod.value = String(state.period);
+    return true;
+  } catch (e) {
+    console.warn("range load failed", e);
+    return false;
+  }
+}
+
+function getCurrentDateRangeLabel() {
+  const month = qMonth?.value || monthFromDateStr(todayStr());
+  const period = qPeriod?.value || "1";
+  if (!month || period === "0") return "טווח נוכחי: כל התקופות";
+  const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+  const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
+  return monthsBack === 1
+    ? `טווח נוכחי: ${month.slice(5,7)}/${month.slice(0,4)}`
+    : `טווח נוכחי: ${startStr} עד ${endStr}`;
+}
+
+function renderHomeDashboard(sum) {
+  if (!homeDashboard) return;
+  const effectiveSum = sum || summarize(queryRows());
+  if (homeIncGross) homeIncGross.textContent = toMoney(effectiveSum.incGross);
+  if (homeExpGross) homeExpGross.textContent = toMoney(effectiveSum.expGross);
+  if (homeVatNet) {
+    homeVatNet.textContent = toMoney(effectiveSum.vatNet);
+    homeVatNet.style.color = effectiveSum.vatNet >= 0 ? 'var(--warning)' : 'var(--accent-2)';
+  }
+  if (homeProfit) {
+    const profit = effectiveSum.incNet - effectiveSum.expTaxDeductible;
+    homeProfit.textContent = toMoney(profit);
+    homeProfit.style.color = profit >= 0 ? 'var(--good)' : 'var(--bad)';
+  }
+  if (homeRangeLabel) homeRangeLabel.textContent = `${getCurrentDateRangeLabel()} — הטווח נשמר עד שינוי ידני.`;
+}
+
+function scrollToMainWorkArea() {
+  document.querySelector(".grid-main")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function queryRows() {
@@ -2740,97 +2707,6 @@ function queryRows() {
   return out;
 }
 
-
-function uiRangeKey(uid){
-  return `uiRangeV1_${uid}`;
-}
-
-function saveRangePrefs(){
-  if (!currentUid || !qMonth || !qPeriod) return;
-  try {
-    localStorage.setItem(uiRangeKey(currentUid), JSON.stringify({
-      month: qMonth.value || "",
-      period: qPeriod.value || "1"
-    }));
-  } catch (e) {
-    console.warn("range prefs save failed", e);
-  }
-}
-
-function restoreRangePrefs(){
-  if (!currentUid || !qMonth || !qPeriod) return;
-  try {
-    const raw = localStorage.getItem(uiRangeKey(currentUid));
-    if (!raw) return;
-    const obj = JSON.parse(raw);
-    if (obj?.month) qMonth.value = obj.month;
-    if (obj?.period) qPeriod.value = obj.period;
-  } catch (e) {
-    console.warn("range prefs load failed", e);
-  }
-}
-
-function currentRangeLabel(){
-  const m = qMonth?.value || monthFromDateStr(todayStr());
-  const period = qPeriod ? qPeriod.value : "1";
-  if (period === "0") return "תקופה: כל התקופות";
-  const [y, mm] = String(m || "").split("-");
-  if (!y || !mm) return "תקופה נבחרת";
-  const monthsBack = Math.max(1, parseInt(period, 10) || 1);
-  if (monthsBack === 1) return `חודש: ${mm}/${y}`;
-  const { startStr, endStr } = monthStartEndFrom(m, monthsBack);
-  return `תקופה: ${startStr} עד ${endStr}`;
-}
-
-function updateDashboardSummary(sum){
-  if (!homeDashboard) return;
-  if (homeIncome) homeIncome.textContent = toMoney(sum.incGross || 0);
-  if (homeExpenses) homeExpenses.textContent = toMoney(sum.expGross || 0);
-  if (homeVat) {
-    homeVat.textContent = toMoney(sum.vatNet || 0);
-    homeVat.style.color = (sum.vatNet || 0) >= 0 ? "var(--warning)" : "var(--accent-2)";
-  }
-  if (homeProfit) {
-    homeProfit.textContent = toMoney(sum.incNet - sum.expNet || 0);
-    homeProfit.style.color = (sum.incNet - sum.expNet || 0) >= 0 ? "var(--income)" : "var(--expense)";
-  }
-  if (homeRangeLabel) homeRangeLabel.textContent = currentRangeLabel();
-}
-
-function scrollToWorkArea(){
-  workArea?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function handleDashboardAction(action){
-  if (action === "work") {
-    scrollToWorkArea();
-    return;
-  }
-  if (action === "import") {
-    openIncomeImportDialog();
-    return;
-  }
-  if (action === "reports") {
-    reportsDialog?.showModal();
-    return;
-  }
-  if (action === "vat") {
-    window.open("https://secapp.taxes.gov.il/taxes-login/login/general", "_blank", "noopener");
-    return;
-  }
-  if (action === "categories") {
-    renderCategoriesTable();
-    categoriesDialog?.showModal();
-    return;
-  }
-  if (action === "profile") {
-    profileDialog?.showModal();
-    return;
-  }
-  showToast("המודול הזה יתווסף בהמשך");
-}
-
-
 function summarize(list) {
   const { vatEnabled, vatRate } = getSettings();
   let incGross = 0, expGross = 0, incVat = 0, expVat = 0, incNet = 0, expNet = 0, expTaxDeductible = 0;
@@ -2863,6 +2739,8 @@ function render() {
   updateFiltersUI();
   const list = queryRows();
   const sum  = summarize(list);
+  saveRangeState();
+  renderHomeDashboard(sum);
   const { vatEnabled, vatRate } = getSettings();
 
   tbody.innerHTML = list.map(r => {
@@ -2882,6 +2760,7 @@ function render() {
         <td class="money">${toMoney(net)}</td>
         <td class="money">${toMoney(vatDisplay)}</td>
         <td class="money">${toMoney(gross)}</td>
+        <td>${r.receiptUrl ? `<a class="btn secondary small" href="${escapeHtml(r.receiptUrl)}" target="_blank" rel="noopener">צפייה</a>` : `<span class="muted">—</span>`}</td>
         <td><button class="btn secondary small" data-act="edit">עריכה</button></td>
       </tr>
     `;
@@ -2919,16 +2798,570 @@ function render() {
 
   const m = qMonth.value || monthFromDateStr(todayStr());
   if (m) {
-    periodLabel.textContent = currentRangeLabel();
+    const [y, mm] = m.split("-");
+    const period = qPeriod ? qPeriod.value : "1";
+    if (period === "0") {
+      periodLabel.textContent = "תקופה: כל התקופות";
+    } else {
+      const monthsBack = Math.max(1, parseInt(period, 10) || 1);
+      const { startStr, endStr } = monthStartEndFrom(m, monthsBack);
+      periodLabel.textContent = monthsBack === 1
+        ? `חודש: ${mm}/${y}`
+        : `תקופה: ${startStr} עד ${endStr}`;
+    }
   }
-  updateDashboardSummary(sum);
 }
+
+
+/* ----------------------------------------------------------
+   12.5) Google Drive - שמירת חשבוניות בדרייב של המשתמש
+---------------------------------------------------------- */
+let driveTokenClient = null;
+let driveAccessToken = null;
+let driveTokenExpiresAt = 0;
+
+function ensureGoogleDriveConfigured() {
+  if (!GOOGLE_DRIVE_CLIENT_ID || GOOGLE_DRIVE_CLIENT_ID.includes("PASTE_YOUR")) {
+    throw new Error("חסר Google Drive Client ID. יש להגדיר את GOOGLE_DRIVE_CLIENT_ID בקוד.");
+  }
+}
+
+function getDriveTokenClient() {
+  ensureGoogleDriveConfigured();
+  if (!window.google?.accounts?.oauth2) {
+    throw new Error("Google Identity Services עדיין לא נטען. יש לנסות שוב בעוד רגע.");
+  }
+  if (!driveTokenClient) {
+    driveTokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_DRIVE_CLIENT_ID,
+      scope: GOOGLE_DRIVE_SCOPE,
+      prompt: "consent",
+      callback: () => {}
+    });
+  }
+  return driveTokenClient;
+}
+
+function requestDriveAccessToken() {
+  const now = Date.now();
+  if (driveAccessToken && now < driveTokenExpiresAt - 60000) {
+    return Promise.resolve(driveAccessToken);
+  }
+  return new Promise((resolve, reject) => {
+    try {
+      const tokenClient = getDriveTokenClient();
+      tokenClient.callback = (resp) => {
+        if (resp?.error) {
+          reject(new Error(resp.error_description || resp.error));
+          return;
+        }
+        driveAccessToken = resp.access_token;
+        const expiresInMs = Number(resp.expires_in || 3600) * 1000;
+        driveTokenExpiresAt = Date.now() + expiresInMs;
+        resolve(driveAccessToken);
+      };
+      tokenClient.requestAccessToken({ prompt: driveAccessToken ? "" : "consent" });
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function driveFetch(path, options = {}) {
+  const token = await requestDriveAccessToken();
+  const res = await fetch(`https://www.googleapis.com/drive/v3/${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options.headers || {})
+    }
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`שגיאת Google Drive (${res.status}): ${text || res.statusText}`);
+  }
+  return res.json();
+}
+
+function driveEscapeQueryValue(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+async function findDriveFolder(name, parentId = "root") {
+  const q = [
+    `name='${driveEscapeQueryValue(name)}'`,
+    "mimeType='application/vnd.google-apps.folder'",
+    "trashed=false",
+    `'${driveEscapeQueryValue(parentId)}' in parents`
+  ].join(" and ");
+  const data = await driveFetch(`files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=10`);
+  return data.files?.[0] || null;
+}
+
+async function createDriveFolder(name, parentId = "root") {
+  const metadata = {
+    name,
+    mimeType: "application/vnd.google-apps.folder",
+    parents: [parentId]
+  };
+  return driveFetch("files?fields=id,name,webViewLink", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(metadata)
+  });
+}
+
+async function getOrCreateDriveFolder(name, parentId = "root") {
+  const existing = await findDriveFolder(name, parentId);
+  if (existing) return existing;
+  return createDriveFolder(name, parentId);
+}
+
+function safeFilePart(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|#%{}~&]/g, "-")
+    .replace(/\s+/g, " ")
+    .slice(0, 80) || "חשבונית";
+}
+
+async function ensureReceiptMonthFolder(dateStr) {
+  const month = (dateStr || todayStr()).slice(0, 7);
+  const rootFolder = await getOrCreateDriveFolder("עצמאי פלוס");
+  const expensesFolder = await getOrCreateDriveFolder("הוצאות", rootFolder.id);
+  return getOrCreateDriveFolder(month, expensesFolder.id);
+}
+
+async function uploadReceiptToDrive(file, rowDraft) {
+  if (!file) return null;
+  const folder = await ensureReceiptMonthFolder(rowDraft.date);
+  const ext = file.name && file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
+  const fileName = `${rowDraft.date}_${safeFilePart(rowDraft.desc)}_${safeFilePart(rowDraft.amount)}${ext}`;
+  const metadata = {
+    name: fileName,
+    mimeType: file.type || "application/octet-stream",
+    parents: [folder.id]
+  };
+  const form = new FormData();
+  form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+  form.append("file", file);
+
+  const token = await requestDriveAccessToken();
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,md5Checksum,size", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`העלאת החשבונית ל-Drive נכשלה (${res.status}): ${text || res.statusText}`);
+  }
+  const uploaded = await res.json();
+  return {
+    receiptFileId: uploaded.id,
+    receiptFileName: uploaded.name,
+    receiptUrl: uploaded.webViewLink || uploaded.webContentLink || "",
+    receiptSize: uploaded.size || file.size || null,
+    receiptMd5: uploaded.md5Checksum || "",
+    receiptUploadedAt: new Date().toISOString(),
+    receiptStorage: "google-drive"
+  };
+}
+
+function buildReceiptDuplicateKey(row) {
+  return [
+    row.type || "",
+    row.date || "",
+    String(row.amount || ""),
+    (row.desc || "").trim().toLowerCase(),
+    row.receiptMd5 || row.receiptFileName || ""
+  ].join("|");
+}
+
+function hasPossibleDuplicateReceipt(row) {
+  const key = buildReceiptDuplicateKey(row);
+  return rows.some(existing => buildReceiptDuplicateKey(existing) === key);
+}
+
+
+/* ----------------------------------------------------------
+   OCR ניסיוני לחשבוניות - חינמי, רץ בדפדפן בלבד
+---------------------------------------------------------- */
+function parseHebrewNumber(raw) {
+  if (!raw) return NaN;
+  let s = String(raw)
+    .replace(/[₪\s]/g, '')
+    .replace(/[Oo]/g, '0')
+    .replace(/[Il]/g, '1')
+    .trim();
+  const hasComma = s.includes(',');
+  const hasDot = s.includes('.');
+  if (hasComma && hasDot) {
+    // 1,234.56 או 1.234,56
+    if (s.lastIndexOf('.') > s.lastIndexOf(',')) s = s.replace(/,/g, '');
+    else s = s.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma && !hasDot) {
+    s = s.replace(',', '.');
+  }
+  const n = parseFloat(s.replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+}
+
+function normalizeReceiptDate(raw) {
+  if (!raw) return '';
+  const m = String(raw).match(/(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})/);
+  if (!m) return '';
+  let [, d, mo, y] = m;
+  if (y.length === 2) y = '20' + y;
+  d = d.padStart(2, '0');
+  mo = mo.padStart(2, '0');
+  return `${y}-${mo}-${d}`;
+}
+
+function guessCategoryFromText(text) {
+  const t = (text || '').toLowerCase();
+  if (/דלק|פז|סונול|דלקן|כביש|חניה|רכב|מוסך|איתוראן/.test(t)) return 'רכב';
+  if (/canva|זום|zoom|google|microsoft|adobe|רב מסר|חשבונית ירוקה|תוכנה|אתר|דומיין|אחסון/.test(t)) return 'תוכנה ושירותים';
+  if (/קפה|מסעד|כיבוד|מאפה|מזון|ארומה/.test(t)) return 'כיבוד קל';
+  if (/ציוד|אופיס|office|דיו|מדפסת|מחשב|מקלדת/.test(t)) return 'ציוד משרדי';
+  if (/פרסום|facebook|meta|instagram|google ads|קידום/.test(t)) return 'פרסום ושיווק';
+  return 'כללי';
+}
+
+function hasDecimalMark(raw) {
+  return /[,.]/.test(String(raw || ''));
+}
+
+function looksLikeCentsWithoutDecimal(raw, line) {
+  const digits = String(raw || '').replace(/\D/g, '');
+  if (digits.length < 3 || digits.length > 6) return false;
+  // חשבוניות ישראליות רבות ב-OCR מאבדות נקודה: 11.68 נקרא כ-1168.
+  // ניצור מועמד באגורות רק כשיש סביבו רמז שזה סכום כספי.
+  const moneyContext = /₪|שח|ש"ח|nis|ils|סה\s*["'״׳]?כ|סהכ|לתשלום|סכום|כולל|total|amount|שולם|חיוב/i.test(line || '');
+  return moneyContext;
+}
+
+function extractReceiptFieldsFromText(text, fileName='') {
+  const cleaned = (text || '')
+    .replace(/\r/g, '\n')
+    .replace(/[|]/g, ' ')
+    .replace(/[־–—]/g, '-')
+    .replace(/\u200f|\u200e/g, '')
+    .replace(/[·•]/g, ' ');
+  const lines = cleaned.split('\n').map(x => x.trim()).filter(Boolean);
+  const joined = lines.join('\n');
+
+  const dateMatches = [...joined.matchAll(/\b(\d{1,2})[\.\/-](\d{1,2})[\.\/-](\d{2,4})\b/g)].map(m => m[0]);
+  const date = normalizeReceiptDate(dateMatches[0] || '');
+
+  const totalWords = /סה\s*["'״׳]?כ|סהכ|לתשלום|לתשלם|סכום\s*כולל|כולל\s*מע["׳']?מ|total|grand\s*total|amount\s*due|balance\s*due|שולם|לחיוב|לתשלום\s*בפועל/i;
+  const moneyWords = /₪|שח|ש"ח|nis|ils|מחיר|סכום|חיוב|תשלום|לתשלום|כולל|סה\s*["'״׳]?כ|סהכ|total|amount/i;
+  const vatWords = /מע["׳']?מ|vat|tax/i;
+  const subtotalWords = /לפני\s*מע["׳']?מ|ללא\s*מע["׳']?מ|סכום\s*לפני|subtotal|sub\s*total|net/i;
+  const rejectLine = /ח\.פ|עוסק|טלפון|טל׳|phone|invoice\s*no|מספר\s*חשבונית|חשבונית\s*מספר|מספר\s*מסמך|מיקוד|zip|עמוד|אישור|אסמכתא/i;
+
+  const candidates = [];
+
+  function contextAround(idx) {
+    return [lines[idx-2], lines[idx-1], lines[idx], lines[idx+1], lines[idx+2]].filter(Boolean).join(' | ');
+  }
+
+  function classifyLine(line, ctx) {
+    const lineHasTotal = totalWords.test(line);
+    const ctxHasTotal = totalWords.test(ctx);
+    const lineHasVat = vatWords.test(line);
+    const ctxHasVat = vatWords.test(ctx);
+    const lineHasSubtotal = subtotalWords.test(line);
+    return { lineHasTotal, ctxHasTotal, lineHasVat, ctxHasVat, lineHasSubtotal };
+  }
+
+  function pushCandidate(raw, line, idx, opts={}) {
+    const n = opts.forceValue ?? parseHebrewNumber(raw);
+    if (!Number.isFinite(n) || n <= 0 || n > 500000) return;
+    if (n >= 1900 && n <= 2100) return;
+    if (n <= 0.5) return;
+
+    const rawStr = String(raw || '').trim();
+    const digitsOnly = rawStr.replace(/\D/g,'');
+    const ctx = contextAround(idx);
+    const cls = classifyLine(line, ctx);
+
+    if (/^\d{1,2}$/.test(rawStr) && !moneyWords.test(ctx) && !totalWords.test(ctx)) return;
+    if (/\d{1,2}[\.\/-]\d{1,2}[\.\/-]\d{2,4}/.test(line)) return;
+    if (rejectLine.test(line) && !cls.lineHasTotal && !moneyWords.test(line)) return;
+
+    let score = 0;
+
+    // מילים ליד המספר חשובות יותר ממילים רחוקות.
+    if (cls.lineHasTotal) score += 1200000;
+    else if (cls.ctxHasTotal) score += 520000;
+    if (moneyWords.test(line)) score += 220000;
+    else if (moneyWords.test(ctx)) score += 85000;
+    if (/₪|שח|ש"ח|nis|ils/i.test(line)) score += 160000;
+
+    // מע״מ כמעט תמיד אינו הסכום לתשלום. לא מוחקים אותו, אבל מורידים לו ניקוד.
+    if (cls.lineHasVat && !cls.lineHasTotal) score -= 520000;
+    else if (cls.ctxHasVat && !cls.ctxHasTotal) score -= 90000;
+    if (cls.lineHasSubtotal && !cls.lineHasTotal) score -= 260000;
+
+    // OCR בעברית מפיל נקודות: 1168 => 11.68. זה חשוב במיוחד בסכומים קטנים.
+    if (hasDecimalMark(rawStr)) score += 120000;
+    if (opts.centsFallback) {
+      // מועמד אגורות: 1168 => 11.68. חשוב להציג אותו גם כשה-OCR לא בטוח.
+      score += 760000;
+      if (digitsOnly.length === 4 && n >= 10 && n < 100) score += 360000;
+      if (cls.ctxHasTotal || moneyWords.test(ctx)) score += 220000;
+    }
+
+    // פסילה/החלשה של דברים שנראים כמו מזהים, טלפונים או מספרי מסמך.
+    if (!hasDecimalMark(rawStr) && !opts.centsFallback && digitsOnly.length >= 5) score -= 420000;
+    if (digitsOnly.length >= 7) score -= 650000;
+    if (/\b05\d|\b0[23489]-?\d{7}|\b\d{7,10}\b/.test(line)) score -= 450000;
+
+    // לא לתת למספר גדול לנצח רק כי הוא גדול; כן לתת יתרון קטן לסכום סביר.
+    if (n < 5 && !cls.lineHasTotal) score -= 160000;
+    if (n >= 5 && n <= 5000) score += 60000;
+    score += Math.min(n, 300);
+
+    candidates.push({ value: Math.round(n * 100) / 100, raw: rawStr, line, context: ctx, score, index: idx, centsFallback: !!opts.centsFallback, vatish: cls.lineHasVat && !cls.lineHasTotal });
+  }
+
+  lines.forEach((line, idx) => {
+    const re = /(?:₪|שח|ש"ח|NIS|ILS)?\s*(-?\d{1,3}(?:[,\.\s]\d{3})*(?:[,\.]\d{1,2})|-?\d{2,7}(?:[,\.]\d{1,2})?)\s*(?:₪|שח|ש"ח|NIS|ILS)?/gi;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      const raw = m[1];
+      pushCandidate(raw, line, idx);
+        // מקרה נפוץ מאוד: OCR מחזיר 1168 במקום 11.68.
+      // בגרסת הבדיקה נציג גם את גרסת האגורות כמועמד, ולא נעלים אותה גם אם המערכת לא בטוחה.
+      const digits = String(raw).replace(/\D/g, '');
+      const ctxMoneyish = looksLikeCentsWithoutDecimal(raw, contextAround(idx)) || moneyWords.test(contextAround(idx)) || !rejectLine.test(line);
+      if (!hasDecimalMark(raw) && digits.length >= 3 && digits.length <= 5 && ctxMoneyish) {
+        const fixed = `${digits.slice(0, -2)}.${digits.slice(-2)}`;
+        pushCandidate(fixed, line, idx, { centsFallback: true, forceValue: Number(fixed) });
+      }
+    }
+
+    // מקרה OCR נפוץ: 11 68 במקום 11.68
+    const spaced = line.match(/(\d{1,5})\s+(\d{2})(?=\s*(?:₪|שח|ש"ח)?)/);
+    if (spaced && (moneyWords.test(contextAround(idx)) || totalWords.test(contextAround(idx)))) {
+      pushCandidate(`${spaced[1]}.${spaced[2]}`, line, idx, { centsFallback: true });
+    }
+  });
+
+  // היגיון חשבונאי: אם זוהה מע״מ 1.78, סכום כולל צפוי להיות בערך 11.67/11.68 בשיעור 18%.
+  // לכן אם יש מועמד קרוב לסכום הכולל המחושב, מעלים אותו מעל סכום המע״מ.
+  const vatRates = [0.18, 0.17];
+  const vatCandidates = candidates.filter(c => c.vatish || vatWords.test(c.line));
+  for (const vat of vatCandidates) {
+    for (const rate of vatRates) {
+      const expectedTotal = Math.round((vat.value / rate) * (1 + rate) * 100) / 100;
+      for (const c of candidates) {
+        if (c === vat) continue;
+        if (Math.abs(c.value - expectedTotal) <= 0.08) {
+          c.score += 850000;
+          c.accountingHint = `נראה כסכום כולל לפי מע״מ ${vat.value}`;
+          vat.score -= 300000;
+        }
+      }
+    }
+  }
+
+  // עוד היגיון: אם יש מספר בלי נקודה וגרסת אגורות שלו קיימת, להעדיף את גרסת האגורות.
+  for (const c of candidates) {
+    if (!c.centsFallback) continue;
+    const rawWhole = String(c.raw || '').replace(/\D/g,'');
+    const whole = Number(rawWhole);
+    if (!Number.isFinite(whole)) continue;
+    for (const other of candidates) {
+      if (other === c) continue;
+      if (Math.abs(other.value - whole) < 0.001) other.score -= 500000;
+    }
+  }
+
+  const seen = new Set();
+  const uniqueCandidates = candidates
+    .sort((a,b) => b.score - a.score)
+    .filter(c => {
+      const key = c.value.toFixed(2);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 14);
+
+  const amount = uniqueCandidates[0]?.value || '';
+
+  const badSupplier = /חשבונית|קבלה|מקור|העתק|תאריך|מספר|ח\.פ|עוסק|טלפון|סה.?כ|לתשלום|total|invoice|receipt|tax|מע["׳']?מ/i;
+  let supplier = '';
+  for (const line of lines.slice(0, 18)) {
+    if (badSupplier.test(line)) continue;
+    if (line.length < 3 || line.length > 55) continue;
+    if (!/[א-תA-Za-z]/.test(line)) continue;
+    if ((line.match(/\d/g) || []).length > 6) continue;
+    supplier = line.replace(/["'`]/g, '').trim();
+    break;
+  }
+  if (!supplier) supplier = fileName.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').slice(0, 45);
+
+  return {
+    date,
+    amount,
+    desc: supplier || 'הוצאה מחשבונית',
+    category: guessCategoryFromText(joined + '\n' + fileName),
+    rawText: cleaned,
+    amountCandidates: uniqueCandidates
+  };
+}
+
+
+function renderReceiptReview(extracted) {
+  if (!extracted || !receiptReviewDialog) return;
+  rrDate.value = extracted.date || fDate.value || todayStr();
+  rrDesc.value = extracted.desc || fDesc.value || '';
+  rrCategory.value = extracted.category || fCategory.value || 'כללי';
+  rrAmount.value = extracted.amount ? String(extracted.amount) : (fAmount.value || '');
+
+  if (rrRawText) rrRawText.textContent = extracted.rawText || '';
+  if (rrAmountCandidates) {
+    rrAmountCandidates.innerHTML = '';
+    const list = extracted.amountCandidates || [];
+    if (!list.length) {
+      rrAmountCandidates.innerHTML = '<span class="hint">לא נמצאו סכומים מספיק ברורים. אפשר להקליד ידנית.</span>';
+    } else {
+      list.slice(0, 8).forEach((c) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn secondary small';
+        b.textContent = `₪ ${c.value}`;
+        b.title = c.line || '';
+        b.addEventListener('click', () => { rrAmount.value = String(c.value); });
+        rrAmountCandidates.appendChild(b);
+      });
+    }
+  }
+  receiptReviewDialog.showModal();
+}
+
+btnReceiptReviewClose?.addEventListener('click', () => receiptReviewDialog?.close());
+btnReceiptReviewApply?.addEventListener('click', () => {
+  if (rrDate?.value) fDate.value = rrDate.value;
+  if (rrDesc?.value) fDesc.value = rrDesc.value;
+  if (rrCategory?.value) fCategory.value = rrCategory.value;
+  if (rrAmount?.value) fAmount.value = rrAmount.value;
+  fType.value = 'expense';
+  receiptReviewDialog?.close();
+  if (receiptOcrStatus) receiptOcrStatus.textContent = 'הנתונים הועברו לטופס. בדקי ולחצי הוספה כדי לשמור ולהעלות ל־Drive.';
+});
+
+async function getPdfText(file, maxPages = 2) {
+  if (!window.pdfjsLib) return '';
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  const pages = Math.min(pdf.numPages || 1, maxPages);
+  const chunks = [];
+  for (let p = 1; p <= pages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const text = (content.items || []).map(item => item.str || '').join(' ');
+    if (text.trim()) chunks.push(text);
+  }
+  return chunks.join('\n');
+}
+
+async function renderPdfFirstPageToCanvas(file) {
+  if (!window.pdfjsLib) return null;
+  const buffer = await file.arrayBuffer();
+  const pdf = await window.pdfjsLib.getDocument({ data: buffer }).promise;
+  const page = await pdf.getPage(1);
+  const viewport = page.getViewport({ scale: 2.7 });
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  canvas.width = Math.floor(viewport.width);
+  canvas.height = Math.floor(viewport.height);
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas;
+}
+
+async function tryOcrReceiptFile(file, { silent=false } = {}) {
+  if (!file) return null;
+
+  const isImage = file.type.startsWith('image/');
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+
+  if (!isImage && !isPdf) {
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'כרגע אפשר לצרף תמונה או PDF בלבד.';
+    return null;
+  }
+
+  if (!window.Tesseract) {
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב הזיהוי עדיין נטען. יש לנסות שוב בעוד כמה שניות.';
+    return null;
+  }
+
+  if (isPdf && !window.pdfjsLib) {
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב קריאת PDF עדיין נטען. יש לנסות שוב בעוד כמה שניות.';
+    return null;
+  }
+
+  if (receiptOcrStatus && !silent) {
+    receiptOcrStatus.textContent = isPdf
+      ? 'קוראת PDF ומנסה לזהות נתונים... זה יכול לקחת עד דקה בפעם הראשונה.'
+      : 'מנסה לקרוא את החשבונית... זה יכול לקחת עד דקה בפעם הראשונה.';
+  }
+
+  try {
+    let rawText = '';
+
+    if (isPdf) {
+      // אם ה-PDF דיגיטלי, ננסה קודם לחלץ טקסט ישירות. זה מדויק יותר מ-OCR.
+      const pdfText = await getPdfText(file, 2);
+      if ((pdfText || '').replace(/\s/g, '').length > 20) {
+        rawText = pdfText;
+      } else {
+        // אם זה PDF סרוק/צילום, נהפוך את העמוד הראשון לתמונה ונריץ OCR.
+        const canvas = await renderPdfFirstPageToCanvas(file);
+        const result = await Tesseract.recognize(canvas, 'heb+eng');
+        rawText = result?.data?.text || '';
+      }
+    } else {
+      const result = await Tesseract.recognize(file, 'heb+eng');
+      rawText = result?.data?.text || '';
+    }
+
+    const extracted = extractReceiptFieldsFromText(rawText, file.name);
+    lastReceiptOcr = extracted;
+    if (fType) fType.value = 'expense';
+    if (receiptOcrStatus && !silent) {
+      const count = extracted.amountCandidates?.length || 0;
+      receiptOcrStatus.textContent = count
+        ? `זוהו ${count} סכומים אפשריים. נפתח חלון בדיקה לפני קליטה.`
+        : 'לא הצלחתי לבחור סכום בטוח. נפתח חלון בדיקה ואפשר להשלים ידנית.';
+      renderReceiptReview(extracted);
+    }
+    return extracted;
+  } catch (err) {
+    console.error('Receipt OCR failed:', err);
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'הזיהוי האוטומטי נכשל. אפשר להשלים ידנית והקובץ עדיין יעלה לדרייב.';
+    return null;
+  }
+}
+
+fReceiptFile?.addEventListener('change', async () => {
+  lastReceiptOcr = null;
+  const file = fReceiptFile.files?.[0];
+  if (!file) {
+    if (receiptOcrStatus) receiptOcrStatus.textContent = '';
+    return;
+  }
+  await tryOcrReceiptFile(file);
+});
 
 /* ----------------------------------------------------------
    13) הוספה / עריכה / מחיקה של תנועה
 ---------------------------------------------------------- */
 
-function addRow() {
+async function addRow() {
   try {
     const date = (fDate?.value || "").trim();
     const type = (fType?.value || "").trim();
@@ -2939,12 +3372,24 @@ function addRow() {
     const deductPct = Math.max(0, Math.min(100, parseFloat(fDeduct?.value || "100") || 100));
 
     if (!date) { showToast("חסר תאריך", true); return; }
-    if (type !== "income" && type !== "expense") { showToast("בחרי סוג (הכנסה/הוצאה)", true); return; }
+    if (type !== "income" && type !== "expense") { showToast("יש לבחור סוג (הכנסה/הוצאה)", true); return; }
 
-    const safeDesc = desc ? desc : (type === "income" ? "הכנסה" : "הוצאה");
-    const safeCategory = type === "income" ? "" : (category ? category : "כללי");
-    const amount = parseFloat(amountRaw);
-    if (!Number.isFinite(amount) || amount <= 0) { showToast("חסר סכום תקין", true); return; }
+    const receiptFileEarly = fReceiptFile?.files?.[0] || null;
+    if ((!amountRaw || parseFloat(amountRaw) <= 0) && receiptFileEarly && receiptFileEarly.type.startsWith('image/')) {
+      btnAdd.disabled = true;
+      btnAdd.textContent = "קורא חשבונית...";
+      await tryOcrReceiptFile(receiptFileEarly);
+      btnAdd.disabled = false;
+      btnAdd.textContent = "הוספה";
+    }
+
+    const finalDesc = (fDesc?.value || desc || "").trim();
+    const finalCategory = (fCategory?.value || category || "").trim();
+    const safeDesc = finalDesc ? finalDesc : (type === "income" ? "הכנסה" : "הוצאה");
+    const safeCategory = type === "income" ? "" : (finalCategory ? finalCategory : "כללי");
+    const finalAmountRaw = (fAmount?.value || amountRaw || "").toString().trim().replace(/,/g, '');
+    const amount = parseFloat(finalAmountRaw);
+    if (!Number.isFinite(amount) || amount <= 0) { showToast("חסר סכום תקין — הזיהוי לא הצליח, מלאי סכום ידנית לבדיקה", true); return; }
 
     const row = {
       id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
@@ -2959,11 +3404,37 @@ function addRow() {
       createdAt: Date.now()
     };
 
+    const receiptFile = receiptFileEarly;
+    if (receiptFile) {
+      if (type !== "expense") {
+        showToast("אפשר לצרף חשבונית רק להוצאה", true);
+        return;
+      }
+      btnAdd.disabled = true;
+      btnAdd.textContent = "מעלה חשבונית...";
+      const receiptMeta = await uploadReceiptToDrive(receiptFile, row);
+      Object.assign(row, receiptMeta);
+      if (hasPossibleDuplicateReceipt(row)) {
+        const ok = confirm("נמצאה הוצאה דומה מאוד שכבר קיימת. לשמור בכל זאת?");
+        if (!ok) {
+          btnAdd.disabled = false;
+          btnAdd.textContent = "הוספה";
+          return;
+        }
+      }
+    }
+
     rows.push(row);
     saveToLocal();
     scheduleCloudSave();
 
-    // לא משנים את טווח החודשים שבחרת — הוא נשמר עד שתשני אותו ידנית.
+    // כדי שהשורה תופיע מיד: מאפסים פילטרים ומכוונים את החודש לתאריך שנקלט
+    qPeriod.value = "1";
+    qMonth.value = date.slice(0, 7);
+    qType.value = "all";
+    qCategory.value = "";
+    qText.value = "";
+
     render();
     showToast("נשמר ✅");
 
@@ -2971,10 +3442,16 @@ function addRow() {
     if (fDesc) fDesc.value = "";
     if (fAmount) fAmount.value = "";
     if (fCategory) fCategory.value = "";
+    if (fReceiptFile) fReceiptFile.value = "";
     if (fDeduct && type === "expense") fDeduct.value = "100";
   } catch (e) {
     console.error(e);
-    showToast("שגיאה בהוספה (בדקי Console)", true);
+    showToast(e?.message || "שגיאה בהוספה (בדקי Console)", true);
+  } finally {
+    if (btnAdd) {
+      btnAdd.disabled = false;
+      btnAdd.textContent = "הוספה";
+    }
   }
 }
 
@@ -2992,6 +3469,11 @@ function openEdit(id) {
   eAmount.value = r.amount;
   eIncVAT.checked = !!r.incVat;
   eDeduct.value = r.deductPct ?? 100;
+  if (eReceiptPreview) {
+    eReceiptPreview.innerHTML = r.receiptUrl
+      ? `<a href="${escapeHtml(r.receiptUrl)}" target="_blank" rel="noopener">${escapeHtml(r.receiptFileName || "צפייה בחשבונית")}</a>`
+      : "אין חשבונית מצורפת";
+  }
 
   editDialog.showModal();
 }
@@ -3032,12 +3514,14 @@ function normalizeImportHeader(h = "") {
 function detectImportColumns(headers = []) {
   const normalized = headers.map(raw => {
     const clean = String(raw || '').replace(/^\ufeff/, '').trim();
-    return {
-      raw,
-      clean,
-      norm: clean.replace(/["׳״”“']/g, '').replace(/\s+/g, ' ').trim()
-    };
+    const norm = clean
+      .replace(/["׳״”“']/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    return { raw, clean, norm };
   });
+
   const findByPriority = (...predicates) => {
     for (const predicate of predicates) {
       const found = normalized.find(x => predicate(x.norm, x.clean));
@@ -3045,51 +3529,61 @@ function detectImportColumns(headers = []) {
     }
     return '';
   };
+
   return {
     date: findByPriority(
       h => h === 'הופק בתאריך',
       h => h === 'תאריך מסמך',
       h => h === 'תאריך',
-      h => h.includes('תאריך')
+      h => h.includes('תאריך'),
+      h => h === 'date' || h.includes('invoice date')
     ),
     docNumber: findByPriority(
       h => h === 'מס מסמך',
       h => h === 'מספר מסמך',
+      h => h === 'מספר חשבונית',
       h => h.includes('מסמך') && !h.includes('סוג'),
-      h => h.includes('מס') && h.includes('מסמך') && !h.includes('סוג')
+      h => (h.includes('invoice') || h.includes('doc')) && (h.includes('number') || h.includes('no'))
+    ),
+    docType: findByPriority(
+      h => h === 'סוג מסמך',
+      h => h.includes('סוג מסמך'),
+      h => h.includes('document type') || h.includes('doc type')
     ),
     client: findByPriority(
       h => h === 'לקוח',
-      h => h.includes('לקוח')
+      h => h === 'שם לקוח',
+      h => h.includes('לקוח'),
+      h => h.includes('client') || h.includes('customer')
+    ),
+    subject: findByPriority(
+      h => h === 'נושא',
+      h => h === 'תיאור',
+      h => h.includes('נושא'),
+      h => h.includes('תיאור'),
+      h => h.includes('description') || h.includes('subject')
     ),
     total: findByPriority(
       h => h === 'סהכ',
       h => h === 'סה"כ',
       h => h === 'סה״כ',
+      h => h === 'סכום כולל',
+      h => h === 'total',
+      h => h.includes('total amount'),
       h => h.includes('סה') && !h.includes('לפני') && !h.includes('מעמ') && !h.includes('מע"מ') && !h.includes('מע״מ')
     ),
     totalAlt: findByPriority(
-      h => h.includes('סה') && !h.includes('לפני')
+      h => h === 'סכום',
+      h => h === 'amount',
+      h => h.includes('סה') && !h.includes('לפני') && !h.includes('מעמ') && !h.includes('מע"מ') && !h.includes('מע״מ')
     ),
     debit: findByPriority(
       h => h === 'חובה',
-      h => h.includes('חובה'),
-      h => h === 'debit',
       h => h.includes('debit')
     ),
     credit: findByPriority(
       h => h === 'זכות',
-      h => h.includes('זכות'),
-      h => h === 'credit',
       h => h.includes('credit')
-    ),
-    subject: findByPriority(
-      h => h === 'נושא',
-      h => h.includes('נושא')
-    ),
-    docType: findByPriority(
-      h => h === 'סוג מסמך',
-      h => h.includes('סוג מסמך')
     )
   };
 }
@@ -3099,15 +3593,6 @@ function parseImportNumber(v) {
   const s = String(v ?? "").replace(/[₪,\s]/g, "").trim();
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : NaN;
-}
-
-function amountFromDebitCredit(src, debitKey, creditKey) {
-  const debit = debitKey ? parseImportNumber(src[debitKey]) : NaN;
-  const credit = creditKey ? parseImportNumber(src[creditKey]) : NaN;
-  const candidates = [debit, credit].filter(Number.isFinite).filter(v => Math.abs(v) > 0);
-  if (!candidates.length) return NaN;
-  // בקבצים מסוימים חובה וזכות זהים; לוקחים את הסכום הגדול בערך מוחלט.
-  return candidates.reduce((best, v) => Math.abs(v) > Math.abs(best) ? v : best, candidates[0]);
 }
 
 function parseImportDate(value) {
@@ -3221,17 +3706,33 @@ function rowsFromParsedImportData(rawRows = []) {
   const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
   const cols = detectImportColumns(headers);
   const totalKey = cols.total || cols.totalAlt;
-  const hasAmountSource = !!totalKey || !!cols.debit || !!cols.credit;
-  if (!cols.date || !cols.docNumber || !cols.client || !hasAmountSource) {
-    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח וסכום/סה״כ/חובה/זכות).');
+
+  if (!cols.date || !cols.docNumber || !cols.client || (!totalKey && !cols.debit && !cols.credit)) {
+    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח וסכום/חובה/זכות).');
   }
+
   return rawRows.map(src => {
     const docNumber = String(src[cols.docNumber] ?? '').trim();
     const clientName = String(src[cols.client] ?? '').trim();
-    const subject = String(src[cols.subject] ?? '').trim();
-    const docType = String(src[cols.docType] ?? '').trim();
-    let amount = totalKey ? parseImportNumber(src[totalKey]) : amountFromDebitCredit(src, cols.debit, cols.credit);
+    const subject = String(cols.subject ? (src[cols.subject] ?? '') : '').trim();
+    const docType = String(cols.docType ? (src[cols.docType] ?? '') : '').trim();
+
+    let amount = NaN;
+
+    if (totalKey) {
+      amount = parseImportNumber(src[totalKey]);
+    }
+
+    // תמיכה בדוחות הנה"ח שבהם הסכום מפוצל לחובה / זכות
+    if (!Number.isFinite(amount)) {
+      const debit = cols.debit ? parseImportNumber(src[cols.debit]) : NaN;
+      const credit = cols.credit ? parseImportNumber(src[cols.credit]) : NaN;
+      if (Number.isFinite(credit) && Math.abs(credit) > 0) amount = Math.abs(credit);
+      else if (Number.isFinite(debit) && Math.abs(debit) > 0) amount = Math.abs(debit);
+    }
+
     if (isCreditDocType(docType) && Number.isFinite(amount)) amount = -Math.abs(amount);
+
     return {
       include: true,
       date: parseImportDate(src[cols.date]),
@@ -3264,7 +3765,7 @@ async function parseIncomeImportFile(file) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws, { defval: '' });
   }
-  throw new Error('סוג הקובץ לא נתמך. העלי CSV או Excel.');
+  throw new Error('סוג הקובץ לא נתמך. יש להעלות CSV או Excel.');
 }
 
 async function handleIncomeImportFileChange() {
@@ -3397,7 +3898,78 @@ function exportPDF() {
       th{background:#f0f2f7}
       .row{display:flex;gap:10px;flex-wrap:wrap}
       .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 0}
-    </style>
+    
+/* ----------------------------------------------------------
+   Phase 1 - מסך בית / Dashboard מובייל-פרסט
+---------------------------------------------------------- */
+.home-dashboard{
+  margin-bottom:18px;
+}
+.home-hero{
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:linear-gradient(135deg,#ffffff,#f4f7ff);
+  box-shadow:var(--card-shadow);
+  padding:18px;
+  margin-bottom:14px;
+}
+.home-hero h2{margin:0 0 6px;font-size:22px}
+.home-hero .hint{font-size:13px}
+.home-summary{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:14px;
+}
+.home-summary .metric{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:16px;
+  padding:12px;
+}
+.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
+.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
+.home-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.home-card{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  border-radius:20px;
+  padding:16px;
+  min-height:112px;
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
+.home-card:active{transform:translateY(0)}
+.home-card.disabled{opacity:.58;cursor:default}
+.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+.home-card .ico{font-size:26px;line-height:1}
+.home-card .title{font-weight:750;font-size:15px}
+.home-card .desc{font-size:12px;color:var(--text-dim)}
+.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
+@media(max-width:900px){
+  .home-summary{grid-template-columns:repeat(2,1fr)}
+  .home-actions{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .home-hero{padding:15px;border-radius:18px}
+  .home-hero h2{font-size:20px}
+  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
+  .home-summary .metric{padding:10px}
+  .home-summary .metric .v{font-size:16px}
+  .home-actions{grid-template-columns:1fr;gap:10px}
+  .home-card{min-height:96px;border-radius:18px;padding:14px}
+}
+
+</style>
   </head>
   <body>
     <h1>סיכומי תקופה</h1>
@@ -3610,7 +4182,78 @@ btnReportPdf.onclick = () => {
         th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
         th{background:#f0f2f7}
         .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0}
-      </style>
+      
+/* ----------------------------------------------------------
+   Phase 1 - מסך בית / Dashboard מובייל-פרסט
+---------------------------------------------------------- */
+.home-dashboard{
+  margin-bottom:18px;
+}
+.home-hero{
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:linear-gradient(135deg,#ffffff,#f4f7ff);
+  box-shadow:var(--card-shadow);
+  padding:18px;
+  margin-bottom:14px;
+}
+.home-hero h2{margin:0 0 6px;font-size:22px}
+.home-hero .hint{font-size:13px}
+.home-summary{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:14px;
+}
+.home-summary .metric{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:16px;
+  padding:12px;
+}
+.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
+.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
+.home-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.home-card{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  border-radius:20px;
+  padding:16px;
+  min-height:112px;
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
+.home-card:active{transform:translateY(0)}
+.home-card.disabled{opacity:.58;cursor:default}
+.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+.home-card .ico{font-size:26px;line-height:1}
+.home-card .title{font-weight:750;font-size:15px}
+.home-card .desc{font-size:12px;color:var(--text-dim)}
+.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
+@media(max-width:900px){
+  .home-summary{grid-template-columns:repeat(2,1fr)}
+  .home-actions{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .home-hero{padding:15px;border-radius:18px}
+  .home-hero h2{font-size:20px}
+  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
+  .home-summary .metric{padding:10px}
+  .home-summary .metric .v{font-size:16px}
+  .home-actions{grid-template-columns:1fr;gap:10px}
+  .home-card{min-height:96px;border-radius:18px;padding:14px}
+}
+
+</style>
     </head>
     <body>
       <h1>${title}</h1>
@@ -3824,7 +4467,78 @@ function buildDocHtml(payload){
       .sum table{width:auto;min-width:320px}
       .logo{width:120px;height:60px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px}
       @media print{button{display:none}}
-    </style>
+    
+/* ----------------------------------------------------------
+   Phase 1 - מסך בית / Dashboard מובייל-פרסט
+---------------------------------------------------------- */
+.home-dashboard{
+  margin-bottom:18px;
+}
+.home-hero{
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:linear-gradient(135deg,#ffffff,#f4f7ff);
+  box-shadow:var(--card-shadow);
+  padding:18px;
+  margin-bottom:14px;
+}
+.home-hero h2{margin:0 0 6px;font-size:22px}
+.home-hero .hint{font-size:13px}
+.home-summary{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-top:14px;
+}
+.home-summary .metric{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:16px;
+  padding:12px;
+}
+.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
+.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
+.home-actions{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:12px;
+}
+.home-card{
+  border:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  border-radius:20px;
+  padding:16px;
+  min-height:112px;
+  box-shadow:0 10px 24px rgba(15,23,42,.06);
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  cursor:pointer;
+  transition:.18s ease;
+}
+.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
+.home-card:active{transform:translateY(0)}
+.home-card.disabled{opacity:.58;cursor:default}
+.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
+.home-card .ico{font-size:26px;line-height:1}
+.home-card .title{font-weight:750;font-size:15px}
+.home-card .desc{font-size:12px;color:var(--text-dim)}
+.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
+@media(max-width:900px){
+  .home-summary{grid-template-columns:repeat(2,1fr)}
+  .home-actions{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:560px){
+  .home-hero{padding:15px;border-radius:18px}
+  .home-hero h2{font-size:20px}
+  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
+  .home-summary .metric{padding:10px}
+  .home-summary .metric .v{font-size:16px}
+  .home-actions{grid-template-columns:1fr;gap:10px}
+  .home-card{min-height:96px;border-radius:18px;padding:14px}
+}
+
+</style>
   </head>
   <body>
     <div class="box">
@@ -3964,7 +4678,7 @@ function renderCustomerCardSelect(){
   if (!ccSelect || !currentUid) return;
   const list = getCustomers(currentUid);
   ccSelect.innerHTML = [
-    '<option value="">בחרי לקוח...</option>',
+    '<option value="">בחירת לקוח...</option>',
     ...list.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || "(ללא שם)")}</option>`)
   ].join("");
 }
@@ -4188,16 +4902,13 @@ function initAppLogic(uid) {
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
-    if (btnHomeTop) btnHomeTop.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (btnDashboardAdd) btnDashboardAdd.onclick = () => {
-      scrollToWorkArea();
-      setTimeout(() => fAmount?.focus(), 350);
-    };
-    if (btnDashboardImport) btnDashboardImport.onclick = openIncomeImportDialog;
-    if (btnDashboardReports) btnDashboardReports.onclick = () => reportsDialog?.showModal();
-    document.querySelectorAll("[data-dash-action]").forEach(btn => {
-      btn.addEventListener("click", () => handleDashboardAction(btn.dataset.dashAction));
-    });
+    if (btnHomeOpen) btnHomeOpen.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
+    if (homeGoImport) homeGoImport.onclick = openIncomeImportDialog;
+    if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
+    if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
+    if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
+    if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
 
     btnClear.onclick = () => {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
@@ -4209,11 +4920,11 @@ function initAppLogic(uid) {
 
     // סינון וניווט חודשים
     ["input", "change"].forEach(evName => {
-      qText.addEventListener(evName, () => { render(); });
-      qType.addEventListener(evName, () => { render(); });
-      qMonth.addEventListener(evName, () => { saveRangePrefs(); render(); });
-      qCategory.addEventListener(evName, () => { render(); });
-      qPeriod.addEventListener(evName, () => { saveRangePrefs(); render(); });
+      qText.addEventListener(evName, () => { saveToLocal(); render(); });
+      qType.addEventListener(evName, () => { saveToLocal(); render(); });
+      qMonth.addEventListener(evName, () => { saveRangeState(); saveToLocal(); render(); });
+      qCategory.addEventListener(evName, () => { saveToLocal(); render(); });
+      qPeriod.addEventListener(evName, () => { saveRangeState(); saveToLocal(); render(); });
       vatRateInput.addEventListener(evName, () => { saveToLocal(); render(); });
       vatEnabledCheckbox.addEventListener(evName, () => { saveToLocal(); render(); });
     });
@@ -4224,7 +4935,7 @@ function initAppLogic(uid) {
       qMonth.value = monthFromDateStr(todayStr());
       qCategory.value = "";
       qPeriod.value = "1";
-      saveRangePrefs();
+      saveRangeState();
       render();
     };
 
@@ -4233,7 +4944,7 @@ function initAppLogic(uid) {
       const [y, mm] = m.split("-").map(Number);
       const d = new Date(y, mm - 2, 1);
       qMonth.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      saveRangePrefs();
+      saveRangeState();
       render();
     };
 
@@ -4242,7 +4953,7 @@ function initAppLogic(uid) {
       const [y, mm] = m.split("-").map(Number);
       const d = new Date(y, mm, 1);
       qMonth.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      saveRangePrefs();
+      saveRangeState();
       render();
     };
 
@@ -4268,10 +4979,11 @@ renderItemsDatalist();
   // לבסוף, לטעון נתונים ולרנדר
   (async () => {
     await loadFromCloudFirst();
-    restoreRangePrefs();
     if (!fDate.value) fDate.value = todayStr();
     if (fType) fType.value = "expense";
-    if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
+    const hadSavedRange = loadRangeState();
+    if (!hadSavedRange && !qMonth.value) qMonth.value = monthFromDateStr(todayStr());
+    if (!hadSavedRange && qPeriod && !qPeriod.value) qPeriod.value = "1";
     if (qPeriod && !qPeriod.value) qPeriod.value = "1";
     render();
   })();
@@ -4312,7 +5024,7 @@ function showToast(msg, isErr=false){
       </div>
 
       <div class="grid2">
-        <label>בחרי לקוח</label>
+        <label>בחירת לקוח</label>
         <select id="ccSelect"></select>
 
         <label>שם</label>
