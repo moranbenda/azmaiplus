@@ -262,7 +262,7 @@
     /* shell של האפליקציה */    
 #appShell{display:none;min-height:100vh}
     header.app-header{
-      position:relative;z-index:10;
+      position:sticky;top:0;z-index:10;
       backdrop-filter:saturate(1.1) blur(10px);
       background:rgba(255,255,255,.9);
       border-bottom:1px solid var(--line);
@@ -559,77 +559,6 @@ body{
   #importIncomeDialog input{font-size:11px;}
 }
 
-
-/* ----------------------------------------------------------
-   Phase 1 - מסך בית / Dashboard מובייל-פרסט
----------------------------------------------------------- */
-.home-dashboard{
-  margin-bottom:18px;
-}
-.home-hero{
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:linear-gradient(135deg,#ffffff,#f4f7ff);
-  box-shadow:var(--card-shadow);
-  padding:18px;
-  margin-bottom:14px;
-}
-.home-hero h2{margin:0 0 6px;font-size:22px}
-.home-hero .hint{font-size:13px}
-.home-summary{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-top:14px;
-}
-.home-summary .metric{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:16px;
-  padding:12px;
-}
-.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
-.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
-.home-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-}
-.home-card{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.94);
-  border-radius:20px;
-  padding:16px;
-  min-height:112px;
-  box-shadow:0 10px 24px rgba(15,23,42,.06);
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  cursor:pointer;
-  transition:.18s ease;
-}
-.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
-.home-card:active{transform:translateY(0)}
-.home-card.disabled{opacity:.58;cursor:default}
-.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
-.home-card .ico{font-size:26px;line-height:1}
-.home-card .title{font-weight:750;font-size:15px}
-.home-card .desc{font-size:12px;color:var(--text-dim)}
-.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
-@media(max-width:900px){
-  .home-summary{grid-template-columns:repeat(2,1fr)}
-  .home-actions{grid-template-columns:repeat(2,1fr)}
-}
-@media(max-width:560px){
-  .home-hero{padding:15px;border-radius:18px}
-  .home-hero h2{font-size:20px}
-  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
-  .home-summary .metric{padding:10px}
-  .home-summary .metric .v{font-size:16px}
-  .home-actions{grid-template-columns:1fr;gap:10px}
-  .home-card{min-height:96px;border-radius:18px;padding:14px}
-}
-
 </style>
 </head>
 <body>
@@ -702,10 +631,9 @@ body{
       </div>
       <div class="top-right">
         <span class="tag" id="userEmailTag">מחובר/ת</span>
-        <button class="btn secondary small" id="btnHomeOpen">בית</button>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+                <a class="btn secondary small" id="btnVatLink" href="https://secapp.taxes.gov.il/taxes-login/login/general" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
@@ -715,67 +643,6 @@ body{
   </header>
 
   <main class="wrap" id="app">
-    <section class="home-dashboard" id="homeDashboard">
-      <div class="home-hero">
-        <h2>מה עושים היום?</h2>
-        <div class="hint">
-          מרכז עבודה מהיר לעצמאים — הזנת הוצאות, ייבוא הכנסות, דוחות, מע״מ והמשך פיתוח מודולים מתקדמים.
-          <span id="homeRangeLabel">הטווח נשמר עד שינוי ידני.</span>
-        </div>
-        <div class="home-summary" id="homeSummaryCards">
-          <div class="metric"><div class="k">הכנסות בתקופה</div><div class="v income" id="homeIncGross">₪ 0.00</div></div>
-          <div class="metric"><div class="k">הוצאות בתקופה</div><div class="v expense" id="homeExpGross">₪ 0.00</div></div>
-          <div class="metric"><div class="k">מע״מ לתשלום</div><div class="v" id="homeVatNet">₪ 0.00</div></div>
-          <div class="metric"><div class="k">רווח משוער</div><div class="v" id="homeProfit">₪ 0.00</div></div>
-        </div>
-      </div>
-
-      <div class="home-actions">
-        <button type="button" class="home-card" id="homeGoLedger">
-          <div class="ico">💰</div>
-          <div class="title">הכנסות והוצאות</div>
-          <div class="desc">הזנה ידנית של הוצאות וצפייה בתנועות.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoImport">
-          <div class="ico">📥</div>
-          <div class="title">ייבוא הכנסות</div>
-          <div class="desc">קליטת דוח הכנסות מקובץ Excel או CSV.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoReports">
-          <div class="ico">📊</div>
-          <div class="title">דוחות</div>
-          <div class="desc">דוחות הכנסות, הוצאות, רווח והפסד ומע״מ.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoVat">
-          <div class="ico">🧾</div>
-          <div class="title">דיווח מע״מ</div>
-          <div class="desc">מעבר לעמוד הדיווח באתר רשות המסים.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoCategories">
-          <div class="ico">🏷️</div>
-          <div class="title">טבלת קטגוריות</div>
-          <div class="desc">בדיקת הכרה למס והאם הוצאה מוכרת למע״מ.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoProfile">
-          <div class="ico">⚙️</div>
-          <div class="title">פרופיל עסק</div>
-          <div class="desc">פרטי העסק, סוג עוסק ואחוז מע״מ.</div>
-        </button>
-        <button type="button" class="home-card disabled" id="homeGoYearEnd" disabled>
-          <div class="ico">📉</div>
-          <div class="title">סגירת שנה</div>
-          <div class="desc">פחת, התאמות וסימולטור מס.</div>
-          <span class="soon">בקרוב</span>
-        </button>
-        <button type="button" class="home-card disabled" id="homeGoDocs" disabled>
-          <div class="ico">📄</div>
-          <div class="title">מסמכים</div>
-          <div class="desc">הפקת מסמכים חשבונאיים וחיבור עתידי לחשבוניות ישראל.</div>
-          <span class="soon">בקרוב</span>
-        </button>
-      </div>
-    </section>
-
     <div class="grid-main">
       <!-- צד ימין: תנועות חדשות -->
       <section class="card">
@@ -808,9 +675,8 @@ body{
             </div>
             <div style="flex:2 1 210px">
               <label>קטגוריה</label>
-              <select id="fCategory">
-                <option value="">בחירת קטגוריה</option>
-              </select>
+              <input type="text" id="fCategory" list="catsList" placeholder="למשל: רכב, ציוד, כיבוד קל" />
+              <datalist id="catsList"></datalist>
             </div>
 
             <div style="flex:1 1 120px">
@@ -941,7 +807,7 @@ body{
           </select>
         </div>
         <div><label>תיאור</label><input type="text" id="eDesc" /></div>
-        <div><label>קטגוריה</label><select id="eCategory"><option value="">בחירת קטגוריה</option></select></div>
+        <div><label>קטגוריה</label><input type="text" id="eCategory" list="catsList" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
@@ -1141,7 +1007,7 @@ body{
   <div class="dlg-bd">
     <div class="grid2">
       <div style="grid-column:1 / -1">
-        <label>בחירת קובץ</label>
+        <label>בחרי קובץ</label>
         <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
         <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
       </div>
@@ -1186,7 +1052,7 @@ body{
       </div>
       <div>
         <label>קטגוריה</label>
-        <select id="rrCategory"><option value="">בחירת קטגוריה</option></select>
+        <input type="text" id="rrCategory" list="catsList" />
       </div>
       <div>
         <label>סכום כולל (₪)</label>
@@ -1461,7 +1327,7 @@ if (btnLogout) {
       authPassword.value = "";
     } catch (err) {
       console.error("Logout error:", err);
-      alert("לא ניתן היה להתנתק כרגע. יש לנסות שוב.");
+      alert("לא ניתן היה להתנתק כרגע. נסי שוב.");
     }
   });
 }
@@ -1707,7 +1573,7 @@ async function handleAuth(e) {
     } else if (err.code === 'auth/email-already-in-use') {
       authError.textContent = "כתובת האימייל הזו כבר רשומה במערכת.";
     } else if (err.code === 'auth/too-many-requests') {
-      authError.textContent = "בוצעו יותר מדי ניסיונות. יש לנסות שוב בעוד כמה דקות.";
+      authError.textContent = "בוצעו יותר מדי ניסיונות. נסי שוב בעוד כמה דקות.";
     } else {
       authError.textContent = err.message?.startsWith("נא למלא")
         ? err.message
@@ -1736,7 +1602,7 @@ btnForgotPassword?.addEventListener("click", async () => {
     setAuthInfo("שלחנו קישור לאיפוס סיסמה למייל שהוזן.");
   } catch (err) {
     console.error("password reset error", err);
-    setAuthInfo("לא הצלחנו לשלוח מייל איפוס. בדקי שהמייל נכון ויש לנסות שוב.", "error");
+    setAuthInfo("לא הצלחנו לשלוח מייל איפוס. בדקי שהמייל נכון ונסי שוב.", "error");
   }
 });
 
@@ -1751,7 +1617,7 @@ btnResendVerification?.addEventListener("click", async () => {
     setAuthInfo("שלחנו שוב מייל אימות. אחרי האישור אפשר להתחבר ולהמשיך.");
   } catch (err) {
     console.error("resend verification error", err);
-    setAuthInfo("לא הצלחנו לשלוח שוב את מייל האימות כרגע. יש לנסות שוב בעוד רגע.", "error");
+    setAuthInfo("לא הצלחנו לשלוח שוב את מייל האימות כרגע. נסי שוב בעוד רגע.", "error");
   }
 });
 
@@ -1898,21 +1764,6 @@ const chips      = document.getElementById("chips");
 const tbody      = document.getElementById("tbody");
 const rowsCount  = document.getElementById("rowsCount");
 const periodLabel= document.getElementById("periodLabel");
-
-/* מסך בית */
-const btnHomeOpen = document.getElementById("btnHomeOpen");
-const homeDashboard = document.getElementById("homeDashboard");
-const homeRangeLabel = document.getElementById("homeRangeLabel");
-const homeIncGross = document.getElementById("homeIncGross");
-const homeExpGross = document.getElementById("homeExpGross");
-const homeVatNet = document.getElementById("homeVatNet");
-const homeProfit = document.getElementById("homeProfit");
-const homeGoLedger = document.getElementById("homeGoLedger");
-const homeGoImport = document.getElementById("homeGoImport");
-const homeGoReports = document.getElementById("homeGoReports");
-const homeGoVat = document.getElementById("homeGoVat");
-const homeGoCategories = document.getElementById("homeGoCategories");
-const homeGoProfile = document.getElementById("homeGoProfile");
 
 /* כפתורי יצוא וגיבוי */
 const btnExportCSV   = document.getElementById("btnExportCSV");
@@ -2101,7 +1952,7 @@ ${msg}
     supportModal?.classList.remove("open");
   } catch (err) {
     console.error("Support send failed:", err);
-    alert("לא הצלחנו לשלוח כרגע. יש לנסות שוב בעוד רגע.");
+    alert("לא הצלחנו לשלוח כרגע. נסי שוב בעוד רגע.");
   }
 });
 /* ----------------------------------------------------------
@@ -2190,9 +2041,112 @@ function renderCategoriesTable() {
 const itemsList = document.getElementById("itemsList");
 
 function renderItemsDatalist() {
-  // שדה התיאור נשאר חופשי. הקטגוריות מופיעות רק בשדה קטגוריה.
   if (!itemsList) return;
+  const seen = new Set();
   itemsList.innerHTML = "";
+  EXPENSE_ITEMS.forEach(item => {
+    if (seen.has(item.item)) return;
+    seen.add(item.item);
+    const opt = document.createElement("option");
+    opt.value = item.item;
+    itemsList.appendChild(opt);
+  });
+}
+
+function normalizeExpenseText(value = "") {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/["'׳״]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function getExpenseMeta(row) {
+  if (!row) return null;
+  const categoryKey = normalizeExpenseText(row.category || "");
+  const descKey = normalizeExpenseText(row.desc || "");
+
+  let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.category) === categoryKey);
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => categoryKey && categoryKey.includes(normalizeExpenseText(item.item)));
+  if (match) return match;
+
+  match = EXPENSE_ITEMS.find(item => descKey && descKey.includes(normalizeExpenseText(item.item)));
+  if (match) return match;
+
+  return null;
+}
+
+function getRecognitionPctForRow(row) {
+  const meta = getExpenseMeta(row);
+  const pct = meta ? meta.incomeTaxPct : (row?.deductPct ?? 100);
+  return Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
+}
+
+function getVatDeductibleFactorForRow(row) {
+  const meta = getExpenseMeta(row);
+  if (meta) {
+    // מע״מ תשומות לא אמור להיחתך לפי אחוז ההכרה למס הכנסה.
+    // אם הקטגוריה מוגדרת כמוכרת למע״מ — מקזזים 100% מהמע״מ.
+    // אם אינה מוכרת למע״מ — מקזזים 0%.
+    return meta.vatAllowed ? 1 : 0;
+  }
+  // כשאין התאמה לטבלת הקטגוריות, נשארים עם התנהגות שמרנית לפי השדה הידני.
+  return Math.max(0, Math.min(100, Number(row?.deductPct ?? 100) || 0)) / 100;
+}
+
+function getTaxDeductibleExpenseAmount(row, amounts) {
+  if (!row || row.type !== "expense") return 0;
+  const settings = getSettings();
+  const resolved = amounts || splitVAT(row.amount, row.incVat, settings.vatEnabled ? settings.vatRate : 0);
+  const meta = getExpenseMeta(row);
+  const pct = getRecognitionPctForRow(row);
+  const base = meta ? (meta.vatAllowed ? resolved.net : resolved.gross) : resolved.net;
+  return base * pct;
+}
+
+const EXPENSE_REPORT_COLUMN_DEFS = [
+  { key: "date", label: "תאריך" },
+  { key: "category", label: "קטגוריה" },
+  { key: "desc", label: "תיאור" },
+  { key: "vatAllowed", label: "מוכר למע״מ" },
+  { key: "recognition", label: "אחוז הכרה למס" },
+  { key: "net", label: "סכום ללא מע״מ" },
+  { key: "vat", label: "מע״מ" },
+  { key: "gross", label: "סכום כולל" }
+];
+
+function getSelectedExpenseReportColumns() {
+  const selected = expenseReportCols()
+    .filter(cb => cb.checked)
+    .map(cb => cb.value);
+  if (selected.length) return selected;
+  return ["date", "category", "desc", "vatAllowed", "recognition", "net", "vat", "gross"];
+}
+
+function buildExpenseRowsForReport(from, to) {
+  const list = filterByDateAndType("expense", from, to);
+  const { rows: withAmounts, totals } = addVatInfo(list);
+  const formattedRows = withAmounts.map(r => {
+    const meta = getExpenseMeta(r);
+    return {
+      ...r,
+      vatAllowed: meta ? (meta.vatAllowed ? "כן" : "לא") : "-",
+      recognition: meta && typeof meta.incomeTaxPct === "number" ? `${meta.incomeTaxPct}%` : "-"
+    };
+  });
+  return { rows: formattedRows, totals };
+}
+
+function valueForExpenseReportCell(row, colKey, formatMoney = false) {
+  if (["net", "vat", "gross"].includes(colKey)) {
+    return formatMoney ? toMoney(row[colKey] || 0) : (row[colKey] || 0);
+  }
+  return row[colKey] ?? "";
 }
 
 /* ----------------------------------------------------------
@@ -2574,106 +2528,21 @@ function uniqueCategories() {
   return Array.from(s).sort((a, b) => a.localeCompare(b, "he"));
 }
 
-function fillExpenseCategorySelect(selectEl) {
-  if (!selectEl) return;
-  const current = selectEl.value || "";
-  const fullExpenseList = Array.from(new Set(EXPENSE_ITEMS.map(i => i.item).filter(Boolean)))
-    .sort((a,b)=>a.localeCompare(b,"he"));
-
-  selectEl.innerHTML = `<option value="">בחירת קטגוריה</option>` +
-    fullExpenseList.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-
-  if (current && !fullExpenseList.includes(current)) {
-    const opt = document.createElement("option");
-    opt.value = current;
-    opt.textContent = current;
-    selectEl.appendChild(opt);
-  }
-  selectEl.value = current;
-}
-
 function updateFiltersUI() {
-  // שדות קטגוריה בטפסים — רשימת הפריטים המלאה מטבלת הקטגוריות
-  fillExpenseCategorySelect(fCategory);
-  fillExpenseCategorySelect(eCategory);
-  fillExpenseCategorySelect(rrCategory);
-
-  // שדה תיאור נשאר חופשי בלבד; אין בו קטגוריות.
-  if (itemsList) itemsList.innerHTML = "";
-
+  const dl = document.getElementById("catsList");
+  if (dl) {
+    const fullExpenseList = Array.from(new Set(EXPENSE_ITEMS.map(i => i.item).filter(Boolean)))
+      .sort((a,b)=>a.localeCompare(b,"he"));
+    dl.innerHTML = fullExpenseList
+      .map(c => `<option value="${escapeHtml(c)}"></option>`)
+      .join("");
+  }
   const current = qCategory.value;
   qCategory.innerHTML = `<option value="">כל הקטגוריות</option>` +
     uniqueCategories().map(c =>
       `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
     ).join("");
   if (current) qCategory.value = current;
-}
-
-
-function rangeStorageKey() {
-  return currentUid ? `azmai_range_${currentUid}` : "azmai_range";
-}
-
-function getRangeState() {
-  return {
-    month: qMonth?.value || monthFromDateStr(todayStr()),
-    period: qPeriod?.value || "1"
-  };
-}
-
-function saveRangeState() {
-  try {
-    if (!qMonth || !qPeriod) return;
-    localStorage.setItem(rangeStorageKey(), JSON.stringify(getRangeState()));
-  } catch (e) {
-    console.warn("range save failed", e);
-  }
-}
-
-function loadRangeState() {
-  try {
-    const raw = localStorage.getItem(rangeStorageKey());
-    if (!raw) return false;
-    const state = JSON.parse(raw);
-    if (state?.month && qMonth) qMonth.value = state.month;
-    if (state?.period && qPeriod) qPeriod.value = String(state.period);
-    return true;
-  } catch (e) {
-    console.warn("range load failed", e);
-    return false;
-  }
-}
-
-function getCurrentDateRangeLabel() {
-  const month = qMonth?.value || monthFromDateStr(todayStr());
-  const period = qPeriod?.value || "1";
-  if (!month || period === "0") return "טווח נוכחי: כל התקופות";
-  const monthsBack = Math.max(1, parseInt(period, 10) || 1);
-  const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
-  return monthsBack === 1
-    ? `טווח נוכחי: ${month.slice(5,7)}/${month.slice(0,4)}`
-    : `טווח נוכחי: ${startStr} עד ${endStr}`;
-}
-
-function renderHomeDashboard(sum) {
-  if (!homeDashboard) return;
-  const effectiveSum = sum || summarize(queryRows());
-  if (homeIncGross) homeIncGross.textContent = toMoney(effectiveSum.incGross);
-  if (homeExpGross) homeExpGross.textContent = toMoney(effectiveSum.expGross);
-  if (homeVatNet) {
-    homeVatNet.textContent = toMoney(effectiveSum.vatNet);
-    homeVatNet.style.color = effectiveSum.vatNet >= 0 ? 'var(--warning)' : 'var(--accent-2)';
-  }
-  if (homeProfit) {
-    const profit = effectiveSum.incNet - effectiveSum.expTaxDeductible;
-    homeProfit.textContent = toMoney(profit);
-    homeProfit.style.color = profit >= 0 ? 'var(--good)' : 'var(--bad)';
-  }
-  if (homeRangeLabel) homeRangeLabel.textContent = `${getCurrentDateRangeLabel()} — הטווח נשמר עד שינוי ידני.`;
-}
-
-function scrollToMainWorkArea() {
-  document.querySelector(".grid-main")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function queryRows() {
@@ -2739,8 +2608,6 @@ function render() {
   updateFiltersUI();
   const list = queryRows();
   const sum  = summarize(list);
-  saveRangeState();
-  renderHomeDashboard(sum);
   const { vatEnabled, vatRate } = getSettings();
 
   tbody.innerHTML = list.map(r => {
@@ -2829,7 +2696,7 @@ function ensureGoogleDriveConfigured() {
 function getDriveTokenClient() {
   ensureGoogleDriveConfigured();
   if (!window.google?.accounts?.oauth2) {
-    throw new Error("Google Identity Services עדיין לא נטען. יש לנסות שוב בעוד רגע.");
+    throw new Error("Google Identity Services עדיין לא נטען. נסי שוב בעוד רגע.");
   }
   if (!driveTokenClient) {
     driveTokenClient = google.accounts.oauth2.initTokenClient({
@@ -3295,12 +3162,12 @@ async function tryOcrReceiptFile(file, { silent=false } = {}) {
   }
 
   if (!window.Tesseract) {
-    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב הזיהוי עדיין נטען. יש לנסות שוב בעוד כמה שניות.';
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב הזיהוי עדיין נטען. נסי שוב בעוד כמה שניות.';
     return null;
   }
 
   if (isPdf && !window.pdfjsLib) {
-    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב קריאת PDF עדיין נטען. יש לנסות שוב בעוד כמה שניות.';
+    if (receiptOcrStatus && !silent) receiptOcrStatus.textContent = 'רכיב קריאת PDF עדיין נטען. נסי שוב בעוד כמה שניות.';
     return null;
   }
 
@@ -3372,7 +3239,7 @@ async function addRow() {
     const deductPct = Math.max(0, Math.min(100, parseFloat(fDeduct?.value || "100") || 100));
 
     if (!date) { showToast("חסר תאריך", true); return; }
-    if (type !== "income" && type !== "expense") { showToast("יש לבחור סוג (הכנסה/הוצאה)", true); return; }
+    if (type !== "income" && type !== "expense") { showToast("בחרי סוג (הכנסה/הוצאה)", true); return; }
 
     const receiptFileEarly = fReceiptFile?.files?.[0] || null;
     if ((!amountRaw || parseFloat(amountRaw) <= 0) && receiptFileEarly && receiptFileEarly.type.startsWith('image/')) {
@@ -3514,14 +3381,12 @@ function normalizeImportHeader(h = "") {
 function detectImportColumns(headers = []) {
   const normalized = headers.map(raw => {
     const clean = String(raw || '').replace(/^\ufeff/, '').trim();
-    const norm = clean
-      .replace(/["׳״”“']/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .toLowerCase();
-    return { raw, clean, norm };
+    return {
+      raw,
+      clean,
+      norm: clean.replace(/["׳״”“']/g, '').replace(/\s+/g, ' ').trim()
+    };
   });
-
   const findByPriority = (...predicates) => {
     for (const predicate of predicates) {
       const found = normalized.find(x => predicate(x.norm, x.clean));
@@ -3529,61 +3394,39 @@ function detectImportColumns(headers = []) {
     }
     return '';
   };
-
   return {
     date: findByPriority(
       h => h === 'הופק בתאריך',
       h => h === 'תאריך מסמך',
       h => h === 'תאריך',
-      h => h.includes('תאריך'),
-      h => h === 'date' || h.includes('invoice date')
+      h => h.includes('תאריך')
     ),
     docNumber: findByPriority(
       h => h === 'מס מסמך',
       h => h === 'מספר מסמך',
-      h => h === 'מספר חשבונית',
       h => h.includes('מסמך') && !h.includes('סוג'),
-      h => (h.includes('invoice') || h.includes('doc')) && (h.includes('number') || h.includes('no'))
-    ),
-    docType: findByPriority(
-      h => h === 'סוג מסמך',
-      h => h.includes('סוג מסמך'),
-      h => h.includes('document type') || h.includes('doc type')
+      h => h.includes('מס') && h.includes('מסמך') && !h.includes('סוג')
     ),
     client: findByPriority(
       h => h === 'לקוח',
-      h => h === 'שם לקוח',
-      h => h.includes('לקוח'),
-      h => h.includes('client') || h.includes('customer')
-    ),
-    subject: findByPriority(
-      h => h === 'נושא',
-      h => h === 'תיאור',
-      h => h.includes('נושא'),
-      h => h.includes('תיאור'),
-      h => h.includes('description') || h.includes('subject')
+      h => h.includes('לקוח')
     ),
     total: findByPriority(
       h => h === 'סהכ',
       h => h === 'סה"כ',
       h => h === 'סה״כ',
-      h => h === 'סכום כולל',
-      h => h === 'total',
-      h => h.includes('total amount'),
       h => h.includes('סה') && !h.includes('לפני') && !h.includes('מעמ') && !h.includes('מע"מ') && !h.includes('מע״מ')
     ),
     totalAlt: findByPriority(
-      h => h === 'סכום',
-      h => h === 'amount',
-      h => h.includes('סה') && !h.includes('לפני') && !h.includes('מעמ') && !h.includes('מע"מ') && !h.includes('מע״מ')
+      h => h.includes('סה') && !h.includes('לפני')
     ),
-    debit: findByPriority(
-      h => h === 'חובה',
-      h => h.includes('debit')
+    subject: findByPriority(
+      h => h === 'נושא',
+      h => h.includes('נושא')
     ),
-    credit: findByPriority(
-      h => h === 'זכות',
-      h => h.includes('credit')
+    docType: findByPriority(
+      h => h === 'סוג מסמך',
+      h => h.includes('סוג מסמך')
     )
   };
 }
@@ -3706,33 +3549,16 @@ function rowsFromParsedImportData(rawRows = []) {
   const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
   const cols = detectImportColumns(headers);
   const totalKey = cols.total || cols.totalAlt;
-
-  if (!cols.date || !cols.docNumber || !cols.client || (!totalKey && !cols.debit && !cols.credit)) {
-    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח וסכום/חובה/זכות).');
+  if (!cols.date || !cols.docNumber || !cols.client || !totalKey) {
+    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח, סה״כ).');
   }
-
   return rawRows.map(src => {
     const docNumber = String(src[cols.docNumber] ?? '').trim();
     const clientName = String(src[cols.client] ?? '').trim();
-    const subject = String(cols.subject ? (src[cols.subject] ?? '') : '').trim();
-    const docType = String(cols.docType ? (src[cols.docType] ?? '') : '').trim();
-
-    let amount = NaN;
-
-    if (totalKey) {
-      amount = parseImportNumber(src[totalKey]);
-    }
-
-    // תמיכה בדוחות הנה"ח שבהם הסכום מפוצל לחובה / זכות
-    if (!Number.isFinite(amount)) {
-      const debit = cols.debit ? parseImportNumber(src[cols.debit]) : NaN;
-      const credit = cols.credit ? parseImportNumber(src[cols.credit]) : NaN;
-      if (Number.isFinite(credit) && Math.abs(credit) > 0) amount = Math.abs(credit);
-      else if (Number.isFinite(debit) && Math.abs(debit) > 0) amount = Math.abs(debit);
-    }
-
+    const subject = String(src[cols.subject] ?? '').trim();
+    const docType = String(src[cols.docType] ?? '').trim();
+    let amount = parseImportNumber(src[totalKey]);
     if (isCreditDocType(docType) && Number.isFinite(amount)) amount = -Math.abs(amount);
-
     return {
       include: true,
       date: parseImportDate(src[cols.date]),
@@ -3765,7 +3591,7 @@ async function parseIncomeImportFile(file) {
     const ws = wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws, { defval: '' });
   }
-  throw new Error('סוג הקובץ לא נתמך. יש להעלות CSV או Excel.');
+  throw new Error('סוג הקובץ לא נתמך. העלי CSV או Excel.');
 }
 
 async function handleIncomeImportFileChange() {
@@ -3898,78 +3724,7 @@ function exportPDF() {
       th{background:#f0f2f7}
       .row{display:flex;gap:10px;flex-wrap:wrap}
       .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 0}
-    
-/* ----------------------------------------------------------
-   Phase 1 - מסך בית / Dashboard מובייל-פרסט
----------------------------------------------------------- */
-.home-dashboard{
-  margin-bottom:18px;
-}
-.home-hero{
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:linear-gradient(135deg,#ffffff,#f4f7ff);
-  box-shadow:var(--card-shadow);
-  padding:18px;
-  margin-bottom:14px;
-}
-.home-hero h2{margin:0 0 6px;font-size:22px}
-.home-hero .hint{font-size:13px}
-.home-summary{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-top:14px;
-}
-.home-summary .metric{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:16px;
-  padding:12px;
-}
-.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
-.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
-.home-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-}
-.home-card{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.94);
-  border-radius:20px;
-  padding:16px;
-  min-height:112px;
-  box-shadow:0 10px 24px rgba(15,23,42,.06);
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  cursor:pointer;
-  transition:.18s ease;
-}
-.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
-.home-card:active{transform:translateY(0)}
-.home-card.disabled{opacity:.58;cursor:default}
-.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
-.home-card .ico{font-size:26px;line-height:1}
-.home-card .title{font-weight:750;font-size:15px}
-.home-card .desc{font-size:12px;color:var(--text-dim)}
-.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
-@media(max-width:900px){
-  .home-summary{grid-template-columns:repeat(2,1fr)}
-  .home-actions{grid-template-columns:repeat(2,1fr)}
-}
-@media(max-width:560px){
-  .home-hero{padding:15px;border-radius:18px}
-  .home-hero h2{font-size:20px}
-  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
-  .home-summary .metric{padding:10px}
-  .home-summary .metric .v{font-size:16px}
-  .home-actions{grid-template-columns:1fr;gap:10px}
-  .home-card{min-height:96px;border-radius:18px;padding:14px}
-}
-
-</style>
+    </style>
   </head>
   <body>
     <h1>סיכומי תקופה</h1>
@@ -4182,78 +3937,7 @@ btnReportPdf.onclick = () => {
         th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
         th{background:#f0f2f7}
         .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0}
-      
-/* ----------------------------------------------------------
-   Phase 1 - מסך בית / Dashboard מובייל-פרסט
----------------------------------------------------------- */
-.home-dashboard{
-  margin-bottom:18px;
-}
-.home-hero{
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:linear-gradient(135deg,#ffffff,#f4f7ff);
-  box-shadow:var(--card-shadow);
-  padding:18px;
-  margin-bottom:14px;
-}
-.home-hero h2{margin:0 0 6px;font-size:22px}
-.home-hero .hint{font-size:13px}
-.home-summary{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-top:14px;
-}
-.home-summary .metric{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:16px;
-  padding:12px;
-}
-.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
-.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
-.home-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-}
-.home-card{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.94);
-  border-radius:20px;
-  padding:16px;
-  min-height:112px;
-  box-shadow:0 10px 24px rgba(15,23,42,.06);
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  cursor:pointer;
-  transition:.18s ease;
-}
-.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
-.home-card:active{transform:translateY(0)}
-.home-card.disabled{opacity:.58;cursor:default}
-.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
-.home-card .ico{font-size:26px;line-height:1}
-.home-card .title{font-weight:750;font-size:15px}
-.home-card .desc{font-size:12px;color:var(--text-dim)}
-.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
-@media(max-width:900px){
-  .home-summary{grid-template-columns:repeat(2,1fr)}
-  .home-actions{grid-template-columns:repeat(2,1fr)}
-}
-@media(max-width:560px){
-  .home-hero{padding:15px;border-radius:18px}
-  .home-hero h2{font-size:20px}
-  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
-  .home-summary .metric{padding:10px}
-  .home-summary .metric .v{font-size:16px}
-  .home-actions{grid-template-columns:1fr;gap:10px}
-  .home-card{min-height:96px;border-radius:18px;padding:14px}
-}
-
-</style>
+      </style>
     </head>
     <body>
       <h1>${title}</h1>
@@ -4467,78 +4151,7 @@ function buildDocHtml(payload){
       .sum table{width:auto;min-width:320px}
       .logo{width:120px;height:60px;border:1px dashed #cbd5e1;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:12px}
       @media print{button{display:none}}
-    
-/* ----------------------------------------------------------
-   Phase 1 - מסך בית / Dashboard מובייל-פרסט
----------------------------------------------------------- */
-.home-dashboard{
-  margin-bottom:18px;
-}
-.home-hero{
-  border:1px solid var(--line);
-  border-radius:22px;
-  background:linear-gradient(135deg,#ffffff,#f4f7ff);
-  box-shadow:var(--card-shadow);
-  padding:18px;
-  margin-bottom:14px;
-}
-.home-hero h2{margin:0 0 6px;font-size:22px}
-.home-hero .hint{font-size:13px}
-.home-summary{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
-  margin-top:14px;
-}
-.home-summary .metric{
-  border:1px solid var(--line);
-  background:#fff;
-  border-radius:16px;
-  padding:12px;
-}
-.home-summary .metric .k{font-size:12px;color:var(--text-dim)}
-.home-summary .metric .v{font-size:18px;font-weight:750;margin-top:4px}
-.home-actions{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
-}
-.home-card{
-  border:1px solid var(--line);
-  background:rgba(255,255,255,.94);
-  border-radius:20px;
-  padding:16px;
-  min-height:112px;
-  box-shadow:0 10px 24px rgba(15,23,42,.06);
-  display:flex;
-  flex-direction:column;
-  gap:8px;
-  cursor:pointer;
-  transition:.18s ease;
-}
-.home-card:hover{transform:translateY(-2px);box-shadow:0 14px 30px rgba(15,23,42,.10)}
-.home-card:active{transform:translateY(0)}
-.home-card.disabled{opacity:.58;cursor:default}
-.home-card.disabled:hover{transform:none;box-shadow:0 10px 24px rgba(15,23,42,.06)}
-.home-card .ico{font-size:26px;line-height:1}
-.home-card .title{font-weight:750;font-size:15px}
-.home-card .desc{font-size:12px;color:var(--text-dim)}
-.home-card .soon{display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content}
-@media(max-width:900px){
-  .home-summary{grid-template-columns:repeat(2,1fr)}
-  .home-actions{grid-template-columns:repeat(2,1fr)}
-}
-@media(max-width:560px){
-  .home-hero{padding:15px;border-radius:18px}
-  .home-hero h2{font-size:20px}
-  .home-summary{grid-template-columns:1fr 1fr;gap:8px}
-  .home-summary .metric{padding:10px}
-  .home-summary .metric .v{font-size:16px}
-  .home-actions{grid-template-columns:1fr;gap:10px}
-  .home-card{min-height:96px;border-radius:18px;padding:14px}
-}
-
-</style>
+    </style>
   </head>
   <body>
     <div class="box">
@@ -4678,7 +4291,7 @@ function renderCustomerCardSelect(){
   if (!ccSelect || !currentUid) return;
   const list = getCustomers(currentUid);
   ccSelect.innerHTML = [
-    '<option value="">בחירת לקוח...</option>',
+    '<option value="">בחרי לקוח...</option>',
     ...list.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.name || "(ללא שם)")}</option>`)
   ].join("");
 }
@@ -4902,14 +4515,6 @@ function initAppLogic(uid) {
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
-    if (btnHomeOpen) btnHomeOpen.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
-    if (homeGoImport) homeGoImport.onclick = openIncomeImportDialog;
-    if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
-    if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
-    if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
-    if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
-
     btnClear.onclick = () => {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
       rows = [];
@@ -4922,9 +4527,9 @@ function initAppLogic(uid) {
     ["input", "change"].forEach(evName => {
       qText.addEventListener(evName, () => { saveToLocal(); render(); });
       qType.addEventListener(evName, () => { saveToLocal(); render(); });
-      qMonth.addEventListener(evName, () => { saveRangeState(); saveToLocal(); render(); });
+      qMonth.addEventListener(evName, () => { saveToLocal(); render(); });
       qCategory.addEventListener(evName, () => { saveToLocal(); render(); });
-      qPeriod.addEventListener(evName, () => { saveRangeState(); saveToLocal(); render(); });
+      qPeriod.addEventListener(evName, () => { saveToLocal(); render(); });
       vatRateInput.addEventListener(evName, () => { saveToLocal(); render(); });
       vatEnabledCheckbox.addEventListener(evName, () => { saveToLocal(); render(); });
     });
@@ -4935,7 +4540,6 @@ function initAppLogic(uid) {
       qMonth.value = monthFromDateStr(todayStr());
       qCategory.value = "";
       qPeriod.value = "1";
-      saveRangeState();
       render();
     };
 
@@ -4944,7 +4548,6 @@ function initAppLogic(uid) {
       const [y, mm] = m.split("-").map(Number);
       const d = new Date(y, mm - 2, 1);
       qMonth.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      saveRangeState();
       render();
     };
 
@@ -4953,7 +4556,6 @@ function initAppLogic(uid) {
       const [y, mm] = m.split("-").map(Number);
       const d = new Date(y, mm, 1);
       qMonth.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
-      saveRangeState();
       render();
     };
 
@@ -4981,9 +4583,7 @@ renderItemsDatalist();
     await loadFromCloudFirst();
     if (!fDate.value) fDate.value = todayStr();
     if (fType) fType.value = "expense";
-    const hadSavedRange = loadRangeState();
-    if (!hadSavedRange && !qMonth.value) qMonth.value = monthFromDateStr(todayStr());
-    if (!hadSavedRange && qPeriod && !qPeriod.value) qPeriod.value = "1";
+    if (!qMonth.value) qMonth.value = monthFromDateStr(todayStr());
     if (qPeriod && !qPeriod.value) qPeriod.value = "1";
     render();
   })();
@@ -5024,7 +4624,7 @@ function showToast(msg, isErr=false){
       </div>
 
       <div class="grid2">
-        <label>בחירת לקוח</label>
+        <label>בחרי לקוח</label>
         <select id="ccSelect"></select>
 
         <label>שם</label>
