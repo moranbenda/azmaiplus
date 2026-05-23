@@ -318,6 +318,44 @@ function parseLocalDate(value) {
   if (!m) return null;
   return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
 }
+
+function pad2(n){ return String(n).padStart(2, '0'); }
+function isReasonableYear(y){ return Number.isFinite(y) && y >= 1900 && y <= 2200; }
+function toIsoDateParts(y, m, d){
+  y = Number(y); m = Number(m); d = Number(d);
+  if (!isReasonableYear(y) || !m || !d || m < 1 || m > 12 || d < 1 || d > 31) return '';
+  return String(y).padStart(4, '0') + '-' + pad2(m) + '-' + pad2(d);
+}
+function normalizeDateValue(value){
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  let m = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return toIsoDateParts(m[1], m[2], m[3]);
+  m = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
+  if (m) {
+    let y = Number(m[3]);
+    if (y < 100) y += 2000;
+    return toIsoDateParts(y, m[2], m[1]);
+  }
+  return '';
+}
+function getDateInputIso(input){
+  if (!input) return '';
+  if (input.valueAsDate && !Number.isNaN(input.valueAsDate.getTime())) {
+    const d = input.valueAsDate;
+    const iso = toIsoDateParts(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+    if (iso) return iso;
+  }
+  return normalizeDateValue(input.value);
+}
+function dateLooksInvalid(value){ return !value || !normalizeDateValue(value); }
+function syncActivationDateFromPurchase(){
+  const purchaseInput = $('purchaseDate');
+  const activationInput = $('activationDate');
+  const purchaseIso = getDateInputIso(purchaseInput);
+  if (!purchaseIso) return;
+  if (!activationInput.value || dateLooksInvalid(activationInput.value)) activationInput.value = purchaseIso;
+}
 function formatDate(value){
   if (!value) return '';
   const d = parseLocalDate(value);
@@ -402,12 +440,14 @@ function emptyAsset(){
   return { id: crypto.randomUUID(), name:'', group:'ציוד', purchaseDate:'', activationDate:'', originalCost:'', incVat:true, vatClaimed:true, baseOverride:'', legalRate:15, claimedRate:'', priorAccumulated:'', sold:false, saleDate:'', salePrice:'', notes:'', sourceRowId:'', sourceRowDesc:'' };
 }
 function getFormAsset(){
+  const purchaseDate = getDateInputIso($('purchaseDate')) || $('purchaseDate').value;
+  const activationDate = getDateInputIso($('activationDate')) || purchaseDate;
   return {
     id: editingId || crypto.randomUUID(),
     name: $('assetName').value.trim(),
     group: $('assetGroup').value.trim() || 'ציוד',
-    purchaseDate: $('purchaseDate').value,
-    activationDate: $('activationDate').value || $('purchaseDate').value,
+    purchaseDate,
+    activationDate,
     originalCost: Number($('originalCost').value) || 0,
     incVat: $('incVat').checked,
     vatClaimed: $('vatClaimed').checked,
@@ -436,8 +476,8 @@ function putFormAsset(asset){
   $('assetName').value = asset.name || '';
   ensureGroupOption(asset.group || 'ציוד');
   $('assetGroup').value = asset.group || 'ציוד';
-  $('purchaseDate').value = asset.purchaseDate || '';
-  $('activationDate').value = asset.activationDate || asset.purchaseDate || '';
+  $('purchaseDate').value = normalizeDateValue(asset.purchaseDate) || asset.purchaseDate || '';
+  $('activationDate').value = normalizeDateValue(asset.activationDate || asset.purchaseDate) || asset.activationDate || asset.purchaseDate || '';
   $('originalCost').value = asset.originalCost ?? '';
   $('incVat').checked = asset.incVat !== false;
   $('vatClaimed').checked = asset.vatClaimed !== false;
@@ -527,6 +567,8 @@ function validateAsset(asset){
   const errors = [];
   if (!asset.name) errors.push('יש למלא שם נכס.');
   if (!asset.purchaseDate) errors.push('יש למלא תאריך רכישה.');
+  if (asset.purchaseDate && !normalizeDateValue(asset.purchaseDate)) errors.push('תאריך הרכישה אינו תקין.');
+  if (asset.activationDate && !normalizeDateValue(asset.activationDate)) errors.push('תאריך ההפעלה אינו תקין.');
   if (!(Number(asset.originalCost) > 0)) errors.push('המחיר המקורי חייב להיות גדול מ־0.');
   if (!(Number(asset.legalRate) > 0) || Number(asset.legalRate) > 100) errors.push('אחוז פחת בחוק חייב להיות בין 0 ל־100.');
   if (asset.claimedRate !== '' && (Number(asset.claimedRate) <= 0 || Number(asset.claimedRate) > 100)) errors.push('אחוז פחת נתבע חייב להיות בין 0 ל־100, או ריק.');
@@ -729,7 +771,9 @@ $('btnAdvanced').addEventListener('click', () => {
   $('btnAdvanced').textContent = document.body.classList.contains('advanced-on') ? 'הסתרת שדות מתקדמים' : 'הצגת שדות מתקדמים';
 });
 $('assetGroup').addEventListener('change', () => applyDefaultRateForGroup(false));
-$('purchaseDate').addEventListener('change', () => { if (!$('activationDate').value) $('activationDate').value = $('purchaseDate').value; });
+$('purchaseDate').addEventListener('change', syncActivationDateFromPurchase);
+$('purchaseDate').addEventListener('input', syncActivationDateFromPurchase);
+$('activationDate').addEventListener('change', () => { if (dateLooksInvalid($('activationDate').value)) syncActivationDateFromPurchase(); });
 taxYear.addEventListener('change', renderAll);
 $('btnSave').addEventListener('click', saveAssets);
 $('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
