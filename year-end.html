@@ -73,10 +73,11 @@
     <div class="wrap top">
       <div>
         <h1>סגירת שנה</h1>
-        <div class="hint">רווח והפסד, קבוצות הוצאה והכנה לדוח שנתי.</div>
+        <div class="hint">רווח והפסד, פחת וריכוז נתונים לדוח שנתי.</div>
       </div>
       <div class="row">
         <a class="btn secondary" href="/">חזרה למסך הראשי</a>
+        <a class="btn" href="/fixed-assets.html">רכוש קבוע ופחת</a>
         <button class="btn ghost" id="btnRefresh" type="button">רענון נתונים</button>
       </div>
     </div>
@@ -92,7 +93,7 @@
             <select id="taxYear"></select>
           </div>
           <div>
-            <label>פחת לשנה</label>
+            <label>תוספת פחת ידנית</label>
             <input type="number" step="1" min="0" id="depreciationInput" placeholder="0" />
           </div>
           <button class="btn" type="button" id="btnPrint">הדפסה / PDF</button>
@@ -218,6 +219,7 @@ const mProfit = document.getElementById('mProfit');
 let currentUser = null;
 let userProfile = null;
 let rows = [];
+let fixedAssets = [];
 let ledgerSettings = { vatEnabled: true, vatRate: DEFAULT_VAT };
 
 function escapeHtml(s=''){
@@ -327,6 +329,59 @@ const GROUP_TITLES = {
 };
 const GROUP_ORDER = ['admin','vehicle','homeOffice','professional','other'];
 
+function parseLocalDate(value) {
+  if (!value) return null;
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function monthSerial(d) { return d.getFullYear() * 12 + d.getMonth(); }
+function monthsInclusive(start, end) {
+  if (!start || !end || end < start) return 0;
+  return Math.max(0, monthSerial(end) - monthSerial(start) + 1);
+}
+function maxDate(a,b){ if (!a) return b; if (!b) return a; return a > b ? a : b; }
+function minDate(a,b){ if (!a) return b; if (!b) return a; return a < b ? a : b; }
+function assetBase(asset, vatRate) {
+  const original = Number(asset.originalCost) || 0;
+  const override = Number(asset.baseOverride);
+  if (Number.isFinite(override) && override > 0) return override;
+  const incVat = asset.incVat === true || asset.incVat === 'true';
+  const vatClaimed = asset.vatClaimed === true || asset.vatClaimed === 'true';
+  const rate = (Number(vatRate) || DEFAULT_VAT) / 100;
+  if (incVat && vatClaimed && rate > 0) return original / (1 + rate);
+  return original;
+}
+function calcAssetDepreciation(asset, year, vatRate) {
+  const base = Math.max(0, assetBase(asset, vatRate));
+  const legalRate = Math.max(0, Number(asset.legalRate ?? asset.depreciationRate) || 0);
+  const claimedRate = Math.max(0, Number(asset.claimedRate ?? asset.depreciationRate ?? legalRate) || 0);
+  const start = parseLocalDate(asset.activationDate || asset.purchaseDate);
+  const purchase = parseLocalDate(asset.purchaseDate || asset.activationDate);
+  const sold = asset.sold === true || asset.sold === 'true';
+  const saleDate = sold ? parseLocalDate(asset.saleDate) : null;
+  const y = Number(year);
+  const yearStart = new Date(y, 0, 1);
+  const yearEnd = new Date(y, 11, 31);
+  const activeEnd = sold && saleDate ? minDate(saleDate, yearEnd) : yearEnd;
+  const periodStart = maxDate(start, yearStart);
+  const monthsThisYear = start ? monthsInclusive(periodStart, activeEnd) : 0;
+  const monthsBefore = start ? monthsInclusive(start, minDate(saleDate || new Date(y-1, 11, 31), new Date(y-1, 11, 31))) : 0;
+  const monthlyDep = base * (claimedRate / 100) / 12;
+  const priorOverride = asset.priorAccumulated !== '' && asset.priorAccumulated != null ? Number(asset.priorAccumulated) : NaN;
+  const accumulatedBefore = Math.min(base, Math.max(0, Number.isFinite(priorOverride) ? priorOverride : monthlyDep * monthsBefore));
+  const rawYearDep = monthlyDep * monthsThisYear;
+  const yearDep = Math.min(Math.max(0, base - accumulatedBefore), Math.max(0, rawYearDep));
+  const totalDep = Math.min(base, accumulatedBefore + yearDep);
+  const writtenDown = Math.max(0, base - totalDep);
+  const additionThisYear = purchase && purchase.getFullYear() === y ? base : 0;
+  return { base, legalRate, claimedRate, monthsThisYear, accumulatedBefore, yearDep, totalDep, writtenDown, additionThisYear };
+}
+function fixedAssetsDepreciationForYear(year) {
+  const rate = getSettings().vatRate || DEFAULT_VAT;
+  return (fixedAssets || []).reduce((sum, asset) => sum + calcAssetDepreciation(asset, year, rate).yearDep, 0);
+}
+
 function calculateYear(){
   const year = taxYear.value;
   const settings = getSettings();
@@ -369,10 +424,12 @@ function calculateYear(){
     totalGrossExpenses += amounts.gross;
     totalInputVat += inputVat;
   }
-  const depreciation = Math.max(0, Number(depreciationInput.value) || 0);
+  const manualDepreciation = Math.max(0, Number(depreciationInput.value) || 0);
+  const fixedDepreciation = fixedAssetsDepreciationForYear(year);
+  const depreciation = fixedDepreciation + manualDepreciation;
   const totalExpenses = totalDeductible + depreciation;
   const operatingProfit = incomeNet - totalExpenses;
-  return { year, list, incomeNet, incomeGross, incomeVat, groups, totalDeductible, totalGrossExpenses, totalInputVat, depreciation, totalExpenses, operatingProfit };
+  return { year, list, incomeNet, incomeGross, incomeVat, groups, totalDeductible, totalGrossExpenses, totalInputVat, manualDepreciation, fixedDepreciation, depreciation, totalExpenses, operatingProfit };
 }
 function renderGroups(calc){
   const rowsHtml = [];
@@ -400,7 +457,13 @@ function renderPnl(calc){
       .map(([cat, vals]) => `<tr><td>${escapeHtml(cat)}</td><td class="money">${toMoney(vals.deductible)}</td></tr>`).join('');
     sections.push(`<div class="section-title">${escapeHtml(g.title)}</div><table><tbody>${lines}<tr class="total-row"><td>סה״כ ${escapeHtml(g.title)}</td><td class="money">${toMoney(g.total)}</td></tr></tbody></table>`);
   }
-  sections.push(`<div class="section-title">פחת</div><table><tbody><tr><td>פחת</td><td class="money">${toMoney(calc.depreciation)}</td></tr><tr class="total-row"><td>סה״כ פחת</td><td class="money">${toMoney(calc.depreciation)}</td></tr></tbody></table>`);
+  {
+    const depLines = [];
+    if (Math.abs(calc.fixedDepreciation) > 0.005) depLines.push(`<tr><td>פחת מרכוש קבוע</td><td class="money">${toMoney(calc.fixedDepreciation)}</td></tr>`);
+    if (Math.abs(calc.manualDepreciation) > 0.005) depLines.push(`<tr><td>תוספת פחת ידנית</td><td class="money">${toMoney(calc.manualDepreciation)}</td></tr>`);
+    if (!depLines.length) depLines.push(`<tr><td>פחת</td><td class="money">${toMoney(0)}</td></tr>`);
+    sections.push(`<div class="section-title">פחת</div><table><tbody>${depLines.join('')}<tr class="total-row"><td>סה״כ פחת</td><td class="money">${toMoney(calc.depreciation)}</td></tr></tbody></table>`);
+  }
   pnlReport.innerHTML = `
     <div class="report-top">
       <div><strong>שם:</strong> ${escapeHtml(displayName)}</div>
@@ -426,7 +489,7 @@ function renderAll(){
   mProfit.style.color = calc.operatingProfit >= 0 ? 'var(--green)' : 'var(--red)';
   renderGroups(calc);
   renderPnl(calc);
-  statusText.textContent = `${calc.list.length} תנועות בשנת ${calc.year}`;
+  statusText.textContent = `${calc.list.length} תנועות, ${fixedAssets.length} נכסי רכוש קבוע בשנת ${calc.year}`;
 }
 function exportPnlCsv(){
   const calc = calculateYear();
@@ -438,7 +501,8 @@ function exportPnlCsv(){
     for (const [cat, vals] of g.categories.entries()) lines.push(['הוצאה', `${g.title} - ${cat}`, vals.deductible].map(csvCell).join(','));
     lines.push(['סה״כ', g.title, g.total].map(csvCell).join(','));
   }
-  lines.push(['פחת','פחת',calc.depreciation].map(csvCell).join(','));
+  lines.push(['פחת','פחת מרכוש קבוע',calc.fixedDepreciation].map(csvCell).join(','));
+  if (Math.abs(calc.manualDepreciation) > 0.005) lines.push(['פחת','תוספת פחת ידנית',calc.manualDepreciation].map(csvCell).join(','));
   lines.push(['סה״כ הוצאות','',calc.totalExpenses].map(csvCell).join(','));
   lines.push(['רווח תפעולי','',calc.operatingProfit].map(csvCell).join(','));
   downloadFile(`דוח-רווח-והפסד-${calc.year}.csv`, lines.join('\n'));
@@ -453,6 +517,7 @@ async function loadData(user){
   userProfile = userSnap.exists() ? userSnap.data() : { email: user.email };
   const ledger = ledgerSnap.exists() ? ledgerSnap.data() : {};
   rows = Array.isArray(ledger.rows) ? ledger.rows : [];
+  fixedAssets = Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets : [];
   ledgerSettings = ledger.settings || { vatEnabled: true, vatRate: userProfile?.vatRate || DEFAULT_VAT };
   const years = yearsFromRows();
   const current = taxYear.value;
