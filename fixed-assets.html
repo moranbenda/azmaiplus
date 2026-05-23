@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>רכוש קבוע ופחת - עצמאי פלוס</title>
+  <style>
+    :root{
+      --bg:#f6f8fc; --panel:#fff; --text:#172033; --muted:#667085; --line:#dfe6f0;
+      --blue:#2f6fec; --green:#16a34a; --red:#dc2626; --orange:#c47a00; --shadow:0 16px 45px rgba(15,23,42,.08);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Heebo",Arial,sans-serif}
+    body{direction:rtl}
+    a{color:inherit}
+    .wrap{max-width:1240px;margin:0 auto;padding:22px}
+    header{background:#fff;border-bottom:1px solid var(--line)}
+    .top{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
+    h1{margin:0;font-size:28px;line-height:1.25}
+    h2{margin:0 0 14px;font-size:22px}
+    h3{margin:0;font-size:17px}
+    .hint{color:var(--muted);font-size:13px;line-height:1.5}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+    .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:5px}
+    input,select,textarea{width:100%;border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px 12px;min-height:42px;font-size:15px;color:var(--text)}
+    textarea{min-height:70px;resize:vertical}
+    input[type="checkbox"]{width:auto;min-height:0;transform:scale(1.1);margin-inline-start:6px}
+    .check-row{display:flex;gap:8px;align-items:center;min-height:42px;border:1px solid var(--line);border-radius:14px;padding:8px 12px;background:#fff}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:none;border-radius:999px;padding:10px 16px;min-height:40px;background:linear-gradient(180deg,#3f7cf1,#2f6fec);color:#fff;text-decoration:none;cursor:pointer;font-size:14px}
+    .btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}
+    .btn.ghost{background:transparent;color:var(--muted);border:1px dashed var(--line)}
+    .btn.danger{background:#dc2626;color:#fff}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}
+    .metric{background:#fff;border:1px solid var(--line);border-radius:18px;padding:14px 16px;box-shadow:0 10px 28px rgba(15,23,42,.04)}
+    .metric .k{font-size:12px;color:var(--muted)}
+    .metric .v{font-size:20px;font-weight:800;margin-top:3px}
+    .income{color:var(--green)} .expense{color:var(--red)} .warn{color:var(--orange)}
+    .card{background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);margin:14px 0;overflow:hidden}
+    .card-hd{padding:16px 18px;background:#f1f5fb;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+    .card-bd{padding:18px}
+    table{width:100%;border-collapse:collapse;background:#fff}
+    th,td{border:1px solid var(--line);padding:9px;text-align:right;vertical-align:top}
+    th{background:#f3f6fb;font-weight:700}
+    .money{white-space:nowrap;font-variant-numeric:tabular-nums}
+    .muted{color:var(--muted)}
+    .table-scroll{overflow:auto}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .empty{padding:30px;text-align:center;color:var(--muted)}
+    .report-paper{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;margin:0 auto}
+    .report-top{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:18px;font-size:14px}
+    .report-title{font-size:22px;text-align:center;margin:12px 0 20px;font-weight:800}
+    .group-row td{font-weight:800;background:#f8fbff}
+    .total-row td{font-weight:800;background:#fafcff}
+    @media(max-width:900px){
+      .wrap{padding:14px}
+      h1{font-size:23px}
+      .grid{grid-template-columns:1fr 1fr}
+      .form-grid{grid-template-columns:1fr}
+      table{min-width:1120px}
+      .report-top{grid-template-columns:1fr}
+    }
+    @media print{
+      body{background:#fff}
+      header,.controls,.nonprint{display:none !important}
+      .wrap{max-width:none;padding:0}
+      .card{box-shadow:none;border:none;margin:0}
+      .card-hd{display:none}
+      .card-bd{padding:0}
+      .report-paper{border:none;border-radius:0;padding:10px;max-width:none}
+      table{min-width:0;font-size:11px}
+      th,td{padding:5px}
+    }
+  </style>
+</head>
+<body>
+  <header class="nonprint">
+    <div class="wrap top">
+      <div>
+        <h1>רכוש קבוע ופחת</h1>
+        <div class="hint">ניהול נכסים והפקת דוח פחת שנתי.</div>
+      </div>
+      <div class="row">
+        <a class="btn secondary" href="/year-end.html">חזרה לסגירת שנה</a>
+        <a class="btn secondary" href="/">חזרה למסך הראשי</a>
+        <button class="btn ghost" id="btnRefresh" type="button">רענון</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card controls">
+      <div class="card-hd"><h3>שנת מס ופעולות</h3><span class="hint" id="statusText">טוען נתונים…</span></div>
+      <div class="card-bd">
+        <div class="row">
+          <div>
+            <label>שנת מס</label>
+            <select id="taxYear"></select>
+          </div>
+          <button class="btn" id="btnNew" type="button">הוספת נכס</button>
+          <button class="btn secondary" id="btnSave" type="button">שמירה</button>
+          <button class="btn secondary" id="btnCsv" type="button">ייצוא CSV</button>
+          <button class="btn secondary" id="btnPrint" type="button">הדפסה / PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid controls" id="metricsGrid">
+      <div class="metric"><div class="k">עלות מקורית</div><div class="v" id="mOriginal">₪ 0.00</div></div>
+      <div class="metric"><div class="k">נכסים בני פחת</div><div class="v" id="mBase">₪ 0.00</div></div>
+      <div class="metric"><div class="k">פחת השנה</div><div class="v warn" id="mYearDep">₪ 0.00</div></div>
+      <div class="metric"><div class="k">עלות מופחתת</div><div class="v" id="mWritten">₪ 0.00</div></div>
+    </section>
+
+    <section class="card controls" id="assetFormCard" style="display:none">
+      <div class="card-hd"><h3 id="formTitle">נכס חדש</h3></div>
+      <div class="card-bd">
+        <div class="form-grid">
+          <div><label>שם הנכס / תיאור</label><input id="assetName" placeholder="למשל: אייפון, מחשב, רכב" /></div>
+          <div><label>קבוצת נכס</label><input id="assetGroup" list="assetGroups" placeholder="למשל: ציוד / רכב" /></div>
+          <div><label>תאריך רכישה / שינוי</label><input id="purchaseDate" type="date" /></div>
+          <div><label>תאריך הפעלה</label><input id="activationDate" type="date" /></div>
+          <div><label>המחיר המקורי</label><input id="originalCost" type="number" step="0.01" min="0" placeholder="0" /></div>
+          <div><label>בסיס לפחת ידני</label><input id="baseOverride" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" /></div>
+          <div><label>% פחת בחוק</label><input id="legalRate" type="number" step="0.01" min="0" placeholder="15" /></div>
+          <div><label>% פחת נתבע</label><input id="claimedRate" type="number" step="0.01" min="0" placeholder="ריק = כמו בחוק" /></div>
+          <div class="check-row"><input id="incVat" type="checkbox" checked /><span>המחיר כולל מע״מ</span></div>
+          <div class="check-row"><input id="vatClaimed" type="checkbox" checked /><span>המע״מ נדרש/יוחזר</span></div>
+          <div><label>פחת נצבר קודם</label><input id="priorAccumulated" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" /></div>
+          <div class="check-row"><input id="sold" type="checkbox" /><span>הנכס נמכר / נגרע</span></div>
+          <div><label>תאריך מכירה / גריעה</label><input id="saleDate" type="date" /></div>
+          <div><label>מחיר מכירה</label><input id="salePrice" type="number" step="0.01" min="0" placeholder="0" /></div>
+          <div style="grid-column:1/-1"><label>הערות</label><textarea id="notes" placeholder="למשל: נמכר, הושבת, מספר רכב וכו׳"></textarea></div>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn" id="btnSaveAsset" type="button">שמירת נכס</button>
+          <button class="btn secondary" id="btnCancelAsset" type="button">ביטול</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card controls">
+      <div class="card-hd"><h3>רשימת נכסים</h3></div>
+      <div class="card-bd table-scroll">
+        <table>
+          <thead><tr><th>שם נכס</th><th>קבוצה</th><th>תאריך רכישה</th><th>עלות מקורית</th><th>% פחת</th><th>נמכר</th><th>פעולות</th></tr></thead>
+          <tbody id="assetsBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" id="depReportCard">
+      <div class="card-hd nonprint"><h3>דוח פחת</h3></div>
+      <div class="card-bd table-scroll">
+        <div class="report-paper" id="depReport"></div>
+      </div>
+    </section>
+  </main>
+
+  <datalist id="assetGroups">
+    <option value="רכב"></option>
+    <option value="ציוד ספורט"></option>
+    <option value="מחשוב ותוכנה"></option>
+    <option value="ציוד"></option>
+    <option value="ריהוט וציוד משרדי"></option>
+    <option value="תוכנה"></option>
+    <option value="אחר"></option>
+  </datalist>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
+  authDomain: "freelance-accounting-6c3bb.firebaseapp.com",
+  projectId: "freelance-accounting-6c3bb",
+  storageBucket: "freelance-accounting-6c3bb.firebasestorage.app",
+  messagingSenderId: "196974556694",
+  appId: "1:196974556694:web:60ba710567f2a7c67c6737"
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const DEFAULT_VAT = 18;
+
+const $ = id => document.getElementById(id);
+const taxYear = $('taxYear');
+const statusText = $('statusText');
+const assetsBody = $('assetsBody');
+const depReport = $('depReport');
+const formCard = $('assetFormCard');
+const formTitle = $('formTitle');
+const mOriginal = $('mOriginal');
+const mBase = $('mBase');
+const mYearDep = $('mYearDep');
+const mWritten = $('mWritten');
+
+let currentUser = null;
+let userProfile = null;
+let ledgerSettings = { vatEnabled:true, vatRate:DEFAULT_VAT };
+let assets = [];
+let editingId = null;
+
+function escapeHtml(s=''){
+  return String(s).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+}
+function toMoney(n){
+  const x = Number(n) || 0;
+  return new Intl.NumberFormat('he-IL', { style:'currency', currency:'ILS', minimumFractionDigits:2 }).format(x);
+}
+function csvCell(v){
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function downloadFile(name, content, type='text/csv;charset=utf-8'){
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+function parseLocalDate(value) {
+  if (!value) return null;
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function formatDate(value){
+  if (!value) return '';
+  const d = parseLocalDate(value);
+  if (!d) return String(value);
+  return d.toLocaleDateString('he-IL');
+}
+function monthSerial(d) { return d.getFullYear() * 12 + d.getMonth(); }
+function monthsInclusive(start, end) {
+  if (!start || !end || end < start) return 0;
+  return Math.max(0, monthSerial(end) - monthSerial(start) + 1);
+}
+function maxDate(a,b){ if (!a) return b; if (!b) return a; return a > b ? a : b; }
+function minDate(a,b){ if (!a) return b; if (!b) return a; return a < b ? a : b; }
+function getVatRate(){
+  const n = Number(ledgerSettings?.vatRate || userProfile?.vatRate || DEFAULT_VAT);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_VAT;
+}
+function assetBase(asset) {
+  const original = Number(asset.originalCost) || 0;
+  const override = Number(asset.baseOverride);
+  if (Number.isFinite(override) && override > 0) return override;
+  const incVat = asset.incVat === true || asset.incVat === 'true';
+  const vatClaimed = asset.vatClaimed === true || asset.vatClaimed === 'true';
+  const rate = getVatRate() / 100;
+  if (incVat && vatClaimed && rate > 0) return original / (1 + rate);
+  return original;
+}
+function calcAsset(asset, year) {
+  const base = Math.max(0, assetBase(asset));
+  const legalRate = Math.max(0, Number(asset.legalRate ?? asset.depreciationRate) || 0);
+  const claimedRate = Math.max(0, Number(asset.claimedRate ?? asset.depreciationRate ?? legalRate) || legalRate || 0);
+  const start = parseLocalDate(asset.activationDate || asset.purchaseDate);
+  const purchase = parseLocalDate(asset.purchaseDate || asset.activationDate);
+  const sold = asset.sold === true || asset.sold === 'true';
+  const saleDate = sold ? parseLocalDate(asset.saleDate) : null;
+  const y = Number(year);
+  const yearStart = new Date(y, 0, 1);
+  const yearEnd = new Date(y, 11, 31);
+  const activeEnd = sold && saleDate ? minDate(saleDate, yearEnd) : yearEnd;
+  const periodStart = maxDate(start, yearStart);
+  const monthsThisYear = start ? monthsInclusive(periodStart, activeEnd) : 0;
+  const priorEnd = new Date(y-1, 11, 31);
+  const beforeEnd = sold && saleDate ? minDate(saleDate, priorEnd) : priorEnd;
+  const monthsBefore = start ? monthsInclusive(start, beforeEnd) : 0;
+  const monthlyDep = base * (claimedRate / 100) / 12;
+  const priorOverride = asset.priorAccumulated !== '' && asset.priorAccumulated != null ? Number(asset.priorAccumulated) : NaN;
+  const accumulatedBefore = Math.min(base, Math.max(0, Number.isFinite(priorOverride) ? priorOverride : monthlyDep * monthsBefore));
+  const rawYearDep = monthlyDep * monthsThisYear;
+  const yearDep = Math.min(Math.max(0, base - accumulatedBefore), Math.max(0, rawYearDep));
+  const totalDep = Math.min(base, accumulatedBefore + yearDep);
+  const writtenDown = Math.max(0, base - totalDep);
+  const additionThisYear = purchase && purchase.getFullYear() === y ? base : 0;
+  return { base, legalRate, claimedRate, monthsThisYear, accumulatedBefore, yearDep, totalDep, writtenDown, additionThisYear };
+}
+function assetYears(){
+  const set = new Set();
+  const now = new Date().getFullYear();
+  set.add(String(now)); set.add(String(now-1));
+  for (const a of assets) {
+    const d = parseLocalDate(a.purchaseDate || a.activationDate);
+    if (d) set.add(String(d.getFullYear()));
+    const s = parseLocalDate(a.saleDate);
+    if (s) set.add(String(s.getFullYear()));
+  }
+  return Array.from(set).sort((a,b)=>b.localeCompare(a));
+}
+function emptyAsset(){
+  return { id: crypto.randomUUID(), name:'', group:'ציוד', purchaseDate:'', activationDate:'', originalCost:'', incVat:true, vatClaimed:true, baseOverride:'', legalRate:15, claimedRate:'', priorAccumulated:'', sold:false, saleDate:'', salePrice:'', notes:'' };
+}
+function getFormAsset(){
+  return {
+    id: editingId || crypto.randomUUID(),
+    name: $('assetName').value.trim(),
+    group: $('assetGroup').value.trim() || 'ציוד',
+    purchaseDate: $('purchaseDate').value,
+    activationDate: $('activationDate').value || $('purchaseDate').value,
+    originalCost: Number($('originalCost').value) || 0,
+    incVat: $('incVat').checked,
+    vatClaimed: $('vatClaimed').checked,
+    baseOverride: $('baseOverride').value === '' ? '' : Number($('baseOverride').value),
+    legalRate: Number($('legalRate').value) || 0,
+    claimedRate: $('claimedRate').value === '' ? '' : Number($('claimedRate').value),
+    priorAccumulated: $('priorAccumulated').value === '' ? '' : Number($('priorAccumulated').value),
+    sold: $('sold').checked,
+    saleDate: $('saleDate').value,
+    salePrice: Number($('salePrice').value) || 0,
+    notes: $('notes').value.trim()
+  };
+}
+function putFormAsset(asset){
+  $('assetName').value = asset.name || '';
+  $('assetGroup').value = asset.group || 'ציוד';
+  $('purchaseDate').value = asset.purchaseDate || '';
+  $('activationDate').value = asset.activationDate || asset.purchaseDate || '';
+  $('originalCost').value = asset.originalCost ?? '';
+  $('incVat').checked = asset.incVat !== false;
+  $('vatClaimed').checked = asset.vatClaimed !== false;
+  $('baseOverride').value = asset.baseOverride ?? '';
+  $('legalRate').value = asset.legalRate ?? asset.depreciationRate ?? 15;
+  $('claimedRate').value = asset.claimedRate ?? '';
+  $('priorAccumulated').value = asset.priorAccumulated ?? '';
+  $('sold').checked = asset.sold === true || asset.sold === 'true';
+  $('saleDate').value = asset.saleDate || '';
+  $('salePrice').value = asset.salePrice ?? '';
+  $('notes').value = asset.notes || '';
+}
+function openForm(asset=null){
+  const a = asset || emptyAsset();
+  editingId = asset ? asset.id : null;
+  formTitle.textContent = asset ? 'עריכת נכס' : 'נכס חדש';
+  putFormAsset(a);
+  formCard.style.display = '';
+  formCard.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function closeForm(){
+  editingId = null;
+  formCard.style.display = 'none';
+}
+async function saveAssets(){
+  if (!currentUser) return;
+  statusText.textContent = 'שומר…';
+  await setDoc(doc(db, 'ledgers', currentUser.uid), {
+    fixedAssets: assets,
+    fixedAssetsUpdatedAt: new Date().toISOString()
+  }, { merge:true });
+  statusText.textContent = `נשמרו ${assets.length} נכסים`;
+}
+function renderAssetsList(){
+  if (!assets.length) {
+    assetsBody.innerHTML = '<tr><td colspan="7" class="empty">אין עדיין נכסים</td></tr>';
+    return;
+  }
+  assetsBody.innerHTML = assets.map(a => `
+    <tr>
+      <td>${escapeHtml(a.name || '')}</td>
+      <td>${escapeHtml(a.group || '')}</td>
+      <td>${escapeHtml(formatDate(a.purchaseDate))}</td>
+      <td class="money">${toMoney(a.originalCost)}</td>
+      <td>${escapeHtml(a.legalRate ?? a.depreciationRate ?? '')}%</td>
+      <td>${(a.sold === true || a.sold === 'true') ? 'כן' : 'לא'}</td>
+      <td><div class="actions"><button class="btn secondary" type="button" data-edit="${escapeHtml(a.id)}">עריכה</button><button class="btn danger" type="button" data-del="${escapeHtml(a.id)}">מחיקה</button></div></td>
+    </tr>`).join('');
+}
+function groupedAssetsForReport(){
+  const year = taxYear.value;
+  const map = new Map();
+  for (const asset of assets) {
+    const group = asset.group || 'אחר';
+    if (!map.has(group)) map.set(group, []);
+    map.get(group).push({ asset, calc: calcAsset(asset, year) });
+  }
+  return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0], 'he'));
+}
+function renderReport(){
+  const year = taxYear.value;
+  const businessName = userProfile?.businessName || 'שם העסק';
+  const displayName = userProfile?.displayName || userProfile?.email || currentUser?.email || '';
+  const businessId = userProfile?.businessId || '';
+  let totalOriginal = 0, totalAdditions = 0, totalBase = 0, totalYearDep = 0, totalAccumBefore = 0, totalDep = 0, totalWritten = 0;
+  const rowsHtml = [];
+  for (const [group, items] of groupedAssetsForReport()) {
+    rowsHtml.push(`<tr class="group-row"><td colspan="13">קבוצה ${escapeHtml(group)}</td></tr>`);
+    let gOriginal = 0, gAdditions = 0, gBase = 0, gYearDep = 0, gAccumBefore = 0, gTotalDep = 0, gWritten = 0;
+    for (const { asset, calc } of items) {
+      const original = Number(asset.originalCost) || 0;
+      gOriginal += original; gAdditions += calc.additionThisYear; gBase += calc.base; gYearDep += calc.yearDep; gAccumBefore += calc.accumulatedBefore; gTotalDep += calc.totalDep; gWritten += calc.writtenDown;
+      const noteParts = [];
+      if (asset.sold) noteParts.push(`נמכר/נגרע${asset.saleDate ? ' ב-' + formatDate(asset.saleDate) : ''}`);
+      if (asset.notes) noteParts.push(asset.notes);
+      rowsHtml.push(`<tr>
+        <td>${escapeHtml(asset.name || '')}</td>
+        <td>${escapeHtml(formatDate(asset.purchaseDate))}</td>
+        <td>${escapeHtml(formatDate(asset.activationDate || asset.purchaseDate))}</td>
+        <td class="money">${toMoney(original)}</td>
+        <td class="money">${toMoney(calc.additionThisYear)}</td>
+        <td class="money">${toMoney(calc.base)}</td>
+        <td>${calc.legalRate.toFixed(2).replace(/\.00$/,'')}%</td>
+        <td>${calc.claimedRate.toFixed(2).replace(/\.00$/,'')}%</td>
+        <td class="money">${toMoney(calc.yearDep)}</td>
+        <td class="money">${toMoney(calc.accumulatedBefore)}</td>
+        <td class="money">${toMoney(calc.totalDep)}</td>
+        <td class="money">${toMoney(calc.writtenDown)}</td>
+        <td>${escapeHtml(noteParts.join(' | '))}</td>
+      </tr>`);
+    }
+    rowsHtml.push(`<tr class="total-row"><td>סה״כ לקבוצה ${escapeHtml(group)}</td><td></td><td></td><td class="money">${toMoney(gOriginal)}</td><td class="money">${toMoney(gAdditions)}</td><td class="money">${toMoney(gBase)}</td><td></td><td></td><td class="money">${toMoney(gYearDep)}</td><td class="money">${toMoney(gAccumBefore)}</td><td class="money">${toMoney(gTotalDep)}</td><td class="money">${toMoney(gWritten)}</td><td></td></tr>`);
+    totalOriginal += gOriginal; totalAdditions += gAdditions; totalBase += gBase; totalYearDep += gYearDep; totalAccumBefore += gAccumBefore; totalDep += gTotalDep; totalWritten += gWritten;
+  }
+  if (!rowsHtml.length) rowsHtml.push('<tr><td colspan="13" class="empty">אין נכסים להצגה</td></tr>');
+  rowsHtml.push(`<tr class="total-row"><td>סה״כ כללי</td><td></td><td></td><td class="money">${toMoney(totalOriginal)}</td><td class="money">${toMoney(totalAdditions)}</td><td class="money">${toMoney(totalBase)}</td><td></td><td></td><td class="money">${toMoney(totalYearDep)}</td><td class="money">${toMoney(totalAccumBefore)}</td><td class="money">${toMoney(totalDep)}</td><td class="money">${toMoney(totalWritten)}</td><td></td></tr>`);
+  mOriginal.textContent = toMoney(totalOriginal);
+  mBase.textContent = toMoney(totalBase);
+  mYearDep.textContent = toMoney(totalYearDep);
+  mWritten.textContent = toMoney(totalWritten);
+  depReport.innerHTML = `
+    <div class="report-top">
+      <div><strong>שם:</strong> ${escapeHtml(displayName)}</div>
+      <div><strong>שם העסק:</strong> ${escapeHtml(businessName)}</div>
+      <div><strong>מספר עוסק / ח.פ:</strong> ${escapeHtml(businessId || '-')}</div>
+      <div><strong>שנת המס:</strong> ${escapeHtml(year)}</div>
+    </div>
+    <div class="report-title">תקנות מס הכנסה (פחת) לשנה שנסתיימה ב־31/12/${escapeHtml(year)}</div>
+    <table>
+      <thead><tr>
+        <th>רשימת הנכסים ותיאורם</th><th>תאריך רכישה/שינוי</th><th>תאריך הפעלה</th><th>המחיר המקורי</th><th>שינויי השנה</th><th>נכסים בני פחת</th><th>% פחת בחוק</th><th>% פחת נתבע</th><th>פחת השנה</th><th>פחת שנצבר</th><th>סה״כ פחת</th><th>עלות מופחתת</th><th>הערות</th>
+      </tr></thead>
+      <tbody>${rowsHtml.join('')}</tbody>
+    </table>
+  `;
+}
+function renderAll(){
+  renderAssetsList();
+  renderReport();
+  statusText.textContent = `${assets.length} נכסים`;
+}
+function exportCsv(){
+  const year = taxYear.value;
+  const lines = [["קבוצה","נכס","תאריך רכישה/שינוי","תאריך הפעלה","המחיר המקורי","שינויי השנה","נכסים בני פחת","% פחת בחוק","% פחת נתבע","פחת השנה","פחת שנצבר","סהכ פחת","עלות מופחתת","הערות"].map(csvCell).join(',')];
+  for (const [group, items] of groupedAssetsForReport()) {
+    for (const { asset, calc } of items) {
+      lines.push([group, asset.name, asset.purchaseDate, asset.activationDate || asset.purchaseDate, asset.originalCost, calc.additionThisYear, calc.base, calc.legalRate, calc.claimedRate, calc.yearDep, calc.accumulatedBefore, calc.totalDep, calc.writtenDown, asset.notes || ''].map(csvCell).join(','));
+    }
+  }
+  downloadFile(`דוח-פחת-${year}.csv`, lines.join('\n'));
+}
+async function loadData(user){
+  currentUser = user;
+  statusText.textContent = 'טוען נתונים…';
+  const [userSnap, ledgerSnap] = await Promise.all([
+    getDoc(doc(db, 'users', user.uid)),
+    getDoc(doc(db, 'ledgers', user.uid))
+  ]);
+  userProfile = userSnap.exists() ? userSnap.data() : { email:user.email };
+  const ledger = ledgerSnap.exists() ? ledgerSnap.data() : {};
+  assets = Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets : [];
+  ledgerSettings = ledger.settings || { vatEnabled:true, vatRate:userProfile?.vatRate || DEFAULT_VAT };
+  const years = assetYears();
+  const current = taxYear.value;
+  taxYear.innerHTML = years.map(y => `<option value="${escapeHtml(y)}">${escapeHtml(y)}</option>`).join('');
+  taxYear.value = years.includes(current) ? current : years[0];
+  renderAll();
+}
+
+$('btnNew').addEventListener('click', () => openForm());
+$('btnCancelAsset').addEventListener('click', closeForm);
+$('btnSaveAsset').addEventListener('click', () => {
+  const asset = getFormAsset();
+  if (!asset.name || !asset.purchaseDate || !asset.originalCost || !asset.legalRate) {
+    alert('יש למלא שם נכס, תאריך רכישה, מחיר מקורי ואחוז פחת.');
+    return;
+  }
+  const idx = assets.findIndex(a => a.id === asset.id);
+  if (idx >= 0) assets[idx] = asset; else assets.push(asset);
+  closeForm();
+  renderAll();
+});
+assetsBody.addEventListener('click', e => {
+  const editId = e.target?.dataset?.edit;
+  const delId = e.target?.dataset?.del;
+  if (editId) {
+    const asset = assets.find(a => a.id === editId);
+    if (asset) openForm(asset);
+  }
+  if (delId) {
+    if (!confirm('למחוק את הנכס מהרשימה?')) return;
+    assets = assets.filter(a => a.id !== delId);
+    renderAll();
+  }
+});
+taxYear.addEventListener('change', renderAll);
+$('btnSave').addEventListener('click', saveAssets);
+$('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
+$('btnCsv').addEventListener('click', exportCsv);
+$('btnPrint').addEventListener('click', () => window.print());
+
+onAuthStateChanged(auth, async user => {
+  try {
+    if (!user) {
+      statusText.textContent = 'יש להתחבר דרך האפליקציה הראשית.';
+      depReport.innerHTML = '<div class="empty">לא מחוברים. חזרה למסך הראשי תאפשר התחברות.</div>';
+      return;
+    }
+    await loadData(user);
+  } catch (err) {
+    console.error(err);
+    statusText.textContent = 'שגיאה בטעינת הנתונים';
+    depReport.innerHTML = '<div class="empty">שגיאה בטעינת הנתונים. כדאי לבדוק Console.</div>';
+  }
+});
+</script>
+</body>
+</html>
