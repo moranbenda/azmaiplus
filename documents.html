@@ -30,6 +30,16 @@
 .customer-option b{display:block;color:var(--text)}
 .customer-option small{display:block;color:var(--muted);margin-top:3px}
 .doc-logo-placeholder{border:1px dashed var(--line);border-radius:14px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;background:#fbfcff;text-align:center;padding:6px}
+
+    .lines-panel{border:1px solid var(--line);border-radius:18px;background:#fbfcff;padding:12px}
+    .doc-lines{display:grid;gap:10px;margin:8px 0 12px}
+    .line-row{display:grid;grid-template-columns:2fr .7fr 1fr 1fr auto;gap:10px;align-items:end;border:1px solid var(--line);border-radius:16px;background:#fff;padding:12px}
+    .line-row .remove-line{min-width:42px;box-shadow:none}
+    .payment-box{border:1px solid var(--line);border-radius:16px;background:#fbfcff;padding:12px}
+    .payment-box[hidden]{display:none!important}
+    .discount-note{font-size:12px;color:var(--muted);margin-top:4px}
+    @media(max-width:900px){.line-row{grid-template-columns:1fr}.line-row .remove-line{width:100%}}
+
 </style>
 </head>
 <body>
@@ -66,10 +76,28 @@
         <div><label>מספר מוצע</label><input type="text" id="docNumber" readonly /></div>
         <div><label>תאריך</label><input type="date" id="docDate" /></div>
         <div class="wide customer-search-wrap"><label>לקוח</label><input type="text" id="docCustomerSearch" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה..." autocomplete="off" /><input type="hidden" id="docCustomer" /><div id="customerSuggest" class="customer-suggest" hidden></div><div class="hint" id="selectedCustomerHint"></div></div>
-        <div class="wide"><label>תיאור השירות / המוצר</label><input type="text" id="itemDesc" placeholder="למשל: שיעור פרטי, ייעוץ, אימון, שירות חודשי..." /></div>
-        <div><label>כמות</label><input type="number" id="itemQty" min="0" step="0.01" value="1" /></div>
-        <div><label>מחיר לפני מע״מ</label><input type="number" id="itemPrice" min="0" step="0.01" value="0" /></div>
+        <div class="wide lines-panel">
+          <label>שורות במסמך</label>
+          <div class="hint">אפשר להוסיף כמה שורות. ניתן להקליד מחיר לפני מע״מ או מחיר כולל מע״מ — השדה השני יתעדכן אוטומטית.</div>
+          <div id="linesEditor" class="doc-lines"></div>
+          <button type="button" class="btn secondary small" id="btnAddLine">+ הוספת שורה</button>
+        </div>
         <div><label>אחוז מע״מ</label><input type="number" id="docVatRate" min="0" step="0.1" /></div>
+        <div><label>הנחה %</label><input type="number" id="docDiscountPct" min="0" max="100" step="0.01" value="0" /><div class="discount-note">ההנחה מחושבת מסה״כ לפני מע״מ.</div></div>
+        <div id="paymentMethodWrap" class="payment-box wide" hidden>
+          <label>אמצעי תשלום</label>
+          <select id="paymentMethod">
+            <option value="">בחירת אמצעי תשלום</option>
+            <option value="cash">מזומן</option>
+            <option value="bank_transfer">העברה בנקאית</option>
+            <option value="credit_card">אשראי</option>
+            <option value="check">צ׳ק</option>
+            <option value="payment_app">אפליקציית תשלום</option>
+            <option value="other">אחר</option>
+          </select>
+          <label style="margin-top:10px">פרטי תשלום / אסמכתא</label>
+          <input type="text" id="paymentRef" placeholder="למשל: מספר אישור, בנק, ארבע ספרות אחרונות וכו׳" />
+        </div>
         <div class="wide"><label>הערות למסמך</label><textarea id="docNotes" placeholder="אפשר להוסיף תנאי תשלום, פרטי העברה בנקאית, תודה וכו׳"></textarea></div>
       </div>
       <div class="footer"><div class="actions"><button class="btn" id="btnPreview">עדכון תצוגה</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הדפסה / PDF</button></div><span class="status" id="draftStatus"></span></div>
@@ -94,7 +122,7 @@ const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authD
 const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
 const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1 };
 const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר" };
-let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[];
+let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[];
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function money(n){return '₪ ' + (Number(n)||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -110,26 +138,55 @@ function renderCustomerSuggestions(query=""){ const box=$('customerSuggest'); if
 function vatEnabled(){return String(profile.businessType||'morasha') !== 'ptor' && Number(profile.vatRate||0)>0;}
 function nextNumberFor(type){return Number(settings[type]||1);}
 function setStatus(el,msg,cls=''){el.textContent=msg;el.className='status '+cls;}
-function totals(){const qty=Number($('itemQty').value||0), price=Number($('itemPrice').value||0), rate=Number($('docVatRate').value||0); const net=qty*price; const vat=vatEnabled()?net*rate/100:0; return {net,vat,gross:net+vat};}
+function round2(n){return Math.round((Number(n)||0)*100)/100;}
+function rateFactor(){return vatEnabled() ? 1 + (Number($('docVatRate').value||0)/100) : 1;}
+function isPaymentDoc(){return ['receipt','tax_invoice_receipt'].includes($('docType').value);}
+function paymentLabel(v){return ({cash:'מזומן', bank_transfer:'העברה בנקאית', credit_card:'אשראי', check:'צ׳ק', payment_app:'אפליקציית תשלום', other:'אחר'}[v] || '');}
+function makeLine(data={}){return {id:data.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())), desc:data.desc ?? data.itemDesc ?? '', qty:Number(data.qty ?? 1), netPrice:Number(data.netPrice ?? data.price ?? 0), grossPrice:Number(data.grossPrice ?? round2(Number(data.netPrice ?? data.price ?? 0)*rateFactor()))};}
+function ensureLines(){if(!Array.isArray(docLines) || !docLines.length) docLines=[makeLine({desc:'',qty:1,netPrice:0})];}
+function lineTotalNet(line){return round2(Number(line.qty||0)*Number(line.netPrice||0));}
+function syncGrossFromNet(){ensureLines(); const f=rateFactor(); docLines=docLines.map(l=>({...l, grossPrice:round2(Number(l.netPrice||0)*f)}));}
+function renderLinesEditor(){ensureLines(); const box=$('linesEditor'); if(!box)return; box.innerHTML=docLines.map((l,idx)=>`
+  <div class="line-row" data-line-id="${escapeHtml(l.id)}">
+    <div><label>תיאור</label><input type="text" data-field="desc" data-id="${escapeHtml(l.id)}" value="${escapeHtml(l.desc||'')}" placeholder="שירות / מוצר" /></div>
+    <div><label>כמות</label><input type="number" data-field="qty" data-id="${escapeHtml(l.id)}" min="0" step="0.01" value="${escapeHtml(l.qty||0)}" /></div>
+    <div><label>מחיר לפני מע״מ</label><input type="number" data-field="netPrice" data-id="${escapeHtml(l.id)}" min="0" step="0.01" value="${escapeHtml(l.netPrice||0)}" /></div>
+    <div><label>מחיר כולל מע״מ</label><input type="number" data-field="grossPrice" data-id="${escapeHtml(l.id)}" min="0" step="0.01" value="${escapeHtml(l.grossPrice||0)}" /></div>
+    <button type="button" class="btn secondary small remove-line" data-remove-line="${escapeHtml(l.id)}" ${docLines.length<=1?'disabled':''}>מחיקה</button>
+  </div>`).join('');
+  box.querySelectorAll('[data-field]').forEach(input=>input.addEventListener('input',()=>{
+    const line=docLines.find(x=>String(x.id)===String(input.dataset.id)); if(!line)return;
+    const field=input.dataset.field;
+    if(field==='desc') line.desc=input.value;
+    if(field==='qty') line.qty=Number(input.value||0);
+    if(field==='netPrice'){ line.netPrice=Number(input.value||0); line.grossPrice=round2(line.netPrice*rateFactor()); const row=input.closest('.line-row'); row.querySelector('[data-field="grossPrice"]').value=line.grossPrice; }
+    if(field==='grossPrice'){ line.grossPrice=Number(input.value||0); line.netPrice=round2(line.grossPrice/rateFactor()); const row=input.closest('.line-row'); row.querySelector('[data-field="netPrice"]').value=line.netPrice; }
+    renderPreview();
+  }));
+  box.querySelectorAll('[data-remove-line]').forEach(btn=>btn.onclick=()=>{ if(docLines.length<=1)return; docLines=docLines.filter(x=>String(x.id)!==String(btn.dataset.removeLine)); renderLinesEditor(); renderPreview(); });
+}
+function totals(){ensureLines(); const subtotal=round2(docLines.reduce((s,l)=>s+lineTotalNet(l),0)); const discountPct=Math.min(100,Math.max(0,Number($('docDiscountPct')?.value||0))); const discount=round2(subtotal*discountPct/100); const net=round2(Math.max(0,subtotal-discount)); const vat=round2(vatEnabled()?net*Number($('docVatRate').value||0)/100:0); return {subtotal,discountPct,discount,net,vat,gross:round2(net+vat)};}
 function hydrateSettings(){settings={...DEFAULT_SETTINGS,...(ledger.documentSettings||{})}; $('setInvoice').value=settings.tax_invoice; $('setReceipt').value=settings.receipt; $('setTaxReceipt').value=settings.tax_invoice_receipt; $('setCredit').value=settings.credit_note; $('setQuote').value=settings.quote;}
 function syncStats(){ $('statCustomers').textContent=customers.length; $('statDrafts').textContent=drafts.length; $('statNextInvoice').textContent=settings.tax_invoice||1; $('statNextReceipt').textContent=settings.receipt||1; }
 function renderCustomerOptions(){ const input=$('docCustomerSearch'); if(!input)return; if(!customers.length){ input.value=''; input.placeholder='אין לקוחות — יש להוסיף לקוח במודול לקוחות'; input.disabled=true; $('docCustomer').value=''; } else { input.disabled=false; input.placeholder='חיפוש לפי שם, מייל, טלפון או מספר מזהה...'; if(!$('docCustomer').value && customers.length===1) setSelectedCustomer(customers[0]); else renderSelectedCustomerHint(); } }
 function updateDocNumber(){ $('docNumber').value = nextNumberFor($('docType').value); }
+function updatePaymentVisibility(){ const wrap=$('paymentMethodWrap'); if(wrap) wrap.hidden=!isPaymentDoc(); }
 function businessBlock(){return `<b>${escapeHtml(profile.businessName||'שם העסק')}</b><br>מספר עוסק/ח.פ: ${escapeHtml(profile.businessId||'')}<br>${profile.phone?`טלפון: ${escapeHtml(profile.phone)}<br>`:''}${profile.email?`מייל: ${escapeHtml(profile.email)}<br>`:''}`;}
 function customerBlock(c){if(!c)return 'לא נבחר לקוח'; return `<b>${escapeHtml(customerName(c))}</b><br>${c.idNumber||c.businessId?`מספר מזהה: ${escapeHtml(c.idNumber||c.businessId)}<br>`:''}${c.contactName?`איש קשר: ${escapeHtml(c.contactName)}<br>`:''}${c.email?`מייל: ${escapeHtml(c.email)}<br>`:''}${c.phone?`טלפון: ${escapeHtml(c.phone)}<br>`:''}${[c.address,c.city,c.zip].filter(Boolean).map(escapeHtml).join(', ')}`;}
-function renderPreview(){ const type=$('docType').value, c=getSelectedCustomer(), t=totals(); const logo=profile.businessLogoDataUrl || profile.businessLogo || profile.logoDataUrl || ""; const item=escapeHtml($('itemDesc').value||'שירות / מוצר'); $('docPreview').innerHTML=`
+function renderPreview(){ const type=$('docType').value, c=getSelectedCustomer(), t=totals(); updatePaymentVisibility(); const logo=profile.businessLogoDataUrl || profile.businessLogo || profile.logoDataUrl || ""; const rows=docLines.map(l=>`<tr><td>${escapeHtml(l.desc||'שירות / מוצר')}</td><td>${escapeHtml(l.qty||0)}</td><td>${money(l.netPrice)}</td><td>${money(lineTotalNet(l))}</td></tr>`).join(''); const paymentHtml=isPaymentDoc()?`<div class="box" style="margin-top:20px"><h3>אמצעי תשלום</h3>${escapeHtml(paymentLabel($('paymentMethod').value)||'לא צוין')}${$('paymentRef').value?`<br>פרטים: ${escapeHtml($('paymentRef').value)}`:''}</div>`:''; $('docPreview').innerHTML=`
   <div class="doc-head"><div>${logo ? `<img class="doc-logo" src="${escapeHtml(logo)}" alt="לוגו העסק">` : `<div class="doc-logo doc-logo-placeholder">לוגו העסק</div>`}<div class="doc-meta">${businessBlock()}</div></div><div class="doc-title"><h2>${escapeHtml(TYPE_LABELS[type])}</h2><div class="doc-meta">מספר: <b>${escapeHtml($('docNumber').value||'')}</b><br>תאריך: ${escapeHtml($('docDate').value||'')}</div></div></div>
   <div class="doc-parties"><div class="box"><h3>פרטי העסק</h3>${businessBlock()}</div><div class="box"><h3>לכבוד</h3>${customerBlock(c)}</div></div>
-  <table class="items"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר</th><th>סה״כ</th></tr></thead><tbody><tr><td>${item}</td><td>${escapeHtml($('itemQty').value||'')}</td><td>${money($('itemPrice').value)}</td><td>${money(t.net)}</td></tr></tbody></table>
-  <div class="totals"><div><span>סה״כ לפני מע״מ</span><span>${money(t.net)}</span></div><div><span>מע״מ</span><span>${money(t.vat)}</span></div><div><span>סה״כ לתשלום</span><span>${money(t.gross)}</span></div></div>
+  <table class="items"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר לפני מע״מ</th><th>סה״כ</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="totals"><div><span>סה״כ לפני מע״מ</span><span>${money(t.subtotal)}</span></div>${t.discount>0?`<div><span>הנחה ${escapeHtml(t.discountPct)}%</span><span>-${money(t.discount)}</span></div><div><span>סה״כ לאחר הנחה לפני מע״מ</span><span>${money(t.net)}</span></div>`:''}<div><span>מע״מ</span><span>${money(t.vat)}</span></div><div><span>סה״כ לתשלום</span><span>${money(t.gross)}</span></div></div>
+  ${paymentHtml}
   ${$('docNotes').value?`<div class="box" style="margin-top:20px"><h3>הערות</h3>${escapeHtml($('docNotes').value).replace(/\n/g,'<br>')}</div>`:''}
   <div class="draft-watermark">טיוטה לבדיקה</div>`; }
-async function loadAll(){ const u=auth.currentUser; uid=u.uid; $('userEmailPill').textContent=u.email||''; const [pSnap,lSnap]=await Promise.all([getDoc(doc(db,'users',uid)), getDoc(doc(db,'ledgers',uid))]); profile=pSnap.exists()?pSnap.data():{email:u.email}; ledger=lSnap.exists()?lSnap.data():{}; customers=normalizeCustomers(ledger.customers); drafts=Array.isArray(ledger.documentDrafts)?ledger.documentDrafts:[]; hydrateSettings(); renderCustomerOptions(); $('docDate').value=today(); $('docVatRate').value=Number(profile.vatRate||18); updateDocNumber(); syncStats(); renderDrafts(); renderPreview(); }
+async function loadAll(){ const u=auth.currentUser; uid=u.uid; $('userEmailPill').textContent=u.email||''; const [pSnap,lSnap]=await Promise.all([getDoc(doc(db,'users',uid)), getDoc(doc(db,'ledgers',uid))]); profile=pSnap.exists()?pSnap.data():{email:u.email}; ledger=lSnap.exists()?lSnap.data():{}; customers=normalizeCustomers(ledger.customers); drafts=Array.isArray(ledger.documentDrafts)?ledger.documentDrafts:[]; hydrateSettings(); renderCustomerOptions(); $('docDate').value=today(); $('docVatRate').value=Number(profile.vatRate||18); docLines=[makeLine({desc:'',qty:1,netPrice:0})]; renderLinesEditor(); updateDocNumber(); updatePaymentVisibility(); syncStats(); renderDrafts(); renderPreview(); }
 async function saveLedgerPatch(patch){ if(!uid)return; await setDoc(doc(db,'ledgers',uid), patch, {merge:true}); ledger={...ledger,...patch}; }
-function draftFromForm(){ const t=totals(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), itemDesc:$('itemDesc').value, qty:Number($('itemQty').value||0), price:Number($('itemPrice').value||0), vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, createdAt:new Date().toISOString() }; }
+function draftFromForm(){ const t=totals(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentMethod:$('paymentMethod')?.value||'', paymentRef:$('paymentRef')?.value||'', vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, createdAt:new Date().toISOString() }; }
 function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(d.date||'')} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); }
-function loadDraft(id){ const d=drafts.find(x=>x.id===id); if(!d)return; $('docType').value=d.type; $('docNumber').value=d.number; $('docDate').value=d.date; $('docCustomer').value=d.customerId||''; const c=getSelectedCustomer(); $('docCustomerSearch').value=c?customerName(c):(d.customerName||''); renderSelectedCustomerHint(); $('itemDesc').value=d.itemDesc||''; $('itemQty').value=d.qty||1; $('itemPrice').value=d.price||0; $('docVatRate').value=d.vatRate||profile.vatRate||18; $('docNotes').value=d.notes||''; renderPreview(); window.scrollTo({top:0,behavior:'smooth'}); }
-$('docType').onchange=()=>{updateDocNumber();renderPreview();}; ['docDate','itemDesc','itemQty','itemPrice','docVatRate','docNotes'].forEach(id=>$(id).addEventListener('input',renderPreview)); $('docCustomerSearch')?.addEventListener('input',()=>{ $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
+function loadDraft(id){ const d=drafts.find(x=>x.id===id); if(!d)return; $('docType').value=d.type; $('docNumber').value=d.number; $('docDate').value=d.date; $('docCustomer').value=d.customerId||''; const c=getSelectedCustomer(); $('docCustomerSearch').value=c?customerName(c):(d.customerName||''); renderSelectedCustomerHint(); docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:d.itemDesc||'',qty:d.qty||1,netPrice:d.price||0})]; $('docDiscountPct').value=d.discountPct||0; $('paymentMethod').value=d.paymentMethod||''; $('paymentRef').value=d.paymentRef||''; $('docVatRate').value=d.vatRate||profile.vatRate||18; $('docNotes').value=d.notes||''; updatePaymentVisibility(); renderLinesEditor(); renderPreview(); window.scrollTo({top:0,behavior:'smooth'}); }
+$('docType').onchange=()=>{updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docNotes','paymentMethod','paymentRef'].forEach(id=>$(id)?.addEventListener('input',()=>{ if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} renderPreview(); })); $('btnAddLine').onclick=()=>{ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnPreview').onclick=renderPreview;
 $('btnPrint').onclick=()=>{renderPreview(); window.print();};
 $('btnSaveSettings').onclick=async()=>{ settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings}); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
