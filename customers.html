@@ -100,10 +100,21 @@
     .metric .v{font-size:20px;font-weight:800;margin-top:4px}
     .grid{
       display:grid;
-      grid-template-columns:380px 1fr;
+      grid-template-columns:1fr;
       gap:14px;
       align-items:start;
     }
+    .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+    .btn.cta{
+      min-height:46px;
+      padding:12px 20px;
+      border-radius:16px;
+      font-size:15px;
+      font-weight:850;
+      background:linear-gradient(135deg,#2563eb,#1d4ed8);
+      box-shadow:0 12px 26px rgba(37,99,235,.28);
+    }
+    .btn.cta:hover{background:linear-gradient(135deg,#1d4ed8,#1e40af)}
     .card{
       background:rgba(255,255,255,.96);
       border:1px solid var(--line);
@@ -234,7 +245,7 @@
     <div class="top-actions">
       <span class="chip" id="userTag">בודק התחברות…</span>
       <a class="btn secondary small" href="/index.html">חזרה למסך הראשי</a>
-      <button class="btn small" id="btnNewCustomer">לקוח חדש</button>
+      <button class="btn cta" id="btnNewCustomer">+ לקוח חדש</button>
     </div>
   </div>
 </header>
@@ -244,6 +255,9 @@
     <h2>ניהול לקוחות</h2>
     <div class="hint">
       כאן נשמרים פרטי הלקוחות שישמשו בהמשך להפקת חשבוניות, קבלות, זיכויים, שליחה למייל וכרטסת לקוח.
+    </div>
+    <div class="hero-actions">
+      <button class="btn cta" id="btnNewCustomerHero" type="button">+ הוספת לקוח חדש</button>
     </div>
     <div class="stats">
       <div class="metric"><div class="k">לקוחות</div><div class="v" id="statCustomers">0</div></div>
@@ -356,7 +370,7 @@
         <div class="toolbar">
           <input class="search" id="q" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה…" />
           <button class="btn secondary" id="btnExportCsv">ייצוא CSV</button>
-          <button class="btn secondary" id="btnPrint">הדפסה / PDF</button>
+          <button class="btn secondary" id="btnPrint">הדפסת רשימת לקוחות / PDF</button>
         </div>
         <div id="customersList"></div>
       </div>
@@ -734,6 +748,70 @@ function exportCsv(){
   URL.revokeObjectURL(a.href);
 }
 
+
+function formatDateForPrint(){
+  return new Date().toLocaleDateString("he-IL", { year:"numeric", month:"2-digit", day:"2-digit" });
+}
+
+function printCustomersList(){
+  const q = $("q").value.trim();
+  const filtered = customers.filter(c => customerMatches(c, q));
+  const rows = filtered.map(c => `
+    <tr>
+      <td><strong>${escapeHtml(c.name || "")}</strong><br><span>${escapeHtml(customerTypeLabels[c.type] || "אחר")}</span></td>
+      <td>${escapeHtml(c.taxId || "—")}</td>
+      <td>${escapeHtml(c.contact || "—")}</td>
+      <td>${escapeHtml(c.phone || "—")}</td>
+      <td>${escapeHtml(c.email || "—")}</td>
+      <td>${escapeHtml(c.city || "—")}</td>
+      <td>${escapeHtml(termsLabels[c.paymentTerms] || "—")}</td>
+    </tr>
+  `).join("");
+
+  const html = `<!doctype html>
+  <html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <title>רשימת לקוחות - עצמאי פלוס</title>
+    <style>
+      body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}
+      .head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:2px solid #e5e7eb;padding-bottom:12px;margin-bottom:16px}
+      h1{margin:0;font-size:24px}.meta{font-size:12px;color:#64748b;line-height:1.7}.summary{font-weight:700;margin:10px 0 14px}
+      table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right;vertical-align:top}th{background:#f1f5f9}span{color:#64748b;font-size:11px}
+      @page{size:A4 portrait;margin:14mm}
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <div>
+        <h1>רשימת לקוחות</h1>
+        <div class="meta">עצמאי פלוס · הופק בתאריך ${formatDateForPrint()}</div>
+      </div>
+      <div class="meta">${escapeHtml(currentUser?.email || "")}</div>
+    </div>
+    <div class="summary">סה״כ לקוחות להדפסה: ${filtered.length}${q ? ` · סינון: ${escapeHtml(q)}` : ""}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>לקוח</th><th>מספר מזהה</th><th>איש קשר</th><th>טלפון</th><th>מייל</th><th>עיר</th><th>תנאי תשלום</th>
+        </tr>
+      </thead>
+      <tbody>${rows || `<tr><td colspan="7">אין לקוחות להצגה.</td></tr>`}</tbody>
+    </table>
+    <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };<\/script>
+  </body>
+  </html>`;
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    showToast("הדפדפן חסם את חלון ההדפסה. אפשר לאפשר חלונות קופצים ולנסות שוב.", true);
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
+
 async function loadData(){
   if (!currentUser) return;
   saveStatus.textContent = "טוען…";
@@ -756,12 +834,13 @@ async function loadData(){
 }
 
 $("btnNewCustomer").addEventListener("click", () => openForm());
+$("btnNewCustomerHero").addEventListener("click", () => openForm());
 $("btnCancelEdit").addEventListener("click", closeForm);
 $("btnClearForm").addEventListener("click", clearForm);
 $("btnSaveCustomer").addEventListener("click", saveCurrentCustomer);
 $("q").addEventListener("input", render);
 $("btnExportCsv").addEventListener("click", exportCsv);
-$("btnPrint").addEventListener("click", () => window.print());
+$("btnPrint").addEventListener("click", printCustomersList);
 
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
