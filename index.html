@@ -642,6 +642,10 @@ header.app-header{
   .home-card{ min-height:96px;border-radius:18px;padding:14px; }
 }
 
+
+.logo-upload-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.biz-logo-preview{width:96px;height:96px;border:1px solid var(--line);border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-size:12px;text-align:center}
+.biz-logo-preview img{width:100%;height:100%;object-fit:contain}
 </style>
 </head>
 <body>
@@ -790,7 +794,7 @@ header.app-header{
         <a class="home-card" id="homeGoDocs" href="/documents.html">
           <div class="ico">📄</div>
           <div class="title">מסמכים</div>
-          <div class="desc">לקוחות, ספרור ותצוגת מסמך לקראת הפקת חשבוניות וקבלות.</div>
+          <div class="desc">טיוטות מסמכים, ספרור, לקוחות ותצוגת מסמך.</div>
         </a>
       </div>
     </section>
@@ -1061,9 +1065,20 @@ header.app-header{
           <input type="number" id="pVatRate" step="0.1" min="0" />
         </div>
       </div>
+      <div style="margin-top:12px">
+        <label>לוגו העסק למסמכים</label>
+        <div class="logo-upload-row">
+          <div class="biz-logo-preview" id="pBusinessLogoPreview">אין לוגו</div>
+          <div style="flex:1 1 240px">
+            <input type="file" id="pBusinessLogoFile" accept="image/*" />
+            <div class="hint" style="margin-top:6px">הלוגו יופיע במסמכים חשבונאיים. מומלץ קובץ PNG/JPG מרובע או אופקי.</div>
+          </div>
+          <button class="btn secondary small" type="button" id="btnRemoveBusinessLogo">הסרת לוגו</button>
+        </div>
+      </div>
       <div class="hint" style="margin-top:8px">
         עוסק פטור: המערכת לא תחשב מע"מ (השדות יוחלשו).<br>
-        עוסק מורשה / חברה: חישובי מע"מ יהיו פעילים לפי האחוז שתגדירי כאן.
+        עוסק מורשה / חברה: חישובי מע"מ יהיו פעילים לפי האחוז שהוגדר כאן.
       </div>
       <div class="footer">
         <div class="left"><button class="btn" id="btnSaveProfile">שמירת פרופיל</button></div>
@@ -1350,6 +1365,9 @@ const pBusinessId = document.getElementById("pBusinessId");
 const pPhone = document.getElementById("pPhone");
 const pBusinessType = document.getElementById("pBusinessType");
 const pVatRate = document.getElementById("pVatRate");
+const pBusinessLogoFile = document.getElementById("pBusinessLogoFile");
+const pBusinessLogoPreview = document.getElementById("pBusinessLogoPreview");
+const btnRemoveBusinessLogo = document.getElementById("btnRemoveBusinessLogo");
 const btnSaveProfile = document.getElementById("btnSaveProfile");
 const profileStatus = document.getElementById("profileStatus");
 const onboardingDialog = document.getElementById("onboardingDialog");
@@ -2388,6 +2406,41 @@ function getEffectiveVatRate(baseRate) {
   return Number.isFinite(n) && n > 0 ? n : DEFAULT_VAT;
 }
 
+
+function renderBusinessLogoPreview(dataUrl) {
+  if (!pBusinessLogoPreview) return;
+  if (dataUrl) {
+    pBusinessLogoPreview.innerHTML = `<img src="${dataUrl}" alt="לוגו העסק">`;
+  } else {
+    pBusinessLogoPreview.textContent = "אין לוגו";
+  }
+}
+
+function readLogoFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) return resolve("");
+    if (!file.type || !file.type.startsWith("image/")) return reject(new Error("יש לבחור קובץ תמונה בלבד"));
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const maxSide = 720;
+        const ratio = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((img.width || 1) * ratio));
+        canvas.height = Math.max(1, Math.round((img.height || 1) * ratio));
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/png"));
+      };
+      img.onerror = () => reject(new Error("לא ניתן לקרוא את התמונה"));
+      img.src = String(reader.result || "");
+    };
+    reader.onerror = () => reject(new Error("לא ניתן לקרוא את הקובץ"));
+    reader.readAsDataURL(file);
+  });
+}
+
 function applyProfileToUI() {
   if (!userProfile) return;
 
@@ -2397,6 +2450,7 @@ function applyProfileToUI() {
   pPhone.value        = userProfile.phone || "";
   pBusinessType.value = normalizeBusinessType(userProfile.businessType);
   pVatRate.value      = normalizeBusinessType(userProfile.businessType) === "ptor" ? 0 : getEffectiveVatRate(userProfile.vatRate);
+  renderBusinessLogoPreview(userProfile.businessLogoDataUrl || "");
 
   const type = normalizeBusinessType(userProfile.businessType);
 
@@ -2409,7 +2463,7 @@ function applyProfileToUI() {
     vatSettingsPanel.style.opacity = 0.4;
     vatIncludedPill.style.display = "none";
   } else {
-    businessHint.textContent = "מצב: עוסק מורשה / חברה — מע\"מ פעיל לפי ההגדרה בפרופיל.";
+    businessHint.textContent = "מצב: עוסק מורשה / חברה — מע\"מ פעיל";
     vatRateInput.value = getEffectiveVatRate(userProfile.vatRate);
     vatEnabledCheckbox.disabled = false;
     vatEnabledCheckbox.checked = true;
@@ -2454,6 +2508,7 @@ async function loadUserProfile(uid) {
       phone: "",
       businessType: "morasha",
       vatRate: DEFAULT_VAT,
+      businessLogoDataUrl: "",
       plan: "legacy"
     };
   } else {
@@ -2481,6 +2536,30 @@ async function loadUserProfile(uid) {
   renderAccountFlags();
 }
 
+
+pBusinessLogoFile?.addEventListener("change", async () => {
+  const file = pBusinessLogoFile.files?.[0];
+  if (!file) return;
+  try {
+    profileStatus.textContent = "קורא לוגו...";
+    const dataUrl = await readLogoFileAsDataUrl(file);
+    userProfile = { ...(userProfile || {}), businessLogoDataUrl: dataUrl };
+    renderBusinessLogoPreview(dataUrl);
+    profileStatus.textContent = "הלוגו מוכן לשמירה";
+  } catch (err) {
+    console.error(err);
+    profileStatus.textContent = err.message || "לא ניתן לקרוא את הלוגו";
+    pBusinessLogoFile.value = "";
+  }
+});
+
+btnRemoveBusinessLogo?.addEventListener("click", () => {
+  userProfile = { ...(userProfile || {}), businessLogoDataUrl: "" };
+  if (pBusinessLogoFile) pBusinessLogoFile.value = "";
+  renderBusinessLogoPreview("");
+  profileStatus.textContent = "הלוגו יוסר לאחר שמירת הפרופיל";
+});
+
 btnSaveProfile.onclick = async () => {
   if (!currentUid) return;
 
@@ -2490,7 +2569,8 @@ btnSaveProfile.onclick = async () => {
     businessId:   pBusinessId.value.trim(),
     phone:        pPhone.value.trim(),
     businessType: pBusinessType.value,
-    vatRate:      parseFloat(pVatRate.value || "0")
+    vatRate:      parseFloat(pVatRate.value || "0"),
+    businessLogoDataUrl: userProfile?.businessLogoDataUrl || ""
   };
 
   try {
