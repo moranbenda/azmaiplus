@@ -641,6 +641,48 @@ header.app-header{
   .home-card{ min-height:96px;border-radius:18px;padding:14px; }
 }
 
+
+/* מודול סגירת שנה - קריאה בלבד */
+.year-end-module{ margin:0 0 18px; }
+.year-end-hero{
+  background:linear-gradient(135deg,#eef6ff,#f8fafc);
+  border:1px solid var(--line);
+  border-radius:22px;
+  padding:18px;
+  box-shadow:0 10px 28px rgba(15,23,42,.06);
+}
+.year-end-hero h2{ margin:0 0 6px; font-size:22px; }
+.year-end-toolbar{ display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-top:14px; }
+.year-end-toolbar > div{ min-width:140px; }
+.year-end-summary{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:14px; }
+.year-end-summary .metric{ background:#fff; border:1px solid var(--line); border-radius:16px; padding:12px; }
+.year-end-summary .metric .k{ font-size:12px; color:var(--text-dim); }
+.year-end-summary .metric .v{ font-size:18px; font-weight:750; margin-top:4px; }
+.year-end-grid{ display:grid; grid-template-columns:1.4fr .8fr; gap:14px; margin-top:14px; }
+.year-end-card{ background:#fff; border:1px solid var(--line); border-radius:18px; overflow:hidden; box-shadow:0 8px 24px rgba(15,23,42,.04); }
+.year-end-card .hd{ padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.year-end-card .bd{ padding:14px; }
+.year-end-table-wrap{ overflow:auto; max-height:48vh; }
+.year-end-table-wrap table{ min-width:720px; }
+.year-end-note{ border:1px dashed #cbd5e1; background:#f8fafc; color:#475569; padding:10px 12px; border-radius:14px; font-size:12px; line-height:1.55; }
+.year-end-checklist{ margin:0; padding:0 18px 0 0; color:#334155; line-height:1.75; font-size:13px; }
+.year-end-adjustments{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.year-end-adjustments input{ width:100%; }
+@media (max-width:900px){
+  .year-end-summary{ grid-template-columns:repeat(2,1fr); }
+  .year-end-grid{ grid-template-columns:1fr; }
+}
+@media (max-width:640px){
+  .year-end-hero{ padding:15px; border-radius:18px; }
+  .year-end-hero h2{ font-size:20px; }
+  .year-end-summary{ grid-template-columns:1fr 1fr; gap:8px; }
+  .year-end-summary .metric{ padding:10px; }
+  .year-end-summary .metric .v{ font-size:15px; }
+  .year-end-toolbar{ align-items:stretch; }
+  .year-end-toolbar > div, .year-end-toolbar button{ width:100%; }
+  .year-end-adjustments{ grid-template-columns:1fr; }
+}
+
 </style>
 </head>
 <body>
@@ -716,6 +758,7 @@ header.app-header{
         <button class="btn secondary small" id="btnHomeOpen">בית</button>
         <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
         <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
+        <button class="btn secondary small" id="btnYearEndOpen">סגירת שנה</button>
                 <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
@@ -773,11 +816,10 @@ header.app-header{
           <div class="title">פרופיל עסק</div>
           <div class="desc">פרטי העסק, סוג עוסק ואחוז מע״מ.</div>
         </button>
-        <button type="button" class="home-card disabled" id="homeGoYearEnd" disabled>
+        <button type="button" class="home-card" id="homeGoYearEnd">
           <div class="ico">📉</div>
           <div class="title">סגירת שנה</div>
-          <div class="desc">פחת, התאמות וסימולטור מס.</div>
-          <span class="soon">בקרוב</span>
+          <div class="desc">דוח שנתי ראשוני, הוצאות מוכרות ותשתית לפחת.</div>
         </button>
         <button type="button" class="home-card disabled" id="homeGoDocs" disabled>
           <div class="ico">📄</div>
@@ -788,7 +830,95 @@ header.app-header{
       </div>
     </section>
 
-    <div class="grid-main">
+    <section class="year-end-module" id="yearEndModule" hidden>
+      <div class="year-end-hero">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap">
+          <div>
+            <h2>סגירת שנה</h2>
+            <div class="hint">מודול קריאה בלבד: מסכם את נתוני השנה מתוך התנועות הקיימות, בלי לשנות את הנתונים ובלי לשמור חזרה ל־Firestore.</div>
+          </div>
+          <button class="btn secondary small" type="button" id="btnYearEndBack">חזרה למסך הראשי</button>
+        </div>
+
+        <div class="year-end-toolbar">
+          <div>
+            <label>שנת מס</label>
+            <select id="yearEndYear"></select>
+          </div>
+          <button class="btn small" type="button" id="btnYearEndRefresh">רענון נתונים</button>
+          <button class="btn secondary small" type="button" id="btnYearEndCsv">ייצוא CSV</button>
+          <button class="btn secondary small" type="button" id="btnYearEndPrint">הדפסה / PDF</button>
+        </div>
+
+        <div class="year-end-summary">
+          <div class="metric"><div class="k">הכנסות ללא מע״מ</div><div class="v income" id="yeIncomeNet">₪ 0.00</div></div>
+          <div class="metric"><div class="k">הוצאות מוכרות למס</div><div class="v expense" id="yeTaxExpenses">₪ 0.00</div></div>
+          <div class="metric"><div class="k">רווח לפני פחת</div><div class="v" id="yeProfitBeforeDep">₪ 0.00</div></div>
+          <div class="metric"><div class="k">רווח חייב משוער</div><div class="v" id="yeTaxProfit">₪ 0.00</div></div>
+        </div>
+      </div>
+
+      <div class="year-end-grid">
+        <section class="year-end-card">
+          <div class="hd">
+            <strong>רווח והפסד למס - לפי קטגוריות</strong>
+            <span class="muted" id="yeRowsCount">0 תנועות</span>
+          </div>
+          <div class="bd">
+            <div class="year-end-note" style="margin-bottom:10px">
+              החישוב משתמש בטבלת הקטגוריות הקיימת: אחוז הכרה למס הכנסה ומוכר/לא מוכר למע״מ. בשלב הזה זהו דוח עזר לסגירת שנה, לא שינוי של הדוחות הקיימים.
+            </div>
+            <div class="year-end-table-wrap">
+              <table class="keep-table">
+                <thead>
+                  <tr>
+                    <th>קבוצת הוצאה</th>
+                    <th>סכום כולל</th>
+                    <th>סכום לפני מע״מ</th>
+                    <th>הוצאה מוכרת למס</th>
+                    <th>מע״מ תשומות</th>
+                  </tr>
+                </thead>
+                <tbody id="yearEndCategoriesBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="year-end-card">
+          <div class="hd"><strong>התאמות ראשוניות</strong></div>
+          <div class="bd">
+            <div class="year-end-adjustments">
+              <div>
+                <label>פחת השנה (ידני כרגע)</label>
+                <input type="number" id="yeDepreciation" min="0" step="0.01" value="0" />
+              </div>
+              <div>
+                <label>התאמות נוספות להפחתה</label>
+                <input type="number" id="yeAdjustments" min="0" step="0.01" value="0" />
+              </div>
+            </div>
+            <div class="hint" style="margin-top:8px">
+              בשלב הבא נוסיף רכוש קבוע ופחת אוטומטי. כרגע אפשר להזין פחת ידני כדי לראות איך זה משפיע על הרווח החייב המשוער. הנתון לא נשמר.
+            </div>
+
+            <div class="year-end-note" style="margin-top:12px">
+              <strong>צ׳קליסט לסגירת שנה</strong>
+              <ul class="year-end-checklist">
+                <li>לוודא שכל ההכנסות לשנה יובאו.</li>
+                <li>לוודא שכל ההוצאות הוזנו עם קטגוריה נכונה.</li>
+                <li>לבדוק הוצאות לא מוכרות למע״מ אך מוכרות למס.</li>
+                <li>להכין רשימת רכוש קבוע לדוח פחת.</li>
+                <li>לבדוק ביטוח לאומי, קרן השתלמות וקופות גמל.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+
+    <div class="grid-main" id="ledgerWorkArea">
       <!-- צד ימין: תנועות חדשות -->
       <section class="card">
         <div class="hd">
@@ -1938,6 +2068,23 @@ const homeIncGross = document.getElementById("homeIncGross");
 const homeExpGross = document.getElementById("homeExpGross");
 const homeVatNet = document.getElementById("homeVatNet");
 const homeProfit = document.getElementById("homeProfit");
+const btnYearEndOpen = document.getElementById("btnYearEndOpen");
+const homeGoYearEnd = document.getElementById("homeGoYearEnd");
+const ledgerWorkArea = document.getElementById("ledgerWorkArea");
+const yearEndModule = document.getElementById("yearEndModule");
+const btnYearEndBack = document.getElementById("btnYearEndBack");
+const yearEndYear = document.getElementById("yearEndYear");
+const btnYearEndRefresh = document.getElementById("btnYearEndRefresh");
+const btnYearEndCsv = document.getElementById("btnYearEndCsv");
+const btnYearEndPrint = document.getElementById("btnYearEndPrint");
+const yeIncomeNet = document.getElementById("yeIncomeNet");
+const yeTaxExpenses = document.getElementById("yeTaxExpenses");
+const yeProfitBeforeDep = document.getElementById("yeProfitBeforeDep");
+const yeTaxProfit = document.getElementById("yeTaxProfit");
+const yeRowsCount = document.getElementById("yeRowsCount");
+const yeDepreciation = document.getElementById("yeDepreciation");
+const yeAdjustments = document.getElementById("yeAdjustments");
+const yearEndCategoriesBody = document.getElementById("yearEndCategoriesBody");
 const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
 
 /* דיאלוג עריכה */
@@ -2834,6 +2981,7 @@ function render() {
   const list = queryRows();
   const sum  = summarize(list);
   renderHomeDashboard(sum);
+  renderYearEndModule();
   const { vatEnabled, vatRate } = getSettings();
 
   tbody.innerHTML = list.map(r => {
@@ -4758,6 +4906,165 @@ if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE_DOCS && btnDocWhatsapp) if (ENABLE
   window.open(`https://wa.me/?text=${txt}`, "_blank", "noopener");
 };
 
+/* ----------------------------------------------------------
+   מודול סגירת שנה - קריאה בלבד
+---------------------------------------------------------- */
+function setMainView(view = "home") {
+  if (view === "yearEnd") {
+    if (homeDashboard) homeDashboard.hidden = true;
+    if (ledgerWorkArea) ledgerWorkArea.hidden = true;
+    if (yearEndModule) yearEndModule.hidden = false;
+    populateYearEndYears();
+    renderYearEndModule();
+    yearEndModule?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  if (yearEndModule) yearEndModule.hidden = true;
+  if (homeDashboard) homeDashboard.hidden = false;
+  if (ledgerWorkArea) ledgerWorkArea.hidden = false;
+  if (view === "ledger") ledgerWorkArea?.scrollIntoView({ behavior: "smooth", block: "start" });
+  else homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function getAvailableTaxYears() {
+  const years = Array.from(new Set(
+    rows
+      .map(r => String(r.date || "").slice(0, 4))
+      .filter(y => /^\d{4}$/.test(y))
+  )).sort((a, b) => Number(b) - Number(a));
+  const current = String(new Date().getFullYear());
+  return years.length ? years : [current];
+}
+
+function populateYearEndYears() {
+  if (!yearEndYear) return;
+  const currentVal = yearEndYear.value;
+  const years = getAvailableTaxYears();
+  yearEndYear.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join("");
+  if (currentVal && years.includes(currentVal)) yearEndYear.value = currentVal;
+  else yearEndYear.value = years[0] || String(new Date().getFullYear());
+}
+
+function getYearEndRows(year) {
+  const y = String(year || yearEndYear?.value || new Date().getFullYear());
+  return rows.filter(r => String(r.date || "").slice(0, 4) === y);
+}
+
+function buildYearEndData(year) {
+  const { vatEnabled, vatRate } = getSettings();
+  const list = getYearEndRows(year);
+  const groups = new Map();
+  let incomeNet = 0, incomeGross = 0, incomeVat = 0;
+  let expenseGross = 0, expenseNet = 0, expenseVat = 0, taxExpenses = 0;
+
+  for (const r of list) {
+    const amounts = splitVAT(Number(r.amount || 0), r.incVat, vatEnabled ? vatRate : 0);
+    if (r.type === "income") {
+      incomeNet += amounts.net;
+      incomeGross += amounts.gross;
+      incomeVat += amounts.vat;
+      continue;
+    }
+    if (r.type !== "expense") continue;
+    const meta = getExpenseMeta(r);
+    const groupName = meta?.category || r.category || "ללא קטגוריה";
+    const taxAmount = getTaxDeductibleExpenseAmount(r, amounts);
+    const vatAmount = amounts.vat * getVatDeductibleFactorForRow(r);
+    expenseGross += amounts.gross;
+    expenseNet += amounts.net;
+    expenseVat += vatAmount;
+    taxExpenses += taxAmount;
+
+    if (!groups.has(groupName)) {
+      groups.set(groupName, { category: groupName, gross: 0, net: 0, tax: 0, vat: 0, count: 0 });
+    }
+    const g = groups.get(groupName);
+    g.gross += amounts.gross;
+    g.net += amounts.net;
+    g.tax += taxAmount;
+    g.vat += vatAmount;
+    g.count += 1;
+  }
+
+  const depreciation = Math.max(0, Number(yeDepreciation?.value || 0) || 0);
+  const adjustments = Math.max(0, Number(yeAdjustments?.value || 0) || 0);
+  const profitBeforeDep = incomeNet - taxExpenses;
+  const taxProfit = profitBeforeDep - depreciation - adjustments;
+  const grouped = Array.from(groups.values()).sort((a, b) => b.tax - a.tax);
+
+  return { list, grouped, incomeNet, incomeGross, incomeVat, expenseGross, expenseNet, expenseVat, taxExpenses, depreciation, adjustments, profitBeforeDep, taxProfit };
+}
+
+function renderYearEndModule() {
+  if (!yearEndModule || yearEndModule.hidden) return;
+  populateYearEndYears();
+  const data = buildYearEndData(yearEndYear?.value);
+  if (yeIncomeNet) yeIncomeNet.textContent = toMoney(data.incomeNet);
+  if (yeTaxExpenses) yeTaxExpenses.textContent = toMoney(data.taxExpenses);
+  if (yeProfitBeforeDep) yeProfitBeforeDep.textContent = toMoney(data.profitBeforeDep);
+  if (yeTaxProfit) yeTaxProfit.textContent = toMoney(data.taxProfit);
+  if (yeRowsCount) yeRowsCount.textContent = `${data.list.length} תנועות`;
+  if (yearEndCategoriesBody) {
+    if (!data.grouped.length) {
+      yearEndCategoriesBody.innerHTML = `<tr><td colspan="5" class="muted">אין הוצאות בשנת המס שנבחרה</td></tr>`;
+    } else {
+      yearEndCategoriesBody.innerHTML = data.grouped.map(g => `
+        <tr>
+          <td>${escapeHtml(g.category)} <span class="muted">(${g.count})</span></td>
+          <td class="money">${toMoney(g.gross)}</td>
+          <td class="money">${toMoney(g.net)}</td>
+          <td class="money">${toMoney(g.tax)}</td>
+          <td class="money">${toMoney(g.vat)}</td>
+        </tr>
+      `).join("");
+    }
+  }
+}
+
+function exportYearEndCsv() {
+  const year = yearEndYear?.value || String(new Date().getFullYear());
+  const data = buildYearEndData(year);
+  const lines = [
+    '\ufeff"section","name","gross","net","tax_deductible","vat_deductible"',
+    `"summary","income_net","","${data.incomeNet.toFixed(2)}","",""`,
+    `"summary","tax_expenses","","","${data.taxExpenses.toFixed(2)}",""`,
+    `"summary","profit_before_depreciation","","","${data.profitBeforeDep.toFixed(2)}",""`,
+    `"summary","depreciation_manual","","","${data.depreciation.toFixed(2)}",""`,
+    `"summary","additional_adjustments","","","${data.adjustments.toFixed(2)}",""`,
+    `"summary","estimated_tax_profit","","","${data.taxProfit.toFixed(2)}",""`,
+  ];
+  data.grouped.forEach(g => {
+    const name = String(g.category || '').replace(/"/g, '""');
+    lines.push(`"expense_group","${name}","${g.gross.toFixed(2)}","${g.net.toFixed(2)}","${g.tax.toFixed(2)}","${g.vat.toFixed(2)}"`);
+  });
+  downloadFile(`year-end-${year}.csv`, lines.join("\n"));
+}
+
+function printYearEndReport() {
+  const year = yearEndYear?.value || String(new Date().getFullYear());
+  const data = buildYearEndData(year);
+  const rowsHtml = data.grouped.map(g => `
+    <tr>
+      <td>${escapeHtml(g.category)}</td>
+      <td>${toMoney(g.gross)}</td>
+      <td>${toMoney(g.net)}</td>
+      <td>${toMoney(g.tax)}</td>
+      <td>${toMoney(g.vat)}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="5">אין הוצאות בשנת המס שנבחרה</td></tr>`;
+  const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>סגירת שנה ${year}</title>
+  <style>body{font-family:Arial,sans-serif;margin:24px;color:#0f172a}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{border:1px solid #dbe4f0;padding:8px;text-align:right}th{background:#f8fafc}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.box{border:1px solid #dbe4f0;border-radius:12px;padding:10px}.k{font-size:12px;color:#64748b}.v{font-weight:bold;font-size:18px;margin-top:4px}@media print{button{display:none}}</style></head><body>
+  <h1>סגירת שנה ${year}</h1>
+  <p>טיוטת דוח עזר מתוך עצמאי פלוס. הנתונים מבוססים על התנועות שהוזנו באפליקציה.</p>
+  <div class="grid"><div class="box"><div class="k">הכנסות ללא מע״מ</div><div class="v">${toMoney(data.incomeNet)}</div></div><div class="box"><div class="k">הוצאות מוכרות למס</div><div class="v">${toMoney(data.taxExpenses)}</div></div><div class="box"><div class="k">רווח לפני פחת</div><div class="v">${toMoney(data.profitBeforeDep)}</div></div><div class="box"><div class="k">רווח חייב משוער</div><div class="v">${toMoney(data.taxProfit)}</div></div></div>
+  <h2>הוצאות לפי קבוצות</h2><table><thead><tr><th>קבוצה</th><th>כולל</th><th>לפני מע״מ</th><th>מוכר למס</th><th>מע״מ תשומות</th></tr></thead><tbody>${rowsHtml}</tbody></table>
+  <button onclick="window.print()">הדפסה</button></body></html>`;
+  const w = window.open("", "_blank");
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+}
+
 function initAppLogic(uid) {
   const switchingUser = currentUid && currentUid !== uid;
   if (switchingUser) {
@@ -4786,13 +5093,22 @@ function initAppLogic(uid) {
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
-    if (btnHomeOpen) btnHomeOpen.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
+    if (btnHomeOpen) btnHomeOpen.onclick = () => setMainView("home");
+    if (homeGoLedger) homeGoLedger.onclick = () => setMainView("ledger");
     if (homeGoImport) homeGoImport.onclick = openIncomeImportDialog;
     if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
     if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
     if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
+    if (homeGoYearEnd) homeGoYearEnd.onclick = () => setMainView("yearEnd");
+    if (btnYearEndOpen) btnYearEndOpen.onclick = () => setMainView("yearEnd");
+    if (btnYearEndBack) btnYearEndBack.onclick = () => setMainView("home");
+    if (yearEndYear) yearEndYear.onchange = renderYearEndModule;
+    if (btnYearEndRefresh) btnYearEndRefresh.onclick = renderYearEndModule;
+    if (btnYearEndCsv) btnYearEndCsv.onclick = exportYearEndCsv;
+    if (btnYearEndPrint) btnYearEndPrint.onclick = printYearEndReport;
+    if (yeDepreciation) yeDepreciation.oninput = renderYearEndModule;
+    if (yeAdjustments) yeAdjustments.oninput = renderYearEndModule;
 
     btnClear.onclick = () => {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
