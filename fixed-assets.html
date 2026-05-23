@@ -143,6 +143,7 @@
             רכוש קבוע הוא ציוד שמשמש את העסק לאורך זמן, כמו מחשב, טלפון, רכב או ציוד מקצועי. במקום לרשום את כל הסכום כהוצאה אחת, המערכת מחשבת פחת שנתי ומכניסה אותו לדוח רווח והפסד. אם לא בטוחים בתאריך הפעלה, לרוב אפשר להשתמש בתאריך הרכישה.
           </div>
         </div>
+        <div id="assetValidation" class="field-help" style="display:none;color:#dc2626;background:#fff1f2;border:1px solid #fecdd3;border-radius:14px;padding:10px;margin:10px 0"></div>
         <div class="form-grid">
           <div>
             <label>שם הנכס / תיאור</label>
@@ -223,6 +224,19 @@
       </div>
     </section>
 
+    <section class="card controls" id="candidateCard" style="display:none">
+      <div class="card-hd"><h3>הוצאות שאולי צריכות לעבור לרכוש קבוע</h3></div>
+      <div class="card-bd">
+        <div class="hint" style="margin-bottom:10px">המערכת מזהה הוצאות שנראות כמו רכוש קבוע, למשל מחשב, טלפון, רכב או ציוד יקר. הוספה מכאן מקשרת את ההוצאה לנכס, כדי שבדוח סוף שנה היא לא תיספר גם כהוצאה רגילה וגם כפחת.</div>
+        <div class="table-scroll">
+          <table>
+            <thead><tr><th>תאריך</th><th>תיאור</th><th>קטגוריה</th><th>סכום</th><th>סיבה</th><th>פעולה</th></tr></thead>
+            <tbody id="assetCandidatesBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <section class="card controls">
       <div class="card-hd"><h3>רשימת נכסים</h3></div>
       <div class="card-bd table-scroll">
@@ -263,6 +277,8 @@ const $ = id => document.getElementById(id);
 const taxYear = $('taxYear');
 const statusText = $('statusText');
 const assetsBody = $('assetsBody');
+const assetCandidatesBody = $('assetCandidatesBody');
+const candidateCard = $('candidateCard');
 const depReport = $('depReport');
 const formCard = $('assetFormCard');
 const formTitle = $('formTitle');
@@ -275,6 +291,7 @@ let currentUser = null;
 let userProfile = null;
 let ledgerSettings = { vatEnabled:true, vatRate:DEFAULT_VAT };
 let assets = [];
+let ledgerRows = [];
 let editingId = null;
 
 function escapeHtml(s=''){
@@ -382,7 +399,7 @@ function applyDefaultRateForGroup(force=false){
   }
 }
 function emptyAsset(){
-  return { id: crypto.randomUUID(), name:'', group:'ציוד', purchaseDate:'', activationDate:'', originalCost:'', incVat:true, vatClaimed:true, baseOverride:'', legalRate:15, claimedRate:'', priorAccumulated:'', sold:false, saleDate:'', salePrice:'', notes:'' };
+  return { id: crypto.randomUUID(), name:'', group:'ציוד', purchaseDate:'', activationDate:'', originalCost:'', incVat:true, vatClaimed:true, baseOverride:'', legalRate:15, claimedRate:'', priorAccumulated:'', sold:false, saleDate:'', salePrice:'', notes:'', sourceRowId:'', sourceRowDesc:'' };
 }
 function getFormAsset(){
   return {
@@ -401,7 +418,9 @@ function getFormAsset(){
     sold: $('sold').checked,
     saleDate: $('saleDate').value,
     salePrice: Number($('salePrice').value) || 0,
-    notes: $('notes').value.trim()
+    notes: $('notes').value.trim(),
+    sourceRowId: editingId ? (assets.find(a => a.id === editingId)?.sourceRowId || '') : '',
+    sourceRowDesc: editingId ? (assets.find(a => a.id === editingId)?.sourceRowDesc || '') : ''
   };
 }
 function ensureGroupOption(group){
@@ -453,6 +472,96 @@ async function saveAssets(){
   }, { merge:true });
   statusText.textContent = `נשמרו ${assets.length} נכסים`;
 }
+
+function rowAmount(row){ return Math.abs(Number(row?.amount) || 0); }
+function rowText(row){ return `${row?.category || ''} ${row?.desc || ''}`.toLowerCase(); }
+function isLikelyAssetExpense(row){
+  if (!row || row.type !== 'expense') return false;
+  if (assets.some(a => a.sourceRowId && a.sourceRowId === row.id)) return false;
+  const text = rowText(row);
+  const amount = rowAmount(row);
+  const keywords = ['מחשב','טאבלט','טלפון','אייפון','iphone','ipad','ציוד','אלקטרוני','מדפסת','מסך','מצלמה','מיקרופון','שואב','רכב','מכשיר','לפטופ','מכונה'];
+  const hasKeyword = keywords.some(k => text.includes(k.toLowerCase()));
+  return hasKeyword || amount >= 1200;
+}
+function candidateReason(row){
+  const text = rowText(row);
+  if (rowAmount(row) >= 1200) return 'סכום גבוה יחסית';
+  if (text.includes('מחשב') || text.includes('טאבלט') || text.includes('אייפון') || text.includes('iphone') || text.includes('טלפון')) return 'מכשיר / מחשוב';
+  if (text.includes('רכב')) return 'רכוש מסוג רכב';
+  if (text.includes('ציוד') || text.includes('מדפסת') || text.includes('מסך') || text.includes('מיקרופון')) return 'ציוד לעסק';
+  return 'ייתכן רכוש קבוע';
+}
+function guessGroupFromRow(row){
+  const text = rowText(row);
+  if (text.includes('רכב')) return 'רכב';
+  if (text.includes('מחשב') || text.includes('טאבלט') || text.includes('iphone') || text.includes('אייפון') || text.includes('טלפון') || text.includes('תוכנה')) return 'מחשוב ותוכנה';
+  if (text.includes('ספורט') || text.includes('פילאטיס')) return 'ציוד ספורט';
+  return 'ציוד';
+}
+function makeAssetFromRow(row){
+  const group = guessGroupFromRow(row);
+  const date = String(row?.date || '').slice(0,10);
+  return {
+    id: crypto.randomUUID(),
+    name: row?.desc || row?.category || 'נכס חדש',
+    group,
+    purchaseDate: date,
+    activationDate: date,
+    originalCost: rowAmount(row),
+    incVat: row?.incVat !== false,
+    vatClaimed: true,
+    baseOverride: '',
+    legalRate: defaultRateForGroup(group),
+    claimedRate: '',
+    priorAccumulated: '',
+    sold: false,
+    saleDate: '',
+    salePrice: '',
+    notes: `נוצר מהוצאה: ${row?.desc || row?.category || ''}`.trim(),
+    sourceRowId: row?.id || '',
+    sourceRowDesc: row?.desc || row?.category || ''
+  };
+}
+function validateAsset(asset){
+  const errors = [];
+  if (!asset.name) errors.push('יש למלא שם נכס.');
+  if (!asset.purchaseDate) errors.push('יש למלא תאריך רכישה.');
+  if (!(Number(asset.originalCost) > 0)) errors.push('המחיר המקורי חייב להיות גדול מ־0.');
+  if (!(Number(asset.legalRate) > 0) || Number(asset.legalRate) > 100) errors.push('אחוז פחת בחוק חייב להיות בין 0 ל־100.');
+  if (asset.claimedRate !== '' && (Number(asset.claimedRate) <= 0 || Number(asset.claimedRate) > 100)) errors.push('אחוז פחת נתבע חייב להיות בין 0 ל־100, או ריק.');
+  const purchase = parseLocalDate(asset.purchaseDate);
+  const activation = parseLocalDate(asset.activationDate || asset.purchaseDate);
+  const sale = parseLocalDate(asset.saleDate);
+  if (purchase && activation && activation < purchase) errors.push('תאריך הפעלה לא יכול להיות לפני תאריך הרכישה.');
+  if (asset.sold && !asset.saleDate) errors.push('אם הנכס נמכר/נגרע, יש למלא תאריך מכירה/גריעה.');
+  if (asset.sold && sale && activation && sale < activation) errors.push('תאריך מכירה/גריעה לא יכול להיות לפני תאריך ההפעלה.');
+  const base = assetBase(asset);
+  if (asset.baseOverride !== '' && Number(asset.baseOverride) > Number(asset.originalCost)) errors.push('בסיס לפחת ידני לא יכול להיות גבוה מהמחיר המקורי.');
+  if (asset.priorAccumulated !== '' && Number(asset.priorAccumulated) > base) errors.push('פחת נצבר קודם לא יכול להיות גבוה מבסיס הפחת.');
+  return errors;
+}
+function showValidation(errors){
+  const box = $('assetValidation');
+  if (!errors.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.innerHTML = errors.map(e => `• ${escapeHtml(e)}`).join('<br>');
+  box.style.display = '';
+}
+function renderAssetSuggestions(){
+  if (!assetCandidatesBody || !candidateCard) return;
+  const candidates = (ledgerRows || []).filter(isLikelyAssetExpense).slice(0, 30);
+  if (!candidates.length) { candidateCard.style.display = 'none'; return; }
+  candidateCard.style.display = '';
+  assetCandidatesBody.innerHTML = candidates.map(r => `
+    <tr>
+      <td>${escapeHtml(formatDate(r.date))}</td>
+      <td>${escapeHtml(r.desc || '')}</td>
+      <td>${escapeHtml(r.category || '')}</td>
+      <td class="money">${toMoney(r.amount)}</td>
+      <td>${escapeHtml(candidateReason(r))}</td>
+      <td><button class="btn secondary" type="button" data-from-expense="${escapeHtml(r.id || '')}">הוספה לרכוש</button></td>
+    </tr>`).join('');
+}
 function renderAssetsList(){
   if (!assets.length) {
     assetsBody.innerHTML = '<tr><td colspan="7" class="empty">אין עדיין נכסים</td></tr>';
@@ -465,7 +574,7 @@ function renderAssetsList(){
       <td>${escapeHtml(formatDate(a.purchaseDate))}</td>
       <td class="money">${toMoney(a.originalCost)}</td>
       <td>${escapeHtml(a.legalRate ?? a.depreciationRate ?? '')}%</td>
-      <td>${(a.sold === true || a.sold === 'true') ? 'כן' : 'לא'}</td>
+      <td>${(a.sold === true || a.sold === 'true') ? 'כן' : 'לא'}${a.sourceRowId ? '<br><span class="hint">מהוצאה</span>' : ''}</td>
       <td><div class="actions"><button class="btn secondary" type="button" data-edit="${escapeHtml(a.id)}">עריכה</button><button class="btn danger" type="button" data-del="${escapeHtml(a.id)}">מחיקה</button></div></td>
     </tr>`).join('');
 }
@@ -538,6 +647,7 @@ function renderReport(){
 }
 function renderAll(){
   renderAssetsList();
+  renderAssetSuggestions();
   renderReport();
   statusText.textContent = `${assets.length} נכסים`;
 }
@@ -561,6 +671,7 @@ async function loadData(user){
   userProfile = userSnap.exists() ? userSnap.data() : { email:user.email };
   const ledger = ledgerSnap.exists() ? ledgerSnap.data() : {};
   assets = Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets : [];
+  ledgerRows = Array.isArray(ledger.rows) ? ledger.rows : [];
   ledgerSettings = ledger.settings || { vatEnabled:true, vatRate:userProfile?.vatRate || DEFAULT_VAT };
   const years = assetYears();
   const current = taxYear.value;
@@ -573,10 +684,9 @@ $('btnNew').addEventListener('click', () => openForm());
 $('btnCancelAsset').addEventListener('click', closeForm);
 $('btnSaveAsset').addEventListener('click', async () => {
   const asset = getFormAsset();
-  if (!asset.name || !asset.purchaseDate || !asset.originalCost || !asset.legalRate) {
-    alert('יש למלא שם נכס, תאריך רכישה, מחיר מקורי ואחוז פחת.');
-    return;
-  }
+  const errors = validateAsset(asset);
+  showValidation(errors);
+  if (errors.length) return;
   const idx = assets.findIndex(a => a.id === asset.id);
   if (idx >= 0) assets[idx] = asset; else assets.push(asset);
   closeForm();
@@ -596,6 +706,19 @@ assetsBody.addEventListener('click', e => {
     renderAll();
     saveAssets().catch(err => { console.error(err); statusText.textContent = 'הנכס נמחק במסך, אך לא הצלחנו לשמור לענן'; });
   }
+});
+
+if (assetCandidatesBody) assetCandidatesBody.addEventListener('click', e => {
+  const rowId = e.target?.dataset?.fromExpense;
+  if (!rowId) return;
+  const row = (ledgerRows || []).find(r => r.id === rowId);
+  if (!row) return;
+  const asset = makeAssetFromRow(row);
+  const errors = validateAsset(asset);
+  if (errors.length) { alert(errors.join('\n')); return; }
+  assets.push(asset);
+  renderAll();
+  saveAssets().catch(err => { console.error(err); statusText.textContent = 'הנכס נוסף במסך, אך לא הצלחנו לשמור לענן'; });
 });
 $('btnGuide').addEventListener('click', () => {
   document.body.classList.toggle('guide-on');
