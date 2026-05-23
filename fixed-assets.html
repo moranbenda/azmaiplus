@@ -50,6 +50,16 @@
     .report-paper{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;margin:0 auto}
     .report-top{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:18px;font-size:14px}
     .report-title{font-size:22px;text-align:center;margin:12px 0 20px;font-weight:800}
+
+    .guide-panel{background:#eff6ff;border:1px solid #bfdbfe;border-radius:18px;padding:14px 16px;margin-bottom:14px;display:none}
+    .guide-on .guide-panel{display:block}
+    .field-help{display:none;color:var(--muted);font-size:12px;line-height:1.45;margin-top:5px}
+    .guide-on .field-help{display:block}
+    .advanced-field{display:none}
+    .advanced-on .advanced-field{display:block}
+    .pill-note{display:inline-flex;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .mini-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .soft-title{font-weight:800;margin-bottom:6px}
     .group-row td{font-weight:800;background:#f8fbff}
     .total-row td{font-weight:800;background:#fafcff}
     @media(max-width:900px){
@@ -83,6 +93,7 @@
       <div class="row">
         <a class="btn secondary" href="/year-end.html">חזרה לסגירת שנה</a>
         <a class="btn secondary" href="/">חזרה למסך הראשי</a>
+        <button class="btn ghost" id="btnGuide" type="button">הפעלת הדרכה</button>
         <button class="btn ghost" id="btnRefresh" type="button">רענון</button>
       </div>
     </div>
@@ -113,24 +124,86 @@
     </section>
 
     <section class="card controls" id="assetFormCard" style="display:none">
-      <div class="card-hd"><h3 id="formTitle">נכס חדש</h3></div>
+      <div class="card-hd"><h3 id="formTitle">נכס חדש</h3><div class="mini-actions"><button class="btn ghost" id="btnAdvanced" type="button">הצגת שדות מתקדמים</button><span class="pill-note">ברירת מחדל: פחת 15%, מחשוב ותוכנה 33%</span></div></div>
       <div class="card-bd">
+        <div class="guide-panel">
+          <div class="soft-title">איך ממלאים רכוש קבוע?</div>
+          <div class="hint">
+            רכוש קבוע הוא ציוד שמשמש את העסק לאורך זמן, כמו מחשב, טלפון, רכב או ציוד מקצועי. במקום לרשום את כל הסכום כהוצאה אחת, המערכת מחשבת פחת שנתי ומכניסה אותו לדוח רווח והפסד. אם לא בטוחים בתאריך הפעלה, לרוב אפשר להשתמש בתאריך הרכישה.
+          </div>
+        </div>
         <div class="form-grid">
-          <div><label>שם הנכס / תיאור</label><input id="assetName" placeholder="למשל: אייפון, מחשב, רכב" /></div>
-          <div><label>קבוצת נכס</label><input id="assetGroup" list="assetGroups" placeholder="למשל: ציוד / רכב" /></div>
-          <div><label>תאריך רכישה / שינוי</label><input id="purchaseDate" type="date" /></div>
-          <div><label>תאריך הפעלה</label><input id="activationDate" type="date" /></div>
-          <div><label>המחיר המקורי</label><input id="originalCost" type="number" step="0.01" min="0" placeholder="0" /></div>
-          <div><label>בסיס לפחת ידני</label><input id="baseOverride" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" /></div>
-          <div><label>% פחת בחוק</label><input id="legalRate" type="number" step="0.01" min="0" placeholder="15" /></div>
-          <div><label>% פחת נתבע</label><input id="claimedRate" type="number" step="0.01" min="0" placeholder="ריק = כמו בחוק" /></div>
+          <div>
+            <label>שם הנכס / תיאור</label>
+            <input id="assetName" placeholder="למשל: אייפון, מחשב, רכב" />
+            <div class="field-help">שם ברור שיופיע בדוח הפחת. לדוגמה: אייפון 15, מחשב נייד, רכב 123-45-678.</div>
+          </div>
+          <div>
+            <label>קבוצת נכס</label>
+            <select id="assetGroup">
+              <option value="רכב">רכב</option>
+              <option value="ציוד ספורט">ציוד ספורט</option>
+              <option value="מחשוב ותוכנה">מחשוב ותוכנה</option>
+              <option value="ציוד">ציוד</option>
+              <option value="ריהוט וציוד משרדי">ריהוט וציוד משרדי</option>
+              <option value="תוכנה">תוכנה</option>
+              <option value="אחר">אחר</option>
+            </select>
+            <div class="field-help">הקבוצה מסדרת את דוח הפחת לפי מבנה מקובל. בחירה בקבוצה גם מציעה אחוז פחת ברירת מחדל.</div>
+          </div>
+          <div>
+            <label>תאריך רכישה / שינוי</label>
+            <input id="purchaseDate" type="date" />
+            <div class="field-help">התאריך שבו קנית את הנכס. אם הנכס נקנה השנה, הוא יופיע גם בעמודת שינויי השנה.</div>
+          </div>
+          <div>
+            <label>תאריך הפעלה</label>
+            <input id="activationDate" type="date" />
+            <div class="field-help">התאריך שממנו הנכס התחיל לשמש את העסק. אם לא ידוע, אפשר להשתמש בתאריך הרכישה.</div>
+          </div>
+          <div>
+            <label>המחיר המקורי</label>
+            <input id="originalCost" type="number" step="0.01" min="0" placeholder="0" />
+            <div class="field-help">הסכום ששולם עבור הנכס. אם המחיר כולל מע״מ והמע״מ קוזז, בסיס הפחת יחושב אוטומטית ללא המע״מ.</div>
+          </div>
+          <div>
+            <label>% פחת בחוק</label>
+            <input id="legalRate" type="number" step="0.01" min="0" placeholder="15" />
+            <div class="field-help">ברוב הציוד משתמשים ב־15%. מחשוב ותוכנה לרוב 33%. ניתן לשנות ידנית לפי הצורך.</div>
+          </div>
           <div class="check-row"><input id="incVat" type="checkbox" checked /><span>המחיר כולל מע״מ</span></div>
           <div class="check-row"><input id="vatClaimed" type="checkbox" checked /><span>המע״מ נדרש/יוחזר</span></div>
-          <div><label>פחת נצבר קודם</label><input id="priorAccumulated" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" /></div>
           <div class="check-row"><input id="sold" type="checkbox" /><span>הנכס נמכר / נגרע</span></div>
-          <div><label>תאריך מכירה / גריעה</label><input id="saleDate" type="date" /></div>
-          <div><label>מחיר מכירה</label><input id="salePrice" type="number" step="0.01" min="0" placeholder="0" /></div>
-          <div style="grid-column:1/-1"><label>הערות</label><textarea id="notes" placeholder="למשל: נמכר, הושבת, מספר רכב וכו׳"></textarea></div>
+          <div>
+            <label>תאריך מכירה / גריעה</label>
+            <input id="saleDate" type="date" />
+            <div class="field-help">אם הנכס נמכר או יצא משימוש, הפחת יחושב רק עד חודש המכירה/הגריעה.</div>
+          </div>
+          <div class="advanced-field">
+            <label>בסיס לפחת ידני</label>
+            <input id="baseOverride" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" />
+            <div class="field-help">למקרים מיוחדים בלבד. אם משאירים ריק, המערכת מחשבת לבד לפי המחיר והמע״מ.</div>
+          </div>
+          <div class="advanced-field">
+            <label>% פחת נתבע</label>
+            <input id="claimedRate" type="number" step="0.01" min="0" placeholder="ריק = כמו בחוק" />
+            <div class="field-help">בדרך כלל להשאיר ריק. ממלאים רק אם בפועל תובעים אחוז שונה מאחוז הפחת בחוק.</div>
+          </div>
+          <div class="advanced-field">
+            <label>פחת נצבר קודם</label>
+            <input id="priorAccumulated" type="number" step="0.01" min="0" placeholder="ריק = חישוב אוטומטי" />
+            <div class="field-help">רלוונטי בעיקר לנכס שנרכש בשנים קודמות ויש כבר דוח פחת קודם. אם לא יודעים, המערכת תחשב אוטומטית לפי תאריך הרכישה.</div>
+          </div>
+          <div class="advanced-field">
+            <label>מחיר מכירה</label>
+            <input id="salePrice" type="number" step="0.01" min="0" placeholder="0" />
+            <div class="field-help">לא חובה כרגע. בהמשך ישמש לחישוב רווח/הפסד ממכירת רכוש.</div>
+          </div>
+          <div class="advanced-field" style="grid-column:1/-1">
+            <label>הערות</label>
+            <textarea id="notes" placeholder="למשל: נמכר, הושבת, מספר רכב וכו׳"></textarea>
+            <div class="field-help">הערות יוצגו בעמודת ההערות בדוח הפחת.</div>
+          </div>
         </div>
         <div class="row" style="margin-top:14px">
           <button class="btn" id="btnSaveAsset" type="button">שמירת נכס</button>
@@ -156,16 +229,6 @@
       </div>
     </section>
   </main>
-
-  <datalist id="assetGroups">
-    <option value="רכב"></option>
-    <option value="ציוד ספורט"></option>
-    <option value="מחשוב ותוכנה"></option>
-    <option value="ציוד"></option>
-    <option value="ריהוט וציוד משרדי"></option>
-    <option value="תוכנה"></option>
-    <option value="אחר"></option>
-  </datalist>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -293,6 +356,20 @@ function assetYears(){
   }
   return Array.from(set).sort((a,b)=>b.localeCompare(a));
 }
+
+function defaultRateForGroup(group){
+  const g = String(group || '');
+  if (g.includes('מחשוב') || g.includes('תוכנה')) return 33;
+  return 15;
+}
+function applyDefaultRateForGroup(force=false){
+  const rateEl = $('legalRate');
+  const newRate = defaultRateForGroup($('assetGroup').value);
+  const current = Number(rateEl.value);
+  if (force || !rateEl.value || current === 15 || current === 33) {
+    rateEl.value = newRate;
+  }
+}
 function emptyAsset(){
   return { id: crypto.randomUUID(), name:'', group:'ציוד', purchaseDate:'', activationDate:'', originalCost:'', incVat:true, vatClaimed:true, baseOverride:'', legalRate:15, claimedRate:'', priorAccumulated:'', sold:false, saleDate:'', salePrice:'', notes:'' };
 }
@@ -316,8 +393,18 @@ function getFormAsset(){
     notes: $('notes').value.trim()
   };
 }
+function ensureGroupOption(group){
+  const sel = $('assetGroup');
+  const value = group || 'ציוד';
+  if (![...sel.options].some(o => o.value === value)) {
+    const opt = document.createElement('option');
+    opt.value = value; opt.textContent = value;
+    sel.appendChild(opt);
+  }
+}
 function putFormAsset(asset){
   $('assetName').value = asset.name || '';
+  ensureGroupOption(asset.group || 'ציוד');
   $('assetGroup').value = asset.group || 'ציוד';
   $('purchaseDate').value = asset.purchaseDate || '';
   $('activationDate').value = asset.activationDate || asset.purchaseDate || '';
@@ -338,6 +425,7 @@ function openForm(asset=null){
   editingId = asset ? asset.id : null;
   formTitle.textContent = asset ? 'עריכת נכס' : 'נכס חדש';
   putFormAsset(a);
+  if (!asset) applyDefaultRateForGroup(true);
   formCard.style.display = '';
   formCard.scrollIntoView({ behavior:'smooth', block:'start' });
 }
@@ -472,7 +560,7 @@ async function loadData(user){
 
 $('btnNew').addEventListener('click', () => openForm());
 $('btnCancelAsset').addEventListener('click', closeForm);
-$('btnSaveAsset').addEventListener('click', () => {
+$('btnSaveAsset').addEventListener('click', async () => {
   const asset = getFormAsset();
   if (!asset.name || !asset.purchaseDate || !asset.originalCost || !asset.legalRate) {
     alert('יש למלא שם נכס, תאריך רכישה, מחיר מקורי ואחוז פחת.');
@@ -482,6 +570,7 @@ $('btnSaveAsset').addEventListener('click', () => {
   if (idx >= 0) assets[idx] = asset; else assets.push(asset);
   closeForm();
   renderAll();
+  try { await saveAssets(); } catch (err) { console.error(err); statusText.textContent = 'הנכס נשמר במסך, אך לא הצלחנו לשמור לענן'; }
 });
 assetsBody.addEventListener('click', e => {
   const editId = e.target?.dataset?.edit;
@@ -494,8 +583,19 @@ assetsBody.addEventListener('click', e => {
     if (!confirm('למחוק את הנכס מהרשימה?')) return;
     assets = assets.filter(a => a.id !== delId);
     renderAll();
+    saveAssets().catch(err => { console.error(err); statusText.textContent = 'הנכס נמחק במסך, אך לא הצלחנו לשמור לענן'; });
   }
 });
+$('btnGuide').addEventListener('click', () => {
+  document.body.classList.toggle('guide-on');
+  $('btnGuide').textContent = document.body.classList.contains('guide-on') ? 'כיבוי הדרכה' : 'הפעלת הדרכה';
+});
+$('btnAdvanced').addEventListener('click', () => {
+  document.body.classList.toggle('advanced-on');
+  $('btnAdvanced').textContent = document.body.classList.contains('advanced-on') ? 'הסתרת שדות מתקדמים' : 'הצגת שדות מתקדמים';
+});
+$('assetGroup').addEventListener('change', () => applyDefaultRateForGroup(false));
+$('purchaseDate').addEventListener('change', () => { if (!$('activationDate').value) $('activationDate').value = $('purchaseDate').value; });
 taxYear.addEventListener('change', renderAll);
 $('btnSave').addEventListener('click', saveAssets);
 $('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
