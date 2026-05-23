@@ -397,6 +397,7 @@ function calculateYear(){
   const year = taxYear.value;
   const settings = getSettings();
   const list = rows.filter(r => String(r.date || '').slice(0,4) === year);
+  const capitalizedExpenseIds = new Set((fixedAssets || []).map(a => a.sourceRowId).filter(Boolean));
   let incomeNet = 0;
   let incomeGross = 0;
   let incomeVat = 0;
@@ -415,6 +416,7 @@ function calculateYear(){
       continue;
     }
     if (r.type !== 'expense') continue;
+    if (capitalizedExpenseIds.has(r.id)) continue;
     const meta = getExpenseMeta(r);
     const categoryName = meta?.category || r.category || 'לא מסווג';
     const itemName = meta?.item || r.category || r.desc || categoryName;
@@ -500,7 +502,8 @@ function renderAll(){
   mProfit.style.color = calc.operatingProfit >= 0 ? 'var(--green)' : 'var(--red)';
   renderGroups(calc);
   renderPnl(calc);
-  statusText.textContent = `${calc.list.length} תנועות, ${fixedAssets.length} נכסי רכוש קבוע בשנת ${calc.year}`;
+  const linked = new Set((fixedAssets || []).map(a => a.sourceRowId).filter(Boolean)).size;
+  statusText.textContent = `${calc.list.length} תנועות, ${fixedAssets.length} נכסי רכוש קבוע בשנת ${calc.year}${linked ? ', ' + linked + ' הוצאות מקושרות לרכוש' : ''}`;
 }
 function exportPnlCsv(){
   const calc = calculateYear();
