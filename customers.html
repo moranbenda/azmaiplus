@@ -105,6 +105,10 @@
       align-items:start;
     }
     .hero-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+    .quickbar-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .quickbar-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .hero-search{margin-top:14px;background:#fff;font-size:15px;min-height:48px}
     .btn.cta{
       min-height:46px;
       padding:12px 20px;
@@ -289,26 +293,25 @@
     <div class="top-actions">
       <span class="chip" id="userTag">בודק התחברות…</span>
       <a class="btn secondary small" href="/index.html">חזרה למסך הראשי</a>
+      <a class="btn secondary small" href="/documents.html">מסמכים</a>
       <button class="btn cta" id="btnNewCustomer">+ לקוח חדש</button>
     </div>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="hero">
-    <h2>ניהול לקוחות</h2>
-    <div class="hint">
-      כאן נשמרים פרטי הלקוחות שישמשו בהמשך להפקת חשבוניות, קבלות, זיכויים, שליחה למייל וכרטסת לקוח.
+  <section class="hero customer-quickbar">
+    <div class="quickbar-head">
+      <div>
+        <h2>איתור לקוח</h2>
+        <div class="hint">חפשו לקוח, פתחו כרטיס, ערכו פרטים או עברו להפקת מסמך.</div>
+      </div>
+      <div class="quickbar-actions">
+        <a class="btn secondary small" href="/documents.html">מסמכים</a>
+        <button class="btn cta" id="btnNewCustomerHero" type="button">+ הוספת לקוח חדש</button>
+      </div>
     </div>
-    <div class="hero-actions">
-      <button class="btn cta" id="btnNewCustomerHero" type="button">+ הוספת לקוח חדש</button>
-    </div>
-    <div class="stats">
-      <div class="metric"><div class="k">לקוחות</div><div class="v" id="statCustomers">0</div></div>
-      <div class="metric"><div class="k">עם מייל</div><div class="v" id="statEmails">0</div></div>
-      <div class="metric"><div class="k">עם טלפון</div><div class="v" id="statPhones">0</div></div>
-      <div class="metric"><div class="k">מסמכים עתידיים</div><div class="v" id="statDocs">0</div></div>
-    </div>
+    <input class="search hero-search" id="qTop" placeholder="חיפוש לקוח לפי שם, מייל, טלפון או מספר מזהה…" autocomplete="off" />
   </section>
 
   <div class="grid">
@@ -626,20 +629,35 @@ function customerMatches(c, q){
 }
 
 function renderStats(){
-  $("statCustomers").textContent = customers.length;
+  const statCustomers = $("statCustomers");
+  if (!statCustomers) return;
+  statCustomers.textContent = customers.length;
   $("statEmails").textContent = customers.filter(c => c.email).length;
   $("statPhones").textContent = customers.filter(c => c.phone).length;
   $("statDocs").textContent = customers.reduce((sum,c) => sum + (Array.isArray(c.documents) ? c.documents.length : 0), 0);
 }
 
+function getCustomerSearch(){
+  const top = $("qTop");
+  const bottom = $("q");
+  return ((top && top.value) || (bottom && bottom.value) || "").trim();
+}
+
+function syncCustomerSearch(value){
+  ["qTop", "q"].forEach(id => {
+    const el = $(id);
+    if (el && el.value !== value) el.value = value;
+  });
+}
+
 function render(){
   renderStats();
-  const q = $("q").value.trim();
+  const q = getCustomerSearch();
   const filtered = customers.filter(c => customerMatches(c, q));
   const list = $("customersList");
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="empty">${customers.length ? "לא נמצאו לקוחות בחיפוש." : "עדיין אין לקוחות. לחצו על לקוח חדש כדי להתחיל."}</div>`;
+    list.innerHTML = `<div class="empty">${customers.length ? "לא נמצאו לקוחות בחיפוש." : "עדיין אין לקוחות. לחצו על הוספת לקוח חדש כדי להתחיל."}</div>`;
     renderSelected();
     return;
   }
@@ -805,7 +823,7 @@ function formatDateForPrint(){
 }
 
 function printCustomersList(){
-  const q = $("q").value.trim();
+  const q = getCustomerSearch();
   const filtered = customers.filter(c => customerMatches(c, q));
   const rows = filtered.map(c => `
     <tr>
@@ -889,7 +907,14 @@ $("btnNewCustomerHero").addEventListener("click", () => openForm());
 $("btnCancelEdit").addEventListener("click", closeForm);
 $("btnClearForm").addEventListener("click", clearForm);
 $("btnSaveCustomer").addEventListener("click", saveCurrentCustomer);
-$("q").addEventListener("input", render);
+["qTop", "q"].forEach(id => {
+  const el = $(id);
+  if (!el) return;
+  el.addEventListener("input", () => {
+    syncCustomerSearch(el.value);
+    render();
+  });
+});
 $("btnExportCsv").addEventListener("click", exportCsv);
 $("btnPrint").addEventListener("click", printCustomersList);
 
