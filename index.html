@@ -730,6 +730,37 @@ header.app-header{
   #tbody tr.open td:last-child::after{content:'סגירה';font-size:12px;color:var(--text-dim);margin-inline-start:auto;}
 }
 
+
+
+/* כרטיסי תנועות קומפקטיים יותר במובייל */
+@media(max-width:700px){
+  #tbody tr{
+    margin:0 0 8px;
+    border-radius:14px;
+    box-shadow:0 3px 10px rgba(15,23,42,.045);
+  }
+  #tbody td{
+    padding:7px 10px;
+    gap:8px;
+    font-size:13px;
+  }
+  #tbody td::before{font-size:11px;flex:0 0 76px;}
+  #tbody tr:not(.open) td:nth-child(1),
+  #tbody tr:not(.open) td:nth-child(2),
+  #tbody tr:not(.open) td:nth-child(3),
+  #tbody tr:not(.open) td:nth-child(7),
+  #tbody tr:not(.open) td:last-child{
+    min-height:auto;
+  }
+  #tbody tr:not(.open) td:nth-child(1),
+  #tbody tr:not(.open) td:nth-child(2){padding-top:6px;padding-bottom:2px;}
+  #tbody tr:not(.open) td:nth-child(3){padding-top:4px;padding-bottom:4px;}
+  #tbody tr:not(.open) td:nth-child(7){font-size:14px;padding-top:4px;padding-bottom:6px;}
+  #tbody tr:not(.open) td:last-child{padding-top:4px;padding-bottom:7px;}
+  #tbody tr:not(.open) td:last-child::after{content:'פרטים';font-size:11px;}
+  #tbody tr.open td:last-child::after{content:'סגירה';font-size:11px;}
+}
+
 </style>
 </head>
 <body>
@@ -855,6 +886,21 @@ header.app-header{
       </div>
 
       <div class="home-actions">
+        <button type="button" class="home-card" id="homeGoProfile">
+          <div class="ico">⚙️</div>
+          <div class="title">פרופיל עסק</div>
+          <div class="desc">פרטי העסק, סוג עוסק, מע״מ ולוגו עסק.</div>
+        </button>
+        <a class="home-card" id="homeGoDocs" href="/documents.html">
+          <div class="ico">📄</div>
+          <div class="title">מסמכים</div>
+          <div class="desc">טיוטות מסמכים, ספרור, לקוחות ותצוגת מסמך.</div>
+        </a>
+        <a class="home-card" id="homeGoCustomers" href="/customers.html">
+          <div class="ico">👥</div>
+          <div class="title">לקוחות</div>
+          <div class="desc">כרטיסי לקוח, פרטי התקשרות והכנה למסמכים וכרטסת.</div>
+        </a>
         <button type="button" class="home-card" id="homeGoLedger">
           <div class="ico">💰</div>
           <div class="title">הכנסות והוצאות</div>
@@ -868,7 +914,7 @@ header.app-header{
         <button type="button" class="home-card" id="homeGoReports">
           <div class="ico">📊</div>
           <div class="title">דוחות</div>
-          <div class="desc">דוחות הכנסות, הוצאות, רווח והפסד ומע״מ.</div>
+          <div class="desc">דוחות הכנסות, הוצאות, תנועות, לקוחות ומע״מ.</div>
         </button>
         <button type="button" class="home-card" id="homeGoVat">
           <div class="ico">🧾</div>
@@ -880,25 +926,10 @@ header.app-header{
           <div class="title">טבלת קטגוריות</div>
           <div class="desc">בדיקת הכרה למס והאם הוצאה מוכרת למע״מ.</div>
         </button>
-        <button type="button" class="home-card" id="homeGoProfile">
-          <div class="ico">⚙️</div>
-          <div class="title">פרופיל עסק</div>
-          <div class="desc">פרטי העסק, סוג עוסק ואחוז מע״מ.</div>
-        </button>
-        <a class="home-card" id="homeGoCustomers" href="/customers.html">
-          <div class="ico">👥</div>
-          <div class="title">לקוחות</div>
-          <div class="desc">כרטיסי לקוח, פרטי התקשרות והכנה למסמכים וכרטסת.</div>
-        </a>
         <a class="home-card" id="homeGoYearEnd" href="/year-end.html">
           <div class="ico">📉</div>
           <div class="title">סגירת שנה</div>
           <div class="desc">דוח רווח והפסד, קבוצות הוצאה, פחת והכנה לדוח שנתי.</div>
-        </a>
-        <a class="home-card" id="homeGoDocs" href="/documents.html">
-          <div class="ico">📄</div>
-          <div class="title">מסמכים</div>
-          <div class="desc">טיוטות מסמכים, ספרור, לקוחות ותצוגת מסמך.</div>
         </a>
       </div>
     </section>
@@ -1243,9 +1274,9 @@ header.app-header{
         <select id="rType">
           <option value="income">דוח הכנסות</option>
           <option value="expense">דוח רשימת הוצאות</option>
-          <option value="both">דוח הכנסות והוצאות</option>
-          <option value="pnl">דוח רווח והפסד</option>
+          <option value="both">דוח תנועות</option>
           <option value="vat">דוח מע״מ</option>
+          <option value="customers">דוח רשימת לקוחות</option>
         </select>
       </div>
       <div id="expenseReportColumnsWrap" style="grid-column:1 / -1" hidden>
@@ -1268,7 +1299,7 @@ header.app-header{
         <button class="btn small" id="btnReportCsv">ייצוא לאקסל (CSV)</button>
         <button class="btn secondary small" id="btnReportPdf">ייצוא ל-PDF</button>
       </div>
-      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים, כולל הכנסות+הוצאות, רווח והפסד, דוח מע״מ ורשימת הוצאות עם בחירת עמודות.</span>
+      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים: הכנסות, הוצאות, תנועות, מע״מ ורשימת לקוחות.</span>
     </div>
   </div>
 </dialog>
@@ -2737,6 +2768,7 @@ btnSaveProfile.onclick = async () => {
 ---------------------------------------------------------- */
 
 let rows = [];
+let ledgerCustomers = [];
 let localLedgerMeta = { updatedAt: null };
 let cloudLoadedForUid = null;
 let isHydratingLedger = false;
@@ -2781,6 +2813,7 @@ function applyLedgerPayload(obj = {}) {
     ...r,
     deductPct: typeof r.deductPct === "number" ? r.deductPct : 100
   }));
+  ledgerCustomers = Array.isArray(obj.customers) ? obj.customers : [];
   localLedgerMeta.updatedAt = obj.updatedAt || null;
   const type = normalizeBusinessType(userProfile?.businessType);
   if (type !== "ptor") {
@@ -4384,11 +4417,46 @@ function buildVatSummary(from, to) {
   };
 }
 
+
+function getReportCustomers(){
+  return Array.isArray(ledgerCustomers) ? ledgerCustomers.slice() : [];
+}
+function customerReportRows(){
+  return getReportCustomers().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''), 'he'));
+}
+function customerTypeLabelForReport(t=''){
+  return {
+    private:'פרטי', ptor:'עוסק פטור', murshe:'עוסק מורשה', company:'חברה בע״מ', nonprofit:'עמותה / מלכ״ר', other:'אחר'
+  }[t] || t || '';
+}
+function paymentTermsLabelForReport(t=''){
+  return {immediate:'מיידי', net15:'שוטף + 15', net30:'שוטף + 30', net60:'שוטף + 60', custom:'אחר'}[t] || t || '';
+}
+function paymentMethodLabelForReport(t=''){
+  return {credit:'אשראי', bank:'העברה בנקאית', cash:'מזומן', bit:'ביט / PayBox', check:'צ׳ק', standing_order:'הוראת קבע', other:'אחר'}[t] || t || '';
+}
+function formatVatNumberForReport(n){
+  return Number(n || 0).toLocaleString('he-IL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 /* ------------ CSV לדוחות ------------ */
 btnReportCsv.onclick = () => {
   const type = rType.value;
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
+
+  if (type === "customers") {
+    const data = customerReportRows();
+    if (!data.length) return alert("אין לקוחות להצגה");
+    const headers = ["name","type","taxId","contact","phone","email","address","city","zip","paymentTerms","paymentMethod","notes"];
+    const csv = [
+      headers.join(","),
+      ...data.map(c => headers.map(h => `"${String(c[h] ?? "").replace(/"/g,'""')}"`).join(","))
+    ];
+    downloadFile("customers-report.csv", csv.join("
+"));
+    return;
+  }
 
   if (type === "pnl") {
     const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
@@ -4431,7 +4499,7 @@ btnReportCsv.onclick = () => {
     csv.push(`"TOTAL_INCOME","","","",${totalsInc.net},${totalsInc.vat},${totalsInc.gross}`);
     csv.push(`"TOTAL_EXPENSE","","","",${totalsExp.net},${totalsExp.vat},${totalsExp.gross}`);
     csv.push(`"BALANCE","","","",${totalsInc.net - totalsExp.net},,${totalsInc.gross - totalsExp.gross}`);
-    downloadFile("income-expense-report.csv", csv.join("\n"));
+    downloadFile("movements-report.csv", csv.join("\n"));
     return;
   }
 
@@ -4499,6 +4567,32 @@ btnReportPdf.onclick = () => {
     w.focus();
   };
 
+  if (type === "customers") {
+    const data = customerReportRows();
+    if (!data.length) {
+      alert("אין לקוחות להצגה");
+      return;
+    }
+    const bodyRows = data.map(c => `
+      <tr>
+        <td>${escapeHtml(c.name || "")}</td>
+        <td>${escapeHtml(customerTypeLabelForReport(c.type))}</td>
+        <td>${escapeHtml(c.taxId || "")}</td>
+        <td>${escapeHtml(c.contact || "")}</td>
+        <td>${escapeHtml(c.phone || "")}</td>
+        <td>${escapeHtml(c.email || "")}</td>
+        <td>${escapeHtml([c.address, c.city, c.zip].filter(Boolean).join(", "))}</td>
+        <td>${escapeHtml(paymentTermsLabelForReport(c.paymentTerms))}</td>
+        <td>${escapeHtml(paymentMethodLabelForReport(c.paymentMethod))}</td>
+      </tr>`).join("");
+    openReportWindow('דוח רשימת לקוחות', `
+      <table>
+        <thead><tr><th>לקוח</th><th>סוג</th><th>מספר מזהה</th><th>איש קשר</th><th>טלפון</th><th>מייל</th><th>כתובת</th><th>תנאי תשלום</th><th>אמצעי תשלום</th></tr></thead>
+        <tbody>${bodyRows}</tbody>
+      </table>`);
+    return;
+  }
+
   if (type === "pnl") {
     const incomeList  = filterByDateAndType("income",  from, to);
     const expenseList = filterByDateAndType("expense", from, to);
@@ -4524,15 +4618,29 @@ btnReportPdf.onclick = () => {
   if (type === "vat") {
     const vat = buildVatSummary(from, to);
     openReportWindow('דו"ח מע"מ', `
+      <div style="border:1px solid #ddd;border-radius:12px;padding:12px;margin-bottom:12px;background:#f8fafc">
+        <b>ריכוז להזנה באתר תשלום מע״מ</b><br>
+        יש לרשום באתר את הסכומים לפני מע״מ ואת מס התשומות לפי השדות שלהלן. תשומות ציוד מוצגות כרגע 0, עד לחיבור אוטומטי מלא לטבלת רכוש קבוע.
+      </div>
       <table>
         <thead>
-          <tr><th>סעיף</th><th>בסיס</th><th>מע"מ</th><th>כולל</th></tr>
+          <tr><th>אזור באתר</th><th>שדה באתר</th><th>ערך להזנה</th><th>הערה</th></tr>
         </thead>
         <tbody>
-          <tr><td>עסקאות (הכנסות ללא מע"מ)</td><td>${toMoney(vat.incomeNet)}</td><td>${toMoney(vat.incomeVat)}</td><td>${toMoney(vat.incomeGross)}</td></tr>
-          <tr><td>תשומות אחרות</td><td>${toMoney(vat.expenseNet)}</td><td>${toMoney(vat.expenseVat)}</td><td>${toMoney(vat.expenseGross)}</td></tr>
-          <tr><td><b>מס תשומות</b></td><td></td><td><b>${toMoney(vat.expenseVat)}</b></td><td></td></tr>
-          <tr><td><b>מע"מ לתשלום / החזר</b></td><td></td><td><b>${toMoney(vat.vatToPay)}</b></td><td></td></tr>
+          <tr><td>עסקאות</td><td>עסקאות חייבות 18%</td><td><b>${formatVatNumberForReport(vat.incomeNet)}</b></td><td>הכנסות ללא מע״מ</td></tr>
+          <tr><td>עסקאות</td><td>מס עסקאות</td><td><b>${formatVatNumberForReport(vat.incomeVat)}</b></td><td>המע״מ על ההכנסות</td></tr>
+          <tr><td>תשומות</td><td>תשומות ציוד</td><td><b>0.00</b></td><td>ימולא בעתיד מטבלת רכוש קבוע</td></tr>
+          <tr><td>תשומות</td><td>תשומות אחרות</td><td><b>${formatVatNumberForReport(vat.expenseVat)}</b></td><td>מס תשומות מהוצאות מוכרות למע״מ</td></tr>
+          <tr><td>סיכום</td><td>סה״כ מס תשומות</td><td><b>${formatVatNumberForReport(vat.expenseVat)}</b></td><td></td></tr>
+          <tr><td>סיכום</td><td>סכום לתשלום / החזר</td><td><b>${formatVatNumberForReport(vat.vatToPay)}</b></td><td>${vat.vatToPay >= 0 ? "לתשלום" : "להחזר"}</td></tr>
+        </tbody>
+      </table>
+      <h2 style="font-size:15px;margin-top:18px">פירוט פנימי</h2>
+      <table>
+        <thead><tr><th>סעיף</th><th>בסיס</th><th>מע״מ</th><th>כולל</th></tr></thead>
+        <tbody>
+          <tr><td>הכנסות</td><td>${toMoney(vat.incomeNet)}</td><td>${toMoney(vat.incomeVat)}</td><td>${toMoney(vat.incomeGross)}</td></tr>
+          <tr><td>הוצאות</td><td>${toMoney(vat.expenseNet)}</td><td>${toMoney(vat.expenseVat)}</td><td>${toMoney(vat.expenseGross)}</td></tr>
         </tbody>
       </table>`);
     return;
@@ -4557,7 +4665,7 @@ btnReportPdf.onclick = () => {
         <td>${toMoney(r.vat)}</td>
         <td>${toMoney(r.gross)}</td>
       </tr>`).join("");
-    openReportWindow('דו"ח הכנסות והוצאות', `
+    openReportWindow('דו"ח תנועות', `
       <table>
         <thead>
           <tr><th>תאריך</th><th>סוג</th><th>קטגוריה</th><th>תיאור</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
