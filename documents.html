@@ -16,7 +16,7 @@
     .card{background:var(--panel);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);padding:20px;margin-top:20px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
     .metric{border:1px solid var(--line);border-radius:18px;background:#fff;padding:16px}.metric .k{font-size:13px;color:var(--muted)}.metric .v{font-size:26px;font-weight:900;margin-top:5px}
     label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;padding:12px;background:#fbfcff;color:var(--text);font:inherit}textarea{min-height:92px;resize:vertical}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.form-grid .wide{grid-column:1/-1}.footer{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
-    .split{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:start}.settings-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fff;color:var(--muted);font-size:13px}.status{font-size:14px;color:var(--muted)}.status.ok{color:var(--green)}.status.err{color:var(--red)}
+    .split{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:start}.settings-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fff;color:var(--muted);font-size:13px}.status{font-size:14px;color:var(--muted)}.status.ok{color:var(--green)}.status.err{color:var(--red)}
     .preview{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;min-height:640px}.doc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid var(--line);padding-bottom:16px}.doc-logo{width:92px;max-height:92px;object-fit:contain}.doc-title{text-align:left}.doc-title h2{font-size:26px;margin:0}.doc-meta{margin-top:8px;color:var(--muted);font-size:13px}.doc-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}.box{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fbfcff}.box h3{margin:0 0 8px;font-size:16px}.items{width:100%;border-collapse:collapse;margin-top:20px}.items th,.items td{border-bottom:1px solid var(--line);padding:10px;text-align:right}.items th{background:#f2f5fa}.totals{width:min(360px,100%);margin:20px 0 0 auto;border:1px solid var(--line);border-radius:16px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}.totals div:last-child{border-bottom:0;font-weight:900;background:#f6f8fc}.draft-watermark{margin-top:18px;color:#8a94a6;font-weight:800;border:1px dashed var(--line);border-radius:14px;padding:10px;text-align:center}
     .drafts-list{display:grid;gap:10px}.draft-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.draft-card b{font-size:16px}.empty{border:1px dashed var(--line);border-radius:18px;padding:20px;text-align:center;color:var(--muted);background:#fff}
     @media(max-width:900px){.split,.grid,.grid3,.grid4,.form-grid,.settings-row,.doc-parties{grid-template-columns:1fr}.wrap{padding:14px}.card{padding:16px;border-radius:20px}.preview{padding:16px}.doc-head{flex-direction:column}.doc-title{text-align:right}.actions .btn{flex:1}.metric .v{font-size:22px}}
@@ -38,6 +38,13 @@
     .payment-box{border:1px solid var(--line);border-radius:16px;background:#fbfcff;padding:12px}
     .payment-box[hidden]{display:none!important}
     .discount-note{font-size:12px;color:var(--muted);margin-top:4px}
+    .allocation-panel{border:1px solid var(--line);border-radius:16px;background:#fbfcff;padding:12px}
+    .allocation-panel[hidden]{display:none!important}
+    .allocation-panel.warn{border-color:#f59e0b;background:#fff8eb}
+    .allocation-panel.ok{border-color:#16a34a;background:#f0fdf4}
+    .allocation-panel.info{border-color:#2f6fec;background:#f4f7ff}
+    .allocation-title{font-weight:900;margin-bottom:5px}
+    .allocation-meta{color:var(--muted);font-size:13px;line-height:1.45}
     @media(max-width:900px){.line-row{grid-template-columns:1fr}.line-row .remove-line{width:100%}}
 
 </style>
@@ -64,6 +71,7 @@
       <div><label>חשבונית מס/קבלה</label><input type="number" min="1" id="setTaxReceipt" /></div>
       <div><label>חשבונית זיכוי</label><input type="number" min="1" id="setCredit" /></div>
       <div><label>הצעת מחיר</label><input type="number" min="1" id="setQuote" /></div>
+      <div><label>חשבונית עסקה</label><input type="number" min="1" id="setDealInvoice" /></div>
     </div>
     <div class="footer"><button class="btn" id="btnSaveSettings">שמירת ספרור</button><span class="status" id="settingsStatus"></span></div>
   </section>
@@ -72,7 +80,7 @@
     <section class="card form-card no-print">
       <h2>טיוטת מסמך</h2>
       <div class="form-grid">
-        <div><label>סוג מסמך</label><select id="docType"><option value="tax_invoice">חשבונית מס</option><option value="receipt">קבלה</option><option value="tax_invoice_receipt">חשבונית מס/קבלה</option><option value="credit_note">חשבונית זיכוי</option><option value="quote">הצעת מחיר</option></select></div>
+        <div><label>סוג מסמך</label><select id="docType"><option value="tax_invoice">חשבונית מס</option><option value="receipt">קבלה</option><option value="tax_invoice_receipt">חשבונית מס/קבלה</option><option value="credit_note">חשבונית זיכוי</option><option value="quote">הצעת מחיר</option><option value="deal_invoice">חשבונית עסקה</option></select></div>
         <div><label>מספר מוצע</label><input type="text" id="docNumber" readonly /></div>
         <div><label>תאריך</label><input type="date" id="docDate" /></div>
         <div class="wide customer-search-wrap"><label>לקוח</label><input type="text" id="docCustomerSearch" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה..." autocomplete="off" /><input type="hidden" id="docCustomer" /><div id="customerSuggest" class="customer-suggest" hidden></div><div class="hint" id="selectedCustomerHint"></div></div>
@@ -84,6 +92,7 @@
         </div>
         <div><label>אחוז מע״מ</label><input type="number" id="docVatRate" min="0" step="0.1" /></div>
         <div><label>הנחה %</label><input type="number" id="docDiscountPct" min="0" max="100" step="0.01" value="0" /><div class="discount-note">ההנחה מחושבת מסה״כ לפני מע״מ.</div></div>
+        <div id="allocationPanel" class="allocation-panel wide" hidden></div>
         <div id="paymentMethodWrap" class="payment-box wide" hidden>
           <label>אמצעי תשלום</label>
           <select id="paymentMethod">
@@ -120,8 +129,8 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authDomain:"freelance-accounting-6c3bb.firebaseapp.com", projectId:"freelance-accounting-6c3bb", storageBucket:"freelance-accounting-6c3bb.firebasestorage.app", messagingSenderId:"196974556694", appId:"1:196974556694:web:60ba710567f2a7c67c6737" };
 const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
-const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1 };
-const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר" };
+const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1, deal_invoice:1 };
+const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר", deal_invoice:"חשבונית עסקה" };
 let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[];
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
@@ -142,6 +151,44 @@ function round2(n){return Math.round((Number(n)||0)*100)/100;}
 function rateFactor(){return vatEnabled() ? 1 + (Number($('docVatRate').value||0)/100) : 1;}
 function isPaymentDoc(){return ['receipt','tax_invoice_receipt'].includes($('docType').value);}
 function paymentLabel(v){return ({cash:'מזומן', bank_transfer:'העברה בנקאית', credit_card:'אשראי', check:'צ׳ק', payment_app:'אפליקציית תשלום', other:'אחר'}[v] || '');}
+function isAllocationDocType(type){return ['tax_invoice','tax_invoice_receipt'].includes(type);}
+function isNonAccountingDocType(type){return ['quote','deal_invoice'].includes(type);}
+function allocationThresholdForDate(dateStr){ const d=String(dateStr||today()).slice(0,10); if(d>='2026-06-01') return 5000; if(d>='2026-01-01') return 10000; if(d>='2025-01-01') return 20000; return 20000; }
+function allocationCheck(){
+  const type=$('docType')?.value||'tax_invoice';
+  const t=totals();
+  const threshold=allocationThresholdForDate($('docDate')?.value||today());
+  if(!isAllocationDocType(type)){
+    return {status:'not_applicable', required:false, threshold, net:t.net, message:'מספר הקצאה רלוונטי רק לחשבונית מס ולחשבונית מס/קבלה.'};
+  }
+  if(t.net>threshold){
+    return {status:'required', required:true, threshold, net:t.net, message:'נדרש מספר הקצאה מרשות המסים לפני הפקה סופית.'};
+  }
+  return {status:'not_required', required:false, threshold, net:t.net, message:'לא נדרש מספר הקצאה לפי סכום המסמך.'};
+}
+function renderAllocationPanel(){
+  const el=$('allocationPanel');
+  if(!el)return;
+  const type=$('docType')?.value||'tax_invoice';
+  if(!isAllocationDocType(type)){
+    el.hidden=true;
+    el.innerHTML='';
+    return;
+  }
+  const a=allocationCheck();
+  el.hidden=false;
+  el.className='allocation-panel wide '+(a.status==='required'?'warn':'ok');
+  const amountLine=`סכום לפני מע״מ לאחר הנחה: ${money(a.net)} · תקרה לבדיקה: ${money(a.threshold)}`;
+  if(a.status==='required'){
+    el.innerHTML=`<div class="allocation-title">חשבוניות ישראל: נדרש מספר הקצאה</div><div class="allocation-meta">${amountLine}<br>סטטוס: ימתין לחיבור API מאובטח. לא תהיה הזנה ידנית ולא תתאפשר הפקה סופית בלי מספר שהתקבל מהמערכת.</div>`;
+    return;
+  }
+  el.innerHTML=`<div class="allocation-title">חשבוניות ישראל: לא נדרש</div><div class="allocation-meta">${amountLine}</div>`;
+}
+function allocationPreviewHtml(a){
+  if(a.status==='required') return `<div class="box" style="margin-top:20px"><h3>חשבוניות ישראל</h3>נדרש מספר הקצאה לפני הפקה סופית.<br>סכום לפני מע״מ: ${money(a.net)} · תקרה: ${money(a.threshold)}</div>`;
+  return '';
+}
 function makeLine(data={}){return {id:data.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())), desc:data.desc ?? data.itemDesc ?? '', qty:Number(data.qty ?? 1), netPrice:Number(data.netPrice ?? data.price ?? 0), grossPrice:Number(data.grossPrice ?? round2(Number(data.netPrice ?? data.price ?? 0)*rateFactor()))};}
 function ensureLines(){if(!Array.isArray(docLines) || !docLines.length) docLines=[makeLine({desc:'',qty:1,netPrice:0})];}
 function lineTotalNet(line){return round2(Number(line.qty||0)*Number(line.netPrice||0));}
@@ -166,30 +213,31 @@ function renderLinesEditor(){ensureLines(); const box=$('linesEditor'); if(!box)
   box.querySelectorAll('[data-remove-line]').forEach(btn=>btn.onclick=()=>{ if(docLines.length<=1)return; docLines=docLines.filter(x=>String(x.id)!==String(btn.dataset.removeLine)); renderLinesEditor(); renderPreview(); });
 }
 function totals(){ensureLines(); const subtotal=round2(docLines.reduce((s,l)=>s+lineTotalNet(l),0)); const discountPct=Math.min(100,Math.max(0,Number($('docDiscountPct')?.value||0))); const discount=round2(subtotal*discountPct/100); const net=round2(Math.max(0,subtotal-discount)); const vat=round2(vatEnabled()?net*Number($('docVatRate').value||0)/100:0); return {subtotal,discountPct,discount,net,vat,gross:round2(net+vat)};}
-function hydrateSettings(){settings={...DEFAULT_SETTINGS,...(ledger.documentSettings||{})}; $('setInvoice').value=settings.tax_invoice; $('setReceipt').value=settings.receipt; $('setTaxReceipt').value=settings.tax_invoice_receipt; $('setCredit').value=settings.credit_note; $('setQuote').value=settings.quote;}
+function hydrateSettings(){settings={...DEFAULT_SETTINGS,...(ledger.documentSettings||{})}; $('setInvoice').value=settings.tax_invoice; $('setReceipt').value=settings.receipt; $('setTaxReceipt').value=settings.tax_invoice_receipt; $('setCredit').value=settings.credit_note; $('setQuote').value=settings.quote; $('setDealInvoice').value=settings.deal_invoice;}
 function syncStats(){ $('statCustomers').textContent=customers.length; $('statDrafts').textContent=drafts.length; $('statNextInvoice').textContent=settings.tax_invoice||1; $('statNextReceipt').textContent=settings.receipt||1; }
 function renderCustomerOptions(){ const input=$('docCustomerSearch'); if(!input)return; if(!customers.length){ input.value=''; input.placeholder='אין לקוחות — יש להוסיף לקוח במודול לקוחות'; input.disabled=true; $('docCustomer').value=''; } else { input.disabled=false; input.placeholder='חיפוש לפי שם, מייל, טלפון או מספר מזהה...'; if(!$('docCustomer').value && customers.length===1) setSelectedCustomer(customers[0]); else renderSelectedCustomerHint(); } }
 function updateDocNumber(){ $('docNumber').value = nextNumberFor($('docType').value); }
 function updatePaymentVisibility(){ const wrap=$('paymentMethodWrap'); if(wrap) wrap.hidden=!isPaymentDoc(); }
 function businessBlock(){return `<b>${escapeHtml(profile.businessName||'שם העסק')}</b><br>מספר עוסק/ח.פ: ${escapeHtml(profile.businessId||'')}<br>${profile.phone?`טלפון: ${escapeHtml(profile.phone)}<br>`:''}${profile.email?`מייל: ${escapeHtml(profile.email)}<br>`:''}`;}
 function customerBlock(c){if(!c)return 'לא נבחר לקוח'; return `<b>${escapeHtml(customerName(c))}</b><br>${c.idNumber||c.businessId?`מספר מזהה: ${escapeHtml(c.idNumber||c.businessId)}<br>`:''}${c.contactName?`איש קשר: ${escapeHtml(c.contactName)}<br>`:''}${c.email?`מייל: ${escapeHtml(c.email)}<br>`:''}${c.phone?`טלפון: ${escapeHtml(c.phone)}<br>`:''}${[c.address,c.city,c.zip].filter(Boolean).map(escapeHtml).join(', ')}`;}
-function renderPreview(){ const type=$('docType').value, c=getSelectedCustomer(), t=totals(); updatePaymentVisibility(); const logo=profile.businessLogoDataUrl || profile.businessLogo || profile.logoDataUrl || ""; const rows=docLines.map(l=>`<tr><td>${escapeHtml(l.desc||'שירות / מוצר')}</td><td>${escapeHtml(l.qty||0)}</td><td>${money(l.netPrice)}</td><td>${money(lineTotalNet(l))}</td></tr>`).join(''); const paymentHtml=isPaymentDoc()?`<div class="box" style="margin-top:20px"><h3>אמצעי תשלום</h3>${escapeHtml(paymentLabel($('paymentMethod').value)||'לא צוין')}${$('paymentRef').value?`<br>פרטים: ${escapeHtml($('paymentRef').value)}`:''}</div>`:''; $('docPreview').innerHTML=`
+function renderPreview(){ const type=$('docType').value, c=getSelectedCustomer(), t=totals(); updatePaymentVisibility(); renderAllocationPanel(); const allocation=allocationCheck(); const logo=profile.businessLogoDataUrl || profile.businessLogo || profile.logoDataUrl || ""; const rows=docLines.map(l=>`<tr><td>${escapeHtml(l.desc||'שירות / מוצר')}</td><td>${escapeHtml(l.qty||0)}</td><td>${money(l.netPrice)}</td><td>${money(lineTotalNet(l))}</td></tr>`).join(''); const paymentHtml=isPaymentDoc()?`<div class="box" style="margin-top:20px"><h3>אמצעי תשלום</h3>${escapeHtml(paymentLabel($('paymentMethod').value)||'לא צוין')}${$('paymentRef').value?`<br>פרטים: ${escapeHtml($('paymentRef').value)}`:''}</div>`:''; $('docPreview').innerHTML=`
   <div class="doc-head"><div>${logo ? `<img class="doc-logo" src="${escapeHtml(logo)}" alt="לוגו העסק">` : `<div class="doc-logo doc-logo-placeholder">לוגו העסק</div>`}<div class="doc-meta">${businessBlock()}</div></div><div class="doc-title"><h2>${escapeHtml(TYPE_LABELS[type])}</h2><div class="doc-meta">מספר: <b>${escapeHtml($('docNumber').value||'')}</b><br>תאריך: ${escapeHtml($('docDate').value||'')}</div></div></div>
   <div class="doc-parties"><div class="box"><h3>פרטי העסק</h3>${businessBlock()}</div><div class="box"><h3>לכבוד</h3>${customerBlock(c)}</div></div>
   <table class="items"><thead><tr><th>תיאור</th><th>כמות</th><th>מחיר לפני מע״מ</th><th>סה״כ</th></tr></thead><tbody>${rows}</tbody></table>
   <div class="totals"><div><span>סה״כ לפני מע״מ</span><span>${money(t.subtotal)}</span></div>${t.discount>0?`<div><span>הנחה ${escapeHtml(t.discountPct)}%</span><span>-${money(t.discount)}</span></div><div><span>סה״כ לאחר הנחה לפני מע״מ</span><span>${money(t.net)}</span></div>`:''}<div><span>מע״מ</span><span>${money(t.vat)}</span></div><div><span>סה״כ לתשלום</span><span>${money(t.gross)}</span></div></div>
   ${paymentHtml}
+  ${allocationPreviewHtml(allocation)}
   ${$('docNotes').value?`<div class="box" style="margin-top:20px"><h3>הערות</h3>${escapeHtml($('docNotes').value).replace(/\n/g,'<br>')}</div>`:''}
   <div class="draft-watermark">טיוטה לבדיקה</div>`; }
 async function loadAll(){ const u=auth.currentUser; uid=u.uid; $('userEmailPill').textContent=u.email||''; const [pSnap,lSnap]=await Promise.all([getDoc(doc(db,'users',uid)), getDoc(doc(db,'ledgers',uid))]); profile=pSnap.exists()?pSnap.data():{email:u.email}; ledger=lSnap.exists()?lSnap.data():{}; customers=normalizeCustomers(ledger.customers); drafts=Array.isArray(ledger.documentDrafts)?ledger.documentDrafts:[]; hydrateSettings(); renderCustomerOptions(); $('docDate').value=today(); $('docVatRate').value=Number(profile.vatRate||18); docLines=[makeLine({desc:'',qty:1,netPrice:0})]; renderLinesEditor(); updateDocNumber(); updatePaymentVisibility(); syncStats(); renderDrafts(); const params=new URLSearchParams(location.search); const preCustomerId=params.get('customerId'); if(preCustomerId){ const c=customers.find(x=>String(x.id)===String(preCustomerId)); if(c) setSelectedCustomer(c); } renderPreview(); }
 async function saveLedgerPatch(patch){ if(!uid)return; await setDoc(doc(db,'ledgers',uid), patch, {merge:true}); ledger={...ledger,...patch}; }
-function draftFromForm(){ const t=totals(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentMethod:$('paymentMethod')?.value||'', paymentRef:$('paymentRef')?.value||'', vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, createdAt:new Date().toISOString() }; }
+function draftFromForm(){ const t=totals(); const allocation=allocationCheck(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentMethod:$('paymentMethod')?.value||'', paymentRef:$('paymentRef')?.value||'', vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, allocationStatus:allocation.status, allocationRequired:allocation.required, allocationThreshold:allocation.threshold, allocationNumber:'', allocationRequestedAt:'', allocationReceivedAt:'', source:'draft', createdAt:new Date().toISOString() }; }
 function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(d.date||'')} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); }
 function loadDraft(id){ const d=drafts.find(x=>x.id===id); if(!d)return; $('docType').value=d.type; $('docNumber').value=d.number; $('docDate').value=d.date; $('docCustomer').value=d.customerId||''; const c=getSelectedCustomer(); $('docCustomerSearch').value=c?customerName(c):(d.customerName||''); renderSelectedCustomerHint(); docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:d.itemDesc||'',qty:d.qty||1,netPrice:d.price||0})]; $('docDiscountPct').value=d.discountPct||0; $('paymentMethod').value=d.paymentMethod||''; $('paymentRef').value=d.paymentRef||''; $('docVatRate').value=d.vatRate||profile.vatRate||18; $('docNotes').value=d.notes||''; updatePaymentVisibility(); renderLinesEditor(); renderPreview(); window.scrollTo({top:0,behavior:'smooth'}); }
 $('docType').onchange=()=>{updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docNotes','paymentMethod','paymentRef'].forEach(id=>$(id)?.addEventListener('input',()=>{ if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} renderPreview(); })); $('btnAddLine').onclick=()=>{ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnPreview').onclick=renderPreview;
 $('btnPrint').onclick=()=>{renderPreview(); window.print();};
-$('btnSaveSettings').onclick=async()=>{ settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings}); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
+$('btnSaveSettings').onclick=async()=>{ settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings}); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
 $('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
 </script>
