@@ -735,13 +735,43 @@ function renderSelected(){
       <div class="ledger-list">${docsHtml}</div>
     </div>
     <div class="selected-actions">
+      <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
+      <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
       <button class="btn secondary" type="button" id="btnEditSelected">עריכת לקוח</button>
       <button class="btn danger" type="button" id="btnDeleteSelected">מחיקת לקוח</button>
     </div>
   `;
 
+  $("btnCreateDocSelected").addEventListener("click", () => {
+    location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}`;
+  });
+  $("btnPrintLedgerSelected").addEventListener("click", () => printCustomerLedger(c.id));
   $("btnEditSelected").addEventListener("click", () => openForm(c));
   $("btnDeleteSelected").addEventListener("click", () => deleteCustomer(c.id));
+}
+
+
+function printCustomerLedger(id){
+  const c = customers.find(x => x.id === id);
+  if (!c) return;
+  const docs = Array.isArray(c.documents) ? c.documents : [];
+  const rows = docs.map(d => `
+    <tr>
+      <td>${escapeHtml(d.date || "")}</td>
+      <td>${escapeHtml(d.type || "מסמך")}</td>
+      <td>${escapeHtml(d.number || "")}</td>
+      <td>${Number(d.debit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      <td>${Number(d.credit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      <td>${Number(d.balance || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+    </tr>`).join("");
+  const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>כרטסת לקוח</title>
+  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}</style></head><body>
+  <h1>כרטסת לקוח</h1><div class="meta"><b>${escapeHtml(c.name)}</b>${c.taxId ? ` · ${escapeHtml(c.taxId)}` : ""}<br>הופק בתאריך ${formatDateForPrint()}</div>
+  <table><thead><tr><th>תאריך</th><th>סוג מסמך</th><th>מספר</th><th>חיוב</th><th>זיכוי</th><th>יתרה</th></tr></thead><tbody>${rows || `<tr><td colspan="6">אין מסמכים להצגה.</td></tr>`}</tbody></table>
+  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) return showToast("הדפדפן חסם את חלון ההדפסה.", true);
+  w.document.open(); w.document.write(html); w.document.close();
 }
 
 function exportCsv(){
