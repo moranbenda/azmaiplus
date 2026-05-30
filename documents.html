@@ -51,6 +51,11 @@
     .is-hidden{display:none!important}.draft-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     @media(max-width:900px){.line-row{grid-template-columns:1fr}.line-row .remove-line{width:100%}}
 
+    .customer-field-row{display:flex;gap:10px;align-items:center}
+    .customer-field-row input{flex:1;min-width:0}
+    .customer-field-row .add-customer-link{white-space:nowrap;text-decoration:none}
+    @media(max-width:700px){.customer-field-row{flex-direction:column;align-items:stretch}.customer-field-row .add-customer-link{width:100%;text-align:center}}
+
 </style>
 </head>
 <body>
@@ -91,7 +96,7 @@
         <div><label>סוג מסמך</label><select id="docType"><option value="tax_invoice">חשבונית מס</option><option value="receipt">קבלה</option><option value="tax_invoice_receipt">חשבונית מס/קבלה</option><option value="credit_note">חשבונית זיכוי</option><option value="quote">הצעת מחיר</option><option value="deal_invoice">חשבונית עסקה</option></select></div>
         <div><label>מספר מוצע</label><input type="text" id="docNumber" readonly /></div>
         <div><label>תאריך</label><input type="date" id="docDate" /></div>
-        <div class="wide customer-search-wrap"><label>לקוח</label><input type="text" id="docCustomerSearch" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה..." autocomplete="off" /><input type="hidden" id="docCustomer" /><div id="customerSuggest" class="customer-suggest" hidden></div><div class="hint" id="selectedCustomerHint"></div></div>
+        <div class="wide customer-search-wrap"><label>לקוח</label><div class="customer-field-row"><input type="text" id="docCustomerSearch" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה..." autocomplete="off" /><a class="btn secondary small add-customer-link" href="customers.html">+ הוספת לקוח חדש</a></div><input type="hidden" id="docCustomer" /><div id="customerSuggest" class="customer-suggest" hidden></div><div class="hint" id="selectedCustomerHint"></div></div>
         <div class="wide lines-panel">
           <label>שורות במסמך</label>
           <div class="hint">אפשר להוסיף כמה שורות. ניתן להקליד מחיר לפני מע״מ או מחיר כולל מע״מ — השדה השני יתעדכן אוטומטית.</div>
@@ -139,7 +144,13 @@ const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authD
 const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
 const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1, deal_invoice:1 };
 const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר", deal_invoice:"חשבונית עסקה" };
-const INVOICE_ISRAEL_CONNECT_URL = "https://www.gov.il/he/departments/topics/israel-invoice/govil-landing-page";
+const INVOICE_ISRAEL_AUTH_BASE = "https://openapi.taxes.gov.il/shaam/production/longtimetoken/oauth2/authorize";
+// יוגדר רק אחרי רישום עצמאי פלוס כמערכת מול רשות המסים וקבלת client_id רשמי משלנו.
+// לא משתמשים ב-client_id או redirect_uri של מערכת אחרת.
+const INVOICE_ISRAEL_CLIENT_ID = "";
+const INVOICE_ISRAEL_SCOPE = "scope";
+const INVOICE_ISRAEL_REDIRECT_URI = `${location.origin}/api/invoice-israel/callback`;
+const INVOICE_ISRAEL_INFO_URL = "https://www.gov.il/he/departments/topics/israel-invoice/govil-landing-page";
 let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[], settingsLocked=false;
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
@@ -224,6 +235,24 @@ function renderLinesEditor(){ensureLines(); const box=$('linesEditor'); if(!box)
 function totals(){ensureLines(); const subtotal=round2(docLines.reduce((s,l)=>s+lineTotalNet(l),0)); const discountPct=Math.min(100,Math.max(0,Number($('docDiscountPct')?.value||0))); const discount=round2(subtotal*discountPct/100); const net=round2(Math.max(0,subtotal-discount)); const vat=round2(vatEnabled()?net*Number($('docVatRate').value||0)/100:0); return {subtotal,discountPct,discount,net,vat,gross:round2(net+vat)};}
 function hydrateSettings(){settings={...DEFAULT_SETTINGS,...(ledger.documentSettings||{})}; settingsLocked=Boolean(ledger.documentSettingsLocked || ledger.documentSettings); $('setInvoice').value=settings.tax_invoice; $('setReceipt').value=settings.receipt; $('setTaxReceipt').value=settings.tax_invoice_receipt; $('setCredit').value=settings.credit_note; $('setQuote').value=settings.quote; $('setDealInvoice').value=settings.deal_invoice; renderNumberingSettings(); renderInvoiceIsraelStatus();}
 function renderNumberingSettings(){ const card=$('numberingSettingsCard'); if(!card)return; card.classList.toggle('is-hidden', !!settingsLocked); }
+function buildInvoiceIsraelConnectUrl(){
+  if(!INVOICE_ISRAEL_CLIENT_ID) return '';
+  const u = new URL(INVOICE_ISRAEL_AUTH_BASE);
+  u.searchParams.set('response_type','code');
+  u.searchParams.set('client_id',INVOICE_ISRAEL_CLIENT_ID);
+  u.searchParams.set('scope',INVOICE_ISRAEL_SCOPE);
+  u.searchParams.set('redirect_uri',INVOICE_ISRAEL_REDIRECT_URI);
+  return u.toString();
+}
+function connectInvoiceIsrael(){
+  const url = buildInvoiceIsraelConnectUrl();
+  if(!url){
+    alert('חיבור חשבוניות ישראל מוכן במבנה הנכון, אבל יופעל רק אחרי רישום עצמאי פלוס כמערכת וקבלת client_id רשמי מרשות המסים. לא ניתן להשתמש בקישור של מערכת אחרת.');
+    window.open(INVOICE_ISRAEL_INFO_URL, '_blank', 'noopener');
+    return;
+  }
+  window.open(url, '_blank', 'noopener');
+}
 function invoiceIsraelConnection(){ return ledger.invoiceIsraelConnection || {}; }
 function renderInvoiceIsraelStatus(){ const el=$('invoiceIsraelStatus'); if(!el)return; const info=invoiceIsraelConnection(); const until=String(info.validUntil||'').slice(0,10); if(info.status==='connected' && until && until>=today()){ el.textContent=`מחובר עד ${until}`; } else { el.textContent='לא מחובר'; } }
 function syncStats(){ $('statCustomers').textContent=customers.length; $('statDrafts').textContent=drafts.length; $('statNextInvoice').textContent=settings.tax_invoice||1; $('statNextReceipt').textContent=settings.receipt||1; }
@@ -251,7 +280,7 @@ $('btnPreview').onclick=renderPreview;
 $('btnPrint').onclick=()=>{renderPreview(); window.print();};
 $('btnSaveSettings').onclick=async()=>{ if(settingsLocked)return; settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings, documentSettingsLocked:true, documentSettingsLockedAt:new Date().toISOString()}); settingsLocked=true; renderNumberingSettings(); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
 $('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
-$('btnConnectInvoiceIsrael')?.addEventListener('click',()=>{ window.open(INVOICE_ISRAEL_CONNECT_URL, '_blank', 'noopener'); });
+$('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
 </script>
 </body>
