@@ -646,6 +646,60 @@ header.app-header{
 .logo-upload-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
 .biz-logo-preview{width:96px;height:96px;border:1px solid var(--line);border-radius:18px;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden;color:var(--muted);font-size:12px;text-align:center}
 .biz-logo-preview img{width:100%;height:100%;object-fit:contain}
+
+/* UX מובייל לתנועות + בחירת תקופה במסך הבית */
+.home-range-panel{
+  margin-top:14px;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#fff;
+}
+.home-range-title{font-weight:800;margin-bottom:8px;color:var(--text)}
+.home-range-controls{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:10px;align-items:end}
+.home-range-controls label{font-size:12px;color:var(--text-dim)}
+.home-range-controls input,.home-range-controls select{width:100%}
+@media(max-width:900px){.home-range-controls{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.home-range-controls{grid-template-columns:1fr}.home-range-controls .btn{width:100%}}
+
+@media(max-width:700px){
+  .top-right{gap:6px;justify-content:flex-start}
+  .tx-table-wrap{max-height:none!important;overflow:visible!important;background:transparent}
+  .tx-table-wrap table{min-width:0!important;border-spacing:0}
+  .tx-table-wrap table thead{display:none}
+  #tbody{display:block}
+  #tbody tr{
+    display:block;
+    margin:0 0 12px;
+    border:1px solid var(--line);
+    border-radius:18px;
+    background:#fff;
+    box-shadow:0 4px 14px rgba(15,23,42,.06);
+    overflow:hidden;
+  }
+  #tbody td{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    padding:10px 12px;
+    border-bottom:1px solid var(--line);
+    text-align:left;
+    word-break:break-word;
+  }
+  #tbody td::before{
+    content:attr(data-label);
+    color:var(--text-dim);
+    font-size:12px;
+    font-weight:700;
+    text-align:right;
+    flex:0 0 88px;
+  }
+  #tbody td:last-child{border-bottom:0;justify-content:flex-end}
+  #tbody td:last-child::before{display:none}
+  #tbody .money{direction:ltr;text-align:left}
+}
+
 </style>
 </head>
 <body>
@@ -719,11 +773,6 @@ header.app-header{
       <div class="top-right">
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnHomeOpen">בית</button>
-        <button class="btn secondary small" id="btnCategoriesOpen">טבלת קטגוריות</button>
-        <button class="btn secondary small" id="btnReportsOpen">דוחות</button>
-        <a class="btn secondary small" id="btnYearEndLink" href="/year-end.html">סגירת שנה</a>
-        <a class="btn secondary small" id="btnCustomersLink" href="/customers.html">לקוחות</a>
-        <a class="btn secondary small" id="btnDocumentsLink" href="/documents.html">מסמכים</a>
                 <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
@@ -741,6 +790,26 @@ header.app-header{
         <div class="hint">
           מרכז עבודה מהיר לעצמאים — הזנת הוצאות, ייבוא הכנסות, דוחות, מע״מ ומודולים מתקדמים בהמשך.
           <span id="homeRangeLabel">הטווח נשמר עד שינוי ידני.</span>
+        </div>
+        <div class="home-range-panel">
+          <div class="home-range-title">תקופת עבודה</div>
+          <div class="home-range-controls">
+            <label>חודש עוגן<br><input type="month" id="homeMonth" /></label>
+            <label>טווח מהיר<br>
+              <select id="homePeriod">
+                <option value="1">חודש</option>
+                <option value="2">חודשיים</option>
+                <option value="3">רבעון</option>
+                <option value="12">שנה</option>
+                <option value="0">כל התקופות</option>
+                <option value="custom">מתאריך עד תאריך</option>
+              </select>
+            </label>
+            <label>מתאריך<br><input type="date" id="homeFrom" /></label>
+            <label>עד תאריך<br><input type="date" id="homeTo" /></label>
+            <button type="button" class="btn small" id="btnHomeApplyRange">החלת תקופה</button>
+            <button type="button" class="btn secondary small" id="btnHomeClearDates">ניקוי תאריכים</button>
+          </div>
         </div>
         <div class="home-summary" id="homeSummaryCards">
           <div class="metric"><div class="k">הכנסות בתקופה</div><div class="v income" id="homeIncGross">₪ 0.00</div></div>
@@ -897,6 +966,7 @@ header.app-header{
               <option value="3">רבעון</option>
               <option value="12">שנה</option>
               <option value="0">כל התקופות</option>
+              <option value="custom">מתאריך עד תאריך</option>
             </select>
 <select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
             <button class="btn small" id="btnReset">איפוס</button>
@@ -1927,6 +1997,8 @@ const qType      = document.getElementById("qType");
 const qMonth     = document.getElementById("qMonth");
 const qPeriod    = document.getElementById("qPeriod");
 const qCategory  = document.getElementById("qCategory");
+const qFrom      = document.getElementById("qFrom");
+const qTo        = document.getElementById("qTo");
 const btnReset   = document.getElementById("btnReset");
 const btnPrev    = document.getElementById("btnPrev");
 const btnNext    = document.getElementById("btnNext");
@@ -1963,6 +2035,12 @@ const homeIncGross = document.getElementById("homeIncGross");
 const homeExpGross = document.getElementById("homeExpGross");
 const homeVatNet = document.getElementById("homeVatNet");
 const homeProfit = document.getElementById("homeProfit");
+const homeMonth = document.getElementById("homeMonth");
+const homePeriod = document.getElementById("homePeriod");
+const homeFrom = document.getElementById("homeFrom");
+const homeTo = document.getElementById("homeTo");
+const btnHomeApplyRange = document.getElementById("btnHomeApplyRange");
+const btnHomeClearDates = document.getElementById("btnHomeClearDates");
 const btnImportIncomeConfirm = document.getElementById("btnImportIncomeConfirm");
 
 /* דיאלוג עריכה */
@@ -2813,7 +2891,12 @@ function saveRangeState() {
   const key = rangeStateKey();
   if (!key) return;
   try {
-    localStorage.setItem(key, JSON.stringify({ month: qMonth?.value || "", period: qPeriod?.value || "1" }));
+    localStorage.setItem(key, JSON.stringify({
+      month: qMonth?.value || "",
+      period: qPeriod?.value || "1",
+      from: qFrom?.value || "",
+      to: qTo?.value || ""
+    }));
   } catch (e) { console.warn("range save failed", e); }
 }
 function loadRangeState() {
@@ -2824,12 +2907,37 @@ function loadRangeState() {
     if (!obj) return false;
     if (obj.month && /^\d{4}-\d{2}$/.test(obj.month)) qMonth.value = obj.month;
     if (obj.period != null && qPeriod) qPeriod.value = String(obj.period);
-    return !!(obj.month || obj.period);
+    if (qFrom) qFrom.value = /^\d{4}-\d{2}-\d{2}$/.test(obj.from || "") ? obj.from : "";
+    if (qTo) qTo.value = /^\d{4}-\d{2}-\d{2}$/.test(obj.to || "") ? obj.to : "";
+    syncFiltersToHome();
+    return !!(obj.month || obj.period || obj.from || obj.to);
   } catch (e) { return false; }
 }
+function syncFiltersToHome(){
+  if (homeMonth && qMonth) homeMonth.value = qMonth.value || "";
+  if (homePeriod && qPeriod) homePeriod.value = qPeriod.value || "1";
+  if (homeFrom && qFrom) homeFrom.value = qFrom.value || "";
+  if (homeTo && qTo) homeTo.value = qTo.value || "";
+}
+function applyHomeRange(){
+  if (homeMonth && qMonth) qMonth.value = homeMonth.value || qMonth.value || monthFromDateStr(todayStr());
+  if (homePeriod && qPeriod) qPeriod.value = homePeriod.value || "1";
+  if (homeFrom && qFrom) qFrom.value = homeFrom.value || "";
+  if (homeTo && qTo) qTo.value = homeTo.value || "";
+  saveRangeState();
+  render();
+}
 function getCurrentDateRangeLabel() {
-  const month = qMonth?.value || "";
   const period = qPeriod ? qPeriod.value : "1";
+  const from = qFrom?.value || "";
+  const to = qTo?.value || "";
+  if (period === "custom") {
+    if (from && to) return `טווח נוכחי: ${from} עד ${to}`;
+    if (from) return `טווח נוכחי: מתאריך ${from}`;
+    if (to) return `טווח נוכחי: עד תאריך ${to}`;
+    return "טווח נוכחי: בחירת תאריכים";
+  }
+  const month = qMonth?.value || "";
   if (!month || period === "0") return "טווח נוכחי: כל התקופות";
   const monthsBack = Math.max(1, parseInt(period, 10) || 1);
   const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
@@ -2839,6 +2947,7 @@ function getCurrentDateRangeLabel() {
 }
 function renderHomeDashboard(sum) {
   if (!homeDashboard) return;
+  syncFiltersToHome();
   const effectiveSum = sum || summarize(queryRows());
   if (homeIncGross) homeIncGross.textContent = toMoney(effectiveSum.incGross);
   if (homeExpGross) homeExpGross.textContent = toMoney(effectiveSum.expGross);
@@ -2862,6 +2971,8 @@ function queryRows() {
   const type = qType.value;
   const month = qMonth.value;
   const period = qPeriod ? qPeriod.value : "1";
+  const from = qFrom?.value || "";
+  const to = qTo?.value || "";
   const cat = qCategory.value;
 
   let out = rows.slice();
@@ -2875,7 +2986,10 @@ function queryRows() {
   if (type !== "all") {
     out = out.filter(r => r.type === type);
   }
-  if (month && period !== "0") {
+  if (period === "custom") {
+    if (from) out = out.filter(r => r.date >= from);
+    if (to) out = out.filter(r => r.date <= to);
+  } else if (month && period !== "0") {
     const monthsBack = Math.max(1, parseInt(period, 10) || 1);
     const { startStr, endStr } = monthStartEndFrom(month, monthsBack);
     out = out.filter(r => r.date >= startStr && r.date <= endStr);
@@ -2931,16 +3045,16 @@ function render() {
 
     return `
       <tr data-id="${r.id}">
-        <td>${r.date}</td>
-        <td><span class="badge ${r.type === "income" ? "income" : "expense"}">
+        <td data-label="תאריך">${r.date}</td>
+        <td data-label="סוג"><span class="badge ${r.type === "income" ? "income" : "expense"}">
           ${r.type === "income" ? "הכנסה" : "הוצאה"}
         </span></td>
-        <td>${escapeHtml(r.desc || "")}</td>
-        <td>${escapeHtml(r.category || "")}</td>
-        <td class="money">${toMoney(net)}</td>
-        <td class="money">${toMoney(vatDisplay)}</td>
-        <td class="money">${toMoney(gross)}</td>
-        <td>${r.receiptUrl ? `<a class="btn secondary small" href="${escapeHtml(r.receiptUrl)}" target="_blank" rel="noopener">צפייה</a>` : `<span class="muted">—</span>`}</td>
+        <td data-label="תיאור">${escapeHtml(r.desc || "")}</td>
+        <td data-label="קטגוריה">${escapeHtml(r.category || "")}</td>
+        <td data-label="סכום נטו" class="money">${toMoney(net)}</td>
+        <td data-label="מע״מ" class="money">${toMoney(vatDisplay)}</td>
+        <td data-label="סכום כולל" class="money">${toMoney(gross)}</td>
+        <td data-label="חשבונית">${r.receiptUrl ? `<a class="btn secondary small" href="${escapeHtml(r.receiptUrl)}" target="_blank" rel="noopener">צפייה</a>` : `<span class="muted">—</span>`}</td>
         <td><button class="btn secondary small" data-act="edit">עריכה</button></td>
       </tr>
     `;
@@ -2977,9 +3091,13 @@ function render() {
   `;
 
   const m = qMonth.value || monthFromDateStr(todayStr());
-  if (m) {
+  const period = qPeriod ? qPeriod.value : "1";
+  if (period === "custom") {
+    const from = qFrom?.value || "";
+    const to = qTo?.value || "";
+    periodLabel.textContent = from || to ? `תקופה: ${from || "…"} עד ${to || "…"}` : "תקופה: בחירת תאריכים";
+  } else if (m) {
     const [y, mm] = m.split("-");
-    const period = qPeriod ? qPeriod.value : "1";
     if (period === "0") {
       periodLabel.textContent = "תקופה: כל התקופות";
     } else {
@@ -4065,7 +4183,12 @@ function exportPDF() {
   const email   = userProfile?.email || auth.currentUser?.email || "";
   const now     = new Date().toLocaleString("he-IL");
 
-  const title = "סיכומים — עצמאי פלוס";
+  const title = "דוח תנועות — עצמאי פלוס";
+  const rowsHtml = list.map(r => {
+    const a = splitVAT(r.amount, r.incVat, vatEnabled ? vatRate : 0);
+    const vatDisplay = r.type === "expense" ? a.vat * getVatDeductibleFactorForRow(r) : a.vat;
+    return `<tr><td>${escapeHtml(r.date || "")}</td><td>${r.type === "income" ? "הכנסה" : "הוצאה"}</td><td>${escapeHtml(r.desc || "")}</td><td>${escapeHtml(r.category || "")}</td><td>${toMoney(a.net)}</td><td>${toMoney(vatDisplay)}</td><td>${toMoney(a.gross)}</td></tr>`;
+  }).join("");
 
   const html = `
   <!DOCTYPE html>
@@ -4085,7 +4208,7 @@ function exportPDF() {
     </style>
   </head>
   <body>
-    <h1>סיכומי תקופה</h1>
+    <h1>דוח תנועות וסיכומי תקופה</h1>
     <div class="meta">
       <div class="row">
         ${bizName ? `<span class="pill"><b>שם העסק:</b> ${escapeHtml(bizName)}</span>` : ""}
@@ -4115,6 +4238,12 @@ function exportPDF() {
         <tr><td>הוצאות מוכרות למס (משוער)</td><td>${toMoney(sum.expTaxDeductible)}</td></tr>
         <tr><td>בסיס רווח לצרכי מס (משוער)</td><td>${toMoney(sum.taxProfitBase)}</td></tr>
       </tbody>
+    </table>
+
+    <h2 style="margin-top:24px;font-size:16px">פירוט תנועות</h2>
+    <table>
+      <thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>קטגוריה</th><th>נטו</th><th>מע״מ</th><th>כולל</th></tr></thead>
+      <tbody>${rowsHtml || `<tr><td colspan="7">אין תנועות להצגה.</td></tr>`}</tbody>
     </table>
 
     
@@ -4880,6 +5009,17 @@ function initAppLogic(uid) {
     if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
     if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
+    if (btnHomeApplyRange) btnHomeApplyRange.onclick = applyHomeRange;
+    if (btnHomeClearDates) btnHomeClearDates.onclick = () => {
+      if (homeFrom) homeFrom.value = "";
+      if (homeTo) homeTo.value = "";
+      if (qFrom) qFrom.value = "";
+      if (qTo) qTo.value = "";
+      if (homePeriod && homePeriod.value === "custom") homePeriod.value = "1";
+      if (qPeriod && qPeriod.value === "custom") qPeriod.value = "1";
+      saveRangeState();
+      render();
+    };
 
     btnClear.onclick = () => {
       if (!confirm("לאפס את כל הנתונים למשתמש זה?")) return;
@@ -4895,6 +5035,8 @@ function initAppLogic(uid) {
       qType.addEventListener(evName, () => { saveToLocal(); render(); });
       qMonth.addEventListener(evName, () => { saveRangeState(); render(); });
       qCategory.addEventListener(evName, () => { saveToLocal(); render(); });
+      qFrom?.addEventListener(evName, () => { if (qPeriod) qPeriod.value = "custom"; saveRangeState(); render(); });
+      qTo?.addEventListener(evName, () => { if (qPeriod) qPeriod.value = "custom"; saveRangeState(); render(); });
       qPeriod.addEventListener(evName, () => { saveRangeState(); render(); });
       vatRateInput.addEventListener(evName, () => { saveToLocal(); render(); });
       vatEnabledCheckbox.addEventListener(evName, () => { saveToLocal(); render(); });
@@ -4905,6 +5047,8 @@ function initAppLogic(uid) {
       qType.value = "all";
       qMonth.value = monthFromDateStr(todayStr());
       qCategory.value = "";
+      if (qFrom) qFrom.value = "";
+      if (qTo) qTo.value = "";
       qPeriod.value = "1";
       saveRangeState();
       render();
