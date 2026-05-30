@@ -708,7 +708,7 @@ header.app-header{
 <section id="authScreen">
   <div id="authCard">
     <h1>התחברות לעצמאי פלוס הנהלת חשבונות עצמאית</h1>
-    <div class="sub">יש להתחבר לפני שימוש במערכת. כל הנתונים נשמרים עבורך בלבד.</div>
+    <div class="sub">פעם ראשונה? לחצ/י על הרשמה</div>
 
     <div class="auth-tabs">
       <button class="auth-tab active" id="tabLogin">התחברות</button>
@@ -774,6 +774,13 @@ header.app-header{
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnHomeOpen">בית</button>
                 <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+        <span class="nav-compat-hidden" style="display:none!important">
+          <button class="btn secondary small" id="btnCategoriesOpen" type="button">טבלת קטגוריות</button>
+          <button class="btn secondary small" id="btnReportsOpen" type="button">דוחות</button>
+          <a class="btn secondary small" id="btnYearEndLink" href="/year-end.html">סגירת שנה</a>
+          <a class="btn secondary small" id="btnCustomersLink" href="/customers.html">לקוחות</a>
+          <a class="btn secondary small" id="btnDocumentsLink" href="/documents.html">מסמכים</a>
+        </span>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
@@ -968,7 +975,9 @@ header.app-header{
               <option value="0">כל התקופות</option>
               <option value="custom">מתאריך עד תאריך</option>
             </select>
-<select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
+<input type="date" id="qFrom" title="מתאריך" style="flex:1 1 145px" />
+            <input type="date" id="qTo" title="עד תאריך" style="flex:1 1 145px" />
+            <select id="qCategory" style="flex:1 1 150px"><option value="">כל הקטגוריות</option></select>
             <button class="btn small" id="btnReset">איפוס</button>
           </div>
 
