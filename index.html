@@ -1029,8 +1029,6 @@ header.app-header{
             <div class="left">
               <button class="btn ghost small" id="btnExportCSV">ייצוא CSV</button>
               <button class="btn ghost small" id="btnExportJSON">גיבוי (JSON)</button>
-              <button class="btn ghost small" id="btnRestoreJSON">שחזור מגיבוי</button>
-              <input type="file" id="backupRestoreFile" accept=".json,application/json" hidden />
               <button class="btn ghost small" id="btnExportPDF">הדפסה / PDF</button>
               <button class="btn small" id="btnImportIncome" style="font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,.18)">ייבוא הכנסות</button>
             </div>
@@ -2066,8 +2064,6 @@ const periodLabel= document.getElementById("periodLabel");
 /* כפתורי יצוא וגיבוי */
 const btnExportCSV   = document.getElementById("btnExportCSV");
 const btnExportJSON  = document.getElementById("btnExportJSON");
-const btnRestoreJSON = document.getElementById("btnRestoreJSON");
-const backupRestoreFile = document.getElementById("backupRestoreFile");
 const btnExportPDF   = document.getElementById("btnExportPDF");
 const btnImportIncome= document.getElementById("btnImportIncome");
 const btnClear       = document.getElementById("btnClear");
@@ -4280,158 +4276,6 @@ async function exportJSON() {
   }
 }
 
-function normalizeBackupLedger(parsed) {
-  if (!parsed || typeof parsed !== "object") return null;
-
-  // גרסה חדשה: { backupVersion, profile, ledger: {...} }
-  if (parsed.ledger && typeof parsed.ledger === "object") {
-    return {
-      rows: Array.isArray(parsed.ledger.rows) ? parsed.ledger.rows : [],
-      customers: Array.isArray(parsed.ledger.customers) ? parsed.ledger.customers : [],
-      fixedAssets: Array.isArray(parsed.ledger.fixedAssets) ? parsed.ledger.fixedAssets : [],
-      documentDrafts: Array.isArray(parsed.ledger.documentDrafts) ? parsed.ledger.documentDrafts : [],
-      settings: parsed.ledger.settings && typeof parsed.ledger.settings === "object" ? parsed.ledger.settings : getSettings(),
-      updatedAt: new Date().toISOString(),
-      customersUpdatedAt: parsed.ledger.customersUpdatedAt || null,
-      fixedAssetsUpdatedAt: parsed.ledger.fixedAssetsUpdatedAt || null,
-      restoredFromBackupAt: new Date().toISOString(),
-      restoredFromBackupVersion: parsed.backupVersion || null
-    };
-  }
-
-  // תמיכה בגיבוי ישן: { rows, settings }
-  if (Array.isArray(parsed.rows)) {
-    return {
-      rows: parsed.rows,
-      customers: Array.isArray(parsed.customers) ? parsed.customers : [],
-      fixedAssets: Array.isArray(parsed.fixedAssets) ? parsed.fixedAssets : [],
-      documentDrafts: Array.isArray(parsed.documentDrafts) ? parsed.documentDrafts : [],
-      settings: parsed.settings && typeof parsed.settings === "object" ? parsed.settings : getSettings(),
-      updatedAt: new Date().toISOString(),
-      restoredFromBackupAt: new Date().toISOString(),
-      restoredFromBackupVersion: parsed.backupVersion || 1
-    };
-  }
-
-  return null;
-}
-
-function backupSummaryText(ledger) {
-  return [
-    `תנועות: ${Array.isArray(ledger.rows) ? ledger.rows.length : 0}`,
-    `לקוחות: ${Array.isArray(ledger.customers) ? ledger.customers.length : 0}`,
-    `רכוש קבוע: ${Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets.length : 0}`,
-    `טיוטות מסמכים: ${Array.isArray(ledger.documentDrafts) ? ledger.documentDrafts.length : 0}`
-  ].join("\n");
-}
-
-function mergeById(currentList = [], backupList = []) {
-  const result = Array.isArray(currentList) ? [...currentList] : [];
-  const keys = new Set(result.map(item => item?.id ? `id:${item.id}` : `json:${JSON.stringify(item)}`));
-
-  for (const item of (Array.isArray(backupList) ? backupList : [])) {
-    const key = item?.id ? `id:${item.id}` : `json:${JSON.stringify(item)}`;
-    if (!keys.has(key)) {
-      result.push(item);
-      keys.add(key);
-    }
-  }
-
-  return result;
-}
-
-async function restoreBackupFromFile(file) {
-  if (!currentUid) {
-    alert("צריך להתחבר לפני שחזור גיבוי.");
-    return;
-  }
-  if (!file) return;
-
-  let parsed;
-  try {
-    const raw = await file.text();
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    console.error("backup parse failed", err);
-    alert("קובץ הגיבוי לא תקין או שאינו JSON תקין.");
-    return;
-  }
-
-  const backupLedger = normalizeBackupLedger(parsed);
-  if (!backupLedger) {
-    alert("הקובץ לא נראה כמו גיבוי תקין של עצמאי פלוס.");
-    return;
-  }
-
-  const summary = backupSummaryText(backupLedger);
-  const wantsRestore = confirm(
-    "נמצא גיבוי תקין:\n\n" +
-    summary +
-    "\n\nהשחזור מתבצע באחריות המשתמש. לפני השחזור תתבצע הורדת גיבוי של המצב הנוכחי.\n\nלהמשיך?"
-  );
-  if (!wantsRestore) return;
-
-  const fullRestore = confirm(
-    "בחרי סוג שחזור:\n\n" +
-    "אישור = שחזור מלא: מחליף את כל נתוני העסק בגיבוי.\n\n" +
-    "ביטול = שחזור חסרים בלבד: מוסיף רק תנועות/לקוחות/נכסים/טיוטות שלא קיימים לפי מזהה, בלי למחוק נתונים קיימים."
-  );
-
-  try {
-    // רשת ביטחון: מורידים גיבוי של המצב הנוכחי לפני שינוי הנתונים בענן
-    await exportJSON();
-
-    const ledgerRef = doc(db, "ledgers", currentUid);
-    let finalLedger = backupLedger;
-
-    if (!fullRestore) {
-      const currentSnap = await getDoc(ledgerRef);
-      const currentLedger = currentSnap.exists() ? (currentSnap.data() || {}) : {};
-
-      finalLedger = {
-        ...currentLedger,
-        rows: mergeById(currentLedger.rows, backupLedger.rows),
-        customers: mergeById(currentLedger.customers, backupLedger.customers),
-        fixedAssets: mergeById(currentLedger.fixedAssets, backupLedger.fixedAssets),
-        documentDrafts: mergeById(currentLedger.documentDrafts, backupLedger.documentDrafts),
-        settings: currentLedger.settings || backupLedger.settings || getSettings(),
-        updatedAt: new Date().toISOString(),
-        restoredFromBackupAt: new Date().toISOString(),
-        restoredFromBackupMode: "merge_missing"
-      };
-    } else {
-      finalLedger = {
-        ...backupLedger,
-        updatedAt: new Date().toISOString(),
-        restoredFromBackupAt: new Date().toISOString(),
-        restoredFromBackupMode: "full_replace"
-      };
-    }
-
-    await setDoc(ledgerRef, finalLedger, { merge: false });
-
-    // רענון הזיכרון המקומי והמסך הראשי בלי לגעת בהתחברות
-    applyLedgerPayload(finalLedger);
-    cloudLoadedForUid = currentUid;
-    lastCloudSavedAt = finalLedger.updatedAt || null;
-    saveToLocal();
-    render();
-
-    alert(
-      "השחזור הושלם בהצלחה.\n\n" +
-      backupSummaryText(finalLedger) +
-      "\n\nמומלץ לרענן את העמוד ולבדוק שהנתונים מוצגים כראוי."
-    );
-  } catch (err) {
-    console.error("restore backup failed", err);
-    alert("השחזור נכשל. לא בוצע שינוי מלא בנתונים. כדאי לבדוק Console או לנסות שוב.");
-  } finally {
-    if (backupRestoreFile) backupRestoreFile.value = "";
-  }
-}
-
-
-
 function exportPDF() {
   if (!currentUid) return;
 
@@ -5351,8 +5195,6 @@ function initAppLogic(uid) {
 
     btnExportCSV.onclick  = () => exportCSV(rows);
     btnExportJSON.onclick = exportJSON;
-    if (btnRestoreJSON) btnRestoreJSON.onclick = () => backupRestoreFile?.click();
-    if (backupRestoreFile) backupRestoreFile.onchange = () => restoreBackupFromFile(backupRestoreFile.files?.[0]);
     btnExportPDF.onclick  = exportPDF;
     if (btnImportIncome) btnImportIncome.onclick = openIncomeImportDialog;
     if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
