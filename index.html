@@ -1345,16 +1345,27 @@ header.app-header{
             הייבוא אינו מוחק נתונים קיימים. לפני הקליטה תוצג תצוגה מקדימה של הנתונים.
           </div>
         </div>
-        <label>בחירת קובץ</label>
-        <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
-        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
+        <div class="grid2" style="align-items:end;margin-top:8px">
+          <div>
+            <label>סוג ייבוא</label>
+            <select id="importKind">
+              <option value="income" selected>הכנסות</option>
+              <option value="expense">הוצאות</option>
+            </select>
+          </div>
+          <div>
+            <label>בחירת קובץ</label>
+            <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
+          </div>
+        </div>
+        <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח/ספק וסכום, ותציג תצוגה מקדימה לפני ייבוא. בייבוא הוצאות ניתן לבחור קטגוריה מתוך הרשימה הקיימת לפני האישור.</div>
       </div>
     </div>
     <div id="importIncomeStatus" class="hint" style="margin-top:10px"></div>
     <div class="tx-table-wrap" style="max-height:45vh;overflow:auto;margin-top:10px">
       <table>
         <thead>
-          <tr><th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th></tr>
+          <tr id="importIncomePreviewHead"><th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th></tr>
         </thead>
         <tbody id="importIncomePreviewBody">
           <tr><td colspan="7" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>
@@ -2130,6 +2141,7 @@ const btnClear       = document.getElementById("btnClear");
 const importIncomeDialog = document.getElementById("importIncomeDialog");
 const btnImportIncomeClose = document.getElementById("btnImportIncomeClose");
 const importIncomeFile = document.getElementById("importIncomeFile");
+const importKind = document.getElementById("importKind");
 const importIncomeStatus = document.getElementById("importIncomeStatus");
 const importIncomePreviewBody = document.getElementById("importIncomePreviewBody");
 
@@ -3931,6 +3943,7 @@ function deleteRow() {
 }
 
 let importIncomeRows = [];
+let importRawRows = [];
 
 function normalizeImportHeader(h = "") {
   return String(h || "").replace(/﻿/g, "").trim().toLowerCase();
@@ -3975,14 +3988,24 @@ function detectImportColumns(headers = []) {
     ),
     client: findByPriority(
       h => h === 'לקוח',
+      h => h === 'ספק',
       h => h.includes('לקוח'),
+      h => h.includes('ספק'),
       h => h.includes('customer'),
-      h => h.includes('client')
+      h => h.includes('client'),
+      h => h.includes('supplier'),
+      h => h.includes('vendor')
+    ),
+    category: findByPriority(
+      h => h === 'קטגוריה',
+      h => h.includes('קטגוריה'),
+      h => h.includes('category')
     ),
     total: findByPriority(
       h => h === 'סהכ',
       h => h === 'סהכ כולל',
       h => h === 'סהכ לתשלום',
+      h => h === 'סכום כולל',
       h => h.includes('סה') && !h.includes('לפני') && !h.includes('ללא') && !h.includes('מעמ') && !h.includes('מע מ') && !h.includes('מע״מ') && !h.includes('מע"מ'),
       h => h.includes('total') && !h.includes('before') && !h.includes('net') && !h.includes('vat'),
       h => h.includes('amount') && !h.includes('vat') && !h.includes('net')
@@ -3991,6 +4014,25 @@ function detectImportColumns(headers = []) {
       h => h.includes('סה') && !h.includes('לפני'),
       h => h.includes('total'),
       h => h.includes('amount')
+    ),
+    net: findByPriority(
+      h => h === 'סכום לפני מעמ',
+      h => h === 'סכום לפני מע״מ',
+      h => h === 'סכום ללא מעמ',
+      h => h === 'סכום ללא מע״מ',
+      h => h.includes('לפני') && (h.includes('מעמ') || h.includes('מע״מ') || h.includes('מע"מ')),
+      h => h.includes('ללא') && (h.includes('מעמ') || h.includes('מע״מ') || h.includes('מע"מ')),
+      h => h.includes('net'),
+      h => h.includes('before vat')
+    ),
+    vat: findByPriority(
+      h => h === 'מעמ',
+      h => h === 'מע״מ',
+      h => h === 'מע"מ',
+      h => h.includes('מעמ'),
+      h => h.includes('מע״מ'),
+      h => h.includes('מע"מ'),
+      h => h.includes('vat')
     ),
     debit: findByPriority(
       h => h === 'חובה',
@@ -4019,6 +4061,7 @@ function detectImportColumns(headers = []) {
     )
   };
 }
+
 function parseImportNumber(v) {
   if (typeof v === "number") return v;
   const s = String(v ?? "").replace(/[₪,\s]/g, "").trim();
@@ -4061,6 +4104,48 @@ function isCreditDocType(docType='') {
   return /זיכוי/.test(s);
 }
 
+function getImportKind() {
+  return importKind?.value === 'expense' ? 'expense' : 'income';
+}
+
+function expenseImportCategoryOptions(selected = '') {
+  const fullExpenseList = Array.from(new Set(EXPENSE_ITEMS.map(i => i.item).filter(Boolean)))
+    .sort((a,b)=>a.localeCompare(b,"he"));
+  const opts = ['טרם סווג', ...fullExpenseList];
+  if (selected && !opts.includes(selected)) opts.push(selected);
+  return opts.map(c => `<option value="${escapeHtml(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+}
+
+function detectImportedExpenseCategory(src = {}, cols = {}) {
+  const explicit = cols.category ? String(src[cols.category] ?? '').trim() : '';
+  if (explicit) {
+    const exact = EXPENSE_ITEMS.find(item =>
+      normalizeExpenseText(item.item) === normalizeExpenseText(explicit) ||
+      normalizeExpenseText(item.category) === normalizeExpenseText(explicit)
+    );
+    if (exact) return exact.item;
+    return explicit;
+  }
+
+  const searchText = [
+    cols.subject ? src[cols.subject] : '',
+    cols.client ? src[cols.client] : '',
+    cols.docType ? src[cols.docType] : ''
+  ].map(v => String(v || '')).join(' ');
+  const key = normalizeExpenseText(searchText);
+  const found = EXPENSE_ITEMS.find(item => key && key.includes(normalizeExpenseText(item.item)));
+  return found ? found.item : 'טרם סווג';
+}
+
+function buildImportedExpenseDescription(docNumber, supplierName, subject, docType='') {
+  const bits = [];
+  if (supplierName) bits.push(supplierName);
+  if (subject) bits.push(subject);
+  const docLabel = (docType || '').trim();
+  if (docNumber) bits.push(`${docLabel || 'מסמך'} ${docNumber}`.trim());
+  return bits.join(" - ") || "הוצאה מיובאת";
+}
+
 
 function normalizeDocTypeForCompare(v='') {
   return String(v || '').trim().replace(/\s+/g, ' ');
@@ -4099,26 +4184,67 @@ function isImportedIncomeDuplicate(item, existingRows = []) {
   });
 }
 
+function isImportedRowDuplicate(item, existingRows = []) {
+  if ((item.type || 'income') === 'income') return isImportedIncomeDuplicate(item, existingRows);
+
+  const itemDoc = normalizeDocNumberForCompare(item.docNumber);
+  const itemType = normalizeDocTypeForCompare(item.docType);
+  const itemDate = String(item.date || '').trim();
+  const itemAmount = Math.abs(Number(item.amount || 0)).toFixed(2);
+  const itemDesc = normalizeDescForCompare(item.desc || '');
+
+  return existingRows.some(r => {
+    if (r.type !== 'expense') return false;
+    const rowDoc = normalizeDocNumberForCompare(r.docNumber);
+    const rowType = normalizeDocTypeForCompare(r.docType);
+    const rowDate = String(r.date || '').trim();
+    const rowAmount = Math.abs(Number(r.amount || 0)).toFixed(2);
+    const rowDesc = normalizeDescForCompare(r.desc || '');
+
+    if (itemDoc && rowDoc && itemDoc === rowDoc) {
+      if (!itemType || !rowType || itemType === rowType) return true;
+    }
+
+    return itemDate && rowDate && itemDate === rowDate && itemAmount === rowAmount && itemDesc && rowDesc && itemDesc === rowDesc;
+  });
+}
+
 function renderImportIncomePreview() {
   if (!importIncomePreviewBody) return;
+  const kind = getImportKind();
+  const head = document.getElementById('importIncomePreviewHead');
+  if (head) {
+    head.innerHTML = kind === 'expense'
+      ? '<th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>ספק / תיאור</th><th>קטגוריה</th><th>תיאור</th><th>סכום כולל</th>'
+      : '<th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th>';
+  }
+  const colspan = kind === 'expense' ? 8 : 7;
   if (!importIncomeRows.length) {
-    importIncomePreviewBody.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>';
+    importIncomePreviewBody.innerHTML = `<tr><td colspan="${colspan}" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>`;
     return;
   }
-  importIncomePreviewBody.innerHTML = importIncomeRows.map((row, idx) => `
-    <tr data-idx="${idx}">
+  importIncomePreviewBody.innerHTML = importIncomeRows.map((row, idx) => {
+    const base = `
       <td style="text-align:center"><input type="checkbox" class="imp-include" ${row.include !== false ? 'checked' : ''}></td>
       <td><input class="imp-date" type="date" value="${escapeHtml(row.date || '')}" style="min-width:132px"></td>
       <td><input class="imp-doctype" type="text" value="${escapeHtml(row.docType || '')}" style="min-width:112px"></td>
       <td><input class="imp-doc" type="text" value="${escapeHtml(row.docNumber || '')}" style="min-width:72px"></td>
-      <td><input class="imp-client" type="text" value="${escapeHtml(row.clientName || '')}" style="min-width:160px"></td>
-      <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:240px"></td>
-      <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:100px"></td>
-    </tr>
-  `).join('');
+      <td><input class="imp-client" type="text" value="${escapeHtml(row.clientName || '')}" style="min-width:160px"></td>`;
+    const categoryCell = kind === 'expense'
+      ? `<td><select class="imp-category" style="min-width:160px">${expenseImportCategoryOptions(row.category || 'טרם סווג')}</select></td>`
+      : '';
+    return `
+      <tr data-idx="${idx}">
+        ${base}
+        ${categoryCell}
+        <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:240px"></td>
+        <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:100px"></td>
+      </tr>`;
+  }).join('');
 }
 
 function syncImportIncomeRowsFromPreview() {
+  const kind = getImportKind();
   const trs = [...(importIncomePreviewBody?.querySelectorAll('tr[data-idx]') || [])];
   importIncomeRows = trs.map(tr => ({
     include: !!tr.querySelector('.imp-include')?.checked,
@@ -4126,10 +4252,11 @@ function syncImportIncomeRowsFromPreview() {
     docType: (tr.querySelector('.imp-doctype')?.value || '').trim(),
     docNumber: (tr.querySelector('.imp-doc')?.value || '').trim(),
     clientName: (tr.querySelector('.imp-client')?.value || '').trim(),
+    category: kind === 'expense' ? ((tr.querySelector('.imp-category')?.value || 'טרם סווג').trim()) : '',
     desc: (tr.querySelector('.imp-desc')?.value || '').trim(),
     amount: parseFloat(tr.querySelector('.imp-amount')?.value || '0') || 0,
     incVat: true,
-    type: 'income'
+    type: kind
   }));
 }
 
@@ -4150,30 +4277,61 @@ function amountFromImportedRow(src, cols) {
   }
   if (hasCredit) return credit;
   if (hasDebit) return debit;
+
+  const net = cols.net ? parseImportNumber(src[cols.net]) : NaN;
+  const vat = cols.vat ? parseImportNumber(src[cols.vat]) : NaN;
+  if (Number.isFinite(net) && Number.isFinite(vat)) return net + vat;
+  if (Number.isFinite(net)) return net;
   return NaN;
 }
 
-function rowsFromParsedImportData(rawRows = []) {
+function incVatFromImportedRow(src, cols) {
+  if (cols.total || cols.totalAlt || cols.debit || cols.credit) return true;
+  const net = cols.net ? parseImportNumber(src[cols.net]) : NaN;
+  return !Number.isFinite(net);
+}
+
+function rowsFromParsedImportData(rawRows = [], kind = getImportKind()) {
   const headers = rawRows.length ? Object.keys(rawRows[0]) : [];
   const cols = detectImportColumns(headers);
-  const hasAmountSource = !!(cols.total || cols.totalAlt || cols.debit || cols.credit);
-  if (!cols.date || !cols.docNumber || !cols.client || !hasAmountSource) {
-    throw new Error('לא זוהו כל העמודות הדרושות (תאריך, מס׳ מסמך, לקוח וסכום/חובה/זכות).');
+  const hasAmountSource = !!(cols.total || cols.totalAlt || cols.debit || cols.credit || cols.net);
+  if (!cols.date || !hasAmountSource) {
+    throw new Error('לא זוהו כל העמודות הדרושות (תאריך וסכום/חובה/זכות).');
   }
+  if (kind === 'income' && (!cols.docNumber || !cols.client)) {
+    throw new Error('לא זוהו כל העמודות הדרושות לייבוא הכנסות (תאריך, מס׳ מסמך, לקוח וסכום/חובה/זכות).');
+  }
+
   return rawRows.map(src => {
-    const docNumber = String(src[cols.docNumber] ?? '').trim();
-    const clientName = String(src[cols.client] ?? '').trim();
+    const docNumber = cols.docNumber ? String(src[cols.docNumber] ?? '').trim() : '';
+    const partyName = cols.client ? String(src[cols.client] ?? '').trim() : '';
     const subject = cols.subject ? String(src[cols.subject] ?? '').trim() : '';
     const docType = cols.docType ? String(src[cols.docType] ?? '').trim() : '';
     let amount = amountFromImportedRow(src, cols);
     if (isCreditDocType(docType) && Number.isFinite(amount)) amount = -Math.abs(amount);
+
+    if (kind === 'expense') {
+      return {
+        include: true,
+        date: parseImportDate(src[cols.date]),
+        docType,
+        docNumber,
+        clientName: partyName,
+        category: detectImportedExpenseCategory(src, cols),
+        desc: buildImportedExpenseDescription(docNumber, partyName, subject, docType),
+        amount: Number.isFinite(amount) ? Math.abs(amount) : amount,
+        incVat: incVatFromImportedRow(src, cols),
+        type: 'expense'
+      };
+    }
+
     return {
       include: true,
       date: parseImportDate(src[cols.date]),
       docType,
       docNumber,
-      clientName,
-      desc: buildImportedIncomeDescription(docNumber, clientName, subject, docType),
+      clientName: partyName,
+      desc: buildImportedIncomeDescription(docNumber, partyName, subject, docType),
       amount,
       incVat: true,
       type: 'income'
@@ -4206,10 +4364,11 @@ async function handleIncomeImportFileChange() {
   if (!file) return;
   importIncomeStatus.textContent = 'קוראת את הקובץ…';
   try {
-    const rawRows = await parseIncomeImportFile(file);
-    importIncomeRows = rowsFromParsedImportData(rawRows);
+    importRawRows = await parseIncomeImportFile(file);
+    importIncomeRows = rowsFromParsedImportData(importRawRows, getImportKind());
     renderImportIncomePreview();
-    importIncomeStatus.textContent = `זוהו ${importIncomeRows.length} שורות לייבוא. אפשר לערוך לפני אישור.`;
+    const kindLabel = getImportKind() === 'expense' ? 'הוצאות' : 'הכנסות';
+    importIncomeStatus.textContent = `זוהו ${importIncomeRows.length} שורות לייבוא ${kindLabel}. אפשר לערוך לפני אישור.`;
     if (!importIncomeRows.length) {
       importIncomeStatus.textContent = 'לא נמצאו שורות תקינות לייבוא בקובץ.';
     }
@@ -4222,8 +4381,30 @@ async function handleIncomeImportFileChange() {
   }
 }
 
+function rebuildImportPreviewForCurrentKind() {
+  if (!importRawRows.length) {
+    importIncomeRows = [];
+    renderImportIncomePreview();
+    return;
+  }
+  try {
+    importIncomeRows = rowsFromParsedImportData(importRawRows, getImportKind());
+    renderImportIncomePreview();
+    const kindLabel = getImportKind() === 'expense' ? 'הוצאות' : 'הכנסות';
+    importIncomeStatus.textContent = `זוהו ${importIncomeRows.length} שורות לייבוא ${kindLabel}. אפשר לערוך לפני אישור.`;
+  } catch (e) {
+    console.error(e);
+    importIncomeRows = [];
+    renderImportIncomePreview();
+    importIncomeStatus.textContent = e?.message || 'שגיאה בזיהוי הקובץ לפי סוג הייבוא שנבחר.';
+    showToast(importIncomeStatus.textContent, true);
+  }
+}
+
 function openIncomeImportDialog() {
   importIncomeRows = [];
+  importRawRows = [];
+  if (importKind) importKind.value = 'income';
   if (importIncomeFile) importIncomeFile.value = '';
   if (importIncomeStatus) importIncomeStatus.textContent = '';
   renderImportIncomePreview();
@@ -4237,23 +4418,34 @@ function confirmIncomeImport() {
     showToast('אין שורות מסומנות לייבוא', true);
     return;
   }
+  const kind = getImportKind();
   let imported = 0, skipped = 0;
   const existingRows = rows.slice();
   for (const item of selected) {
     if (!item.date || !Number.isFinite(item.amount) || item.amount === 0) { skipped++; continue; }
-    const duplicate = isImportedIncomeDuplicate(item, existingRows);
+    const duplicate = isImportedRowDuplicate(item, existingRows);
     if (duplicate) { skipped++; continue; }
+
+    const rowType = kind === 'expense' ? 'expense' : 'income';
+    const category = rowType === 'expense' ? (item.category && item.category !== 'טרם סווג' ? item.category : 'טרם סווג') : '';
+    const rowForMeta = { type: rowType, category, desc: item.desc || '' };
+    const meta = rowType === 'expense' ? getExpenseMeta(rowForMeta) : null;
+
     const newRow = {
       id: crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2)),
       date: item.date,
-      type: 'income',
-      category: '',
-      desc: item.desc || buildImportedIncomeDescription(item.docNumber, item.clientName, '', item.docType || ''),
+      type: rowType,
+      category,
+      desc: item.desc || (rowType === 'expense'
+        ? buildImportedExpenseDescription(item.docNumber, item.clientName, '', item.docType || '')
+        : buildImportedIncomeDescription(item.docNumber, item.clientName, '', item.docType || '')),
       docNumber: item.docNumber || '',
       docType: item.docType || '',
-      amount: item.amount,
-      incVat: true,
-      deductPct: 100,
+      amount: rowType === 'expense' ? Math.abs(item.amount) : item.amount,
+      incVat: item.incVat !== false,
+      deductPct: rowType === 'expense'
+        ? Math.max(0, Math.min(100, Number(meta?.incomeTaxPct ?? 100) || 100))
+        : 100,
       source: 'csvImport',
       createdAt: Date.now()
     };
@@ -4265,7 +4457,8 @@ function confirmIncomeImport() {
   scheduleCloudSave();
   render();
   importIncomeDialog?.close();
-  showToast(imported ? `יובאו ${imported} הכנסות${skipped ? `, דולגו ${skipped}` : ''}` : 'לא יובאו שורות חדשות', !imported);
+  const label = kind === 'expense' ? 'הוצאות' : 'הכנסות';
+  showToast(imported ? `יובאו ${imported} ${label}${skipped ? `, דולגו ${skipped}` : ''}` : 'לא יובאו שורות חדשות', !imported);
 }
 
 /* ----------------------------------------------------------
@@ -5415,6 +5608,7 @@ function initAppLogic(uid) {
     if (btnImportIncome) btnImportIncome.onclick = () => { dataManageDialog?.close(); openIncomeImportDialog(); };
     if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
+    if (importKind) importKind.onchange = rebuildImportPreviewForCurrentKind;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
     if (btnHomeOpen) btnHomeOpen.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
