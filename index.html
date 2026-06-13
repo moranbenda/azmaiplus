@@ -823,6 +823,7 @@ header.app-header{
         </span>
         
 <button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
+        <button class="btn secondary small" id="btnDataManageOpen">ייבוא וניהול נתונים</button>
         <button class="btn secondary small" id="btnSupportOpen">פנייה למפתח</button>
         <button class="btn small" id="btnLogout">התנתקות</button>
       </div>
@@ -890,8 +891,8 @@ header.app-header{
         </button>
         <button type="button" class="home-card" id="homeGoImport">
           <div class="ico">📥</div>
-          <div class="title">ייבוא הכנסות</div>
-          <div class="desc">קליטת דוח הכנסות מקובץ Excel או CSV.</div>
+          <div class="title">ייבוא נתונים</div>
+          <div class="desc">קליטת נתונים מתוכנה קודמת מקובץ Excel או CSV.</div>
         </button>
         <button type="button" class="home-card" id="homeGoReports">
           <div class="ico">📊</div>
@@ -1028,9 +1029,7 @@ header.app-header{
           <div class="footer" style="margin-top:14px">
             <div class="left">
               <button class="btn ghost small" id="btnExportCSV">ייצוא CSV</button>
-              <button class="btn ghost small" id="btnExportJSON">גיבוי (JSON)</button>
               <button class="btn ghost small" id="btnExportPDF">הדפסה / PDF</button>
-              <button class="btn small" id="btnImportIncome" style="font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,.18)">ייבוא הכנסות</button>
             </div>
             <button class="btn warn small" id="btnClear">איפוס כל הנתונים</button>
           </div>
@@ -1125,12 +1124,8 @@ header.app-header{
         <div class="onboard-box">
           <strong>איך מתחילים?</strong>
           <div>1. ממלאים פרופיל משתמש ופרטי עסק</div>
-          <div>2. מזינים הוצאות והכנסות או מייבאים הכנסות</div>
-          <div>3. מפיקים דוחות למע״מ ולמס הכנסה</div>
-        </div>
-        <div class="onboard-box">
-          <strong>טיפ קטן</strong>
-          <div>אפשר להזין הוצאות ידנית בכל יום, ואת ההכנסות לייבא בהמשך מקובץ מסודר.</div>
+          <div>2. מזינים הוצאות והכנסות או מייבאים נתונים מתוכנה קודמת באמצעות כפתור "ייבוא וניהול נתונים"</div>
+          <div>3. מתחילים לנהל את העסק בראש שקט!</div>
         </div>
         <div class="onboard-actions">
           <button class="btn" type="button" id="btnOnboardingProfile">השלמת פרופיל משתמש</button>
@@ -1287,9 +1282,49 @@ header.app-header{
 </dialog>
 
 
+<!-- דיאלוג ייבוא וניהול נתונים -->
+<dialog id="dataManageDialog">
+  <div class="dlg">
+    <div class="dlg-hd">
+      <button class="btn secondary small" type="button" id="btnDataManageClose">סגירה</button>
+      <div>ייבוא וניהול נתונים</div>
+    </div>
+    <div class="dlg-bd">
+      <div class="grid2">
+        <div class="card" style="grid-column:1 / -1;box-shadow:none">
+          <h3 style="margin:0 0 8px">ייבוא נתונים מתוכנה קודמת</h3>
+          <p class="hint" style="font-size:15px;line-height:1.8;margin:0">
+            ניתן לייבא הכנסות והוצאות מקובץ CSV או Excel שהופק ממערכת אחרת.
+          </p>
+          <div class="hint" style="font-size:14px;line-height:1.8;margin-top:10px">
+            <strong>מתי להשתמש?</strong><br>
+            מעבר למערכת באמצע השנה, מעבר מתוכנת הנהלת חשבונות אחרת או ייבוא נתונים היסטוריים.
+          </div>
+          <div class="hint" style="font-size:14px;line-height:1.8;margin-top:10px">
+            <strong>מה מיובא?</strong><br>
+            הכנסות, הוצאות, קטגוריות, נתוני מע״מ ומספרי מסמכים כאשר הם קיימים בקובץ.
+          </div>
+          <div class="hint" style="font-size:14px;line-height:1.8;margin-top:10px">
+            <strong>חשוב לדעת:</strong><br>
+            הייבוא אינו מוחק נתונים קיימים. לפני הקליטה יוצג מסך סיכום ואישור.
+          </div>
+        </div>
+      </div>
+      <div class="footer" style="margin-top:14px;gap:10px;flex-wrap:wrap">
+        <div class="left" style="gap:10px;flex-wrap:wrap">
+          <button class="btn" type="button" id="btnImportIncome" style="font-weight:700;box-shadow:0 4px 12px rgba(37,99,235,.18)">ייבוא נתונים</button>
+          <button class="btn secondary" type="button" id="btnExportJSON">הורדת גיבוי מלא</button>
+          <button class="btn secondary" type="button" id="btnRestoreJSON">שחזור מגיבוי</button>
+          <input type="file" id="backupRestoreFile" accept=".json,application/json" hidden />
+        </div>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="importIncomeDialog">
   <div class="dlg-hd">
-    <div>ייבוא הכנסות מ-CSV / Excel</div>
+    <div>ייבוא נתונים מ-CSV / Excel</div>
     <button class="btn secondary small" type="button" id="btnImportIncomeClose">סגירה</button>
   </div>
   <div class="dlg-bd">
@@ -1516,6 +1551,12 @@ const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
 const categoriesDialog = document.getElementById("categoriesDialog");
 const btnCategoriesClose = document.getElementById("btnCategoriesClose");
 const catTbody = document.getElementById("catTbody");
+
+
+/* דיאלוג ייבוא וניהול נתונים */
+const btnDataManageOpen = document.getElementById("btnDataManageOpen");
+const dataManageDialog = document.getElementById("dataManageDialog");
+const btnDataManageClose = document.getElementById("btnDataManageClose");
 
 
 /* כפתור פנייה למפתח */
@@ -2064,6 +2105,8 @@ const periodLabel= document.getElementById("periodLabel");
 /* כפתורי יצוא וגיבוי */
 const btnExportCSV   = document.getElementById("btnExportCSV");
 const btnExportJSON  = document.getElementById("btnExportJSON");
+const btnRestoreJSON = document.getElementById("btnRestoreJSON");
+const backupRestoreFile = document.getElementById("backupRestoreFile");
 const btnExportPDF   = document.getElementById("btnExportPDF");
 const btnImportIncome= document.getElementById("btnImportIncome");
 const btnClear       = document.getElementById("btnClear");
@@ -2187,6 +2230,10 @@ btnReportsOpen.onclick    = () => {
   reportsDialog.showModal();
 };
 rType.addEventListener("change", updateReportDialogUI);
+/* ייבוא וניהול נתונים ---------------------------------------------------------- */
+if (btnDataManageOpen) btnDataManageOpen.onclick = () => dataManageDialog?.showModal();
+if (btnDataManageClose) btnDataManageClose.onclick = () => dataManageDialog?.close();
+
 /* פנייה למפתח (נשלח ב-mailto) ---------------------------------------------------------- */
 // (removed stray text)
 // (removed stray text)
@@ -4276,6 +4323,158 @@ async function exportJSON() {
   }
 }
 
+function normalizeBackupLedger(parsed) {
+  if (!parsed || typeof parsed !== "object") return null;
+
+  // גרסה חדשה: { backupVersion, profile, ledger: {...} }
+  if (parsed.ledger && typeof parsed.ledger === "object") {
+    return {
+      rows: Array.isArray(parsed.ledger.rows) ? parsed.ledger.rows : [],
+      customers: Array.isArray(parsed.ledger.customers) ? parsed.ledger.customers : [],
+      fixedAssets: Array.isArray(parsed.ledger.fixedAssets) ? parsed.ledger.fixedAssets : [],
+      documentDrafts: Array.isArray(parsed.ledger.documentDrafts) ? parsed.ledger.documentDrafts : [],
+      settings: parsed.ledger.settings && typeof parsed.ledger.settings === "object" ? parsed.ledger.settings : getSettings(),
+      updatedAt: new Date().toISOString(),
+      customersUpdatedAt: parsed.ledger.customersUpdatedAt || null,
+      fixedAssetsUpdatedAt: parsed.ledger.fixedAssetsUpdatedAt || null,
+      restoredFromBackupAt: new Date().toISOString(),
+      restoredFromBackupVersion: parsed.backupVersion || null
+    };
+  }
+
+  // תמיכה בגיבוי ישן: { rows, settings }
+  if (Array.isArray(parsed.rows)) {
+    return {
+      rows: parsed.rows,
+      customers: Array.isArray(parsed.customers) ? parsed.customers : [],
+      fixedAssets: Array.isArray(parsed.fixedAssets) ? parsed.fixedAssets : [],
+      documentDrafts: Array.isArray(parsed.documentDrafts) ? parsed.documentDrafts : [],
+      settings: parsed.settings && typeof parsed.settings === "object" ? parsed.settings : getSettings(),
+      updatedAt: new Date().toISOString(),
+      restoredFromBackupAt: new Date().toISOString(),
+      restoredFromBackupVersion: parsed.backupVersion || 1
+    };
+  }
+
+  return null;
+}
+
+function backupSummaryText(ledger) {
+  return [
+    `תנועות: ${Array.isArray(ledger.rows) ? ledger.rows.length : 0}`,
+    `לקוחות: ${Array.isArray(ledger.customers) ? ledger.customers.length : 0}`,
+    `רכוש קבוע: ${Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets.length : 0}`,
+    `טיוטות מסמכים: ${Array.isArray(ledger.documentDrafts) ? ledger.documentDrafts.length : 0}`
+  ].join("\n");
+}
+
+function mergeById(currentList = [], backupList = []) {
+  const result = Array.isArray(currentList) ? [...currentList] : [];
+  const keys = new Set(result.map(item => item?.id ? `id:${item.id}` : `json:${JSON.stringify(item)}`));
+
+  for (const item of (Array.isArray(backupList) ? backupList : [])) {
+    const key = item?.id ? `id:${item.id}` : `json:${JSON.stringify(item)}`;
+    if (!keys.has(key)) {
+      result.push(item);
+      keys.add(key);
+    }
+  }
+
+  return result;
+}
+
+async function restoreBackupFromFile(file) {
+  if (!currentUid) {
+    alert("צריך להתחבר לפני שחזור גיבוי.");
+    return;
+  }
+  if (!file) return;
+
+  let parsed;
+  try {
+    const raw = await file.text();
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    console.error("backup parse failed", err);
+    alert("קובץ הגיבוי לא תקין או שאינו JSON תקין.");
+    return;
+  }
+
+  const backupLedger = normalizeBackupLedger(parsed);
+  if (!backupLedger) {
+    alert("הקובץ לא נראה כמו גיבוי תקין של עצמאי פלוס.");
+    return;
+  }
+
+  const summary = backupSummaryText(backupLedger);
+  const wantsRestore = confirm(
+    "נמצא גיבוי תקין:\n\n" +
+    summary +
+    "\n\nהשחזור מתבצע באחריות המשתמש. לפני השחזור תתבצע הורדת גיבוי של המצב הנוכחי.\n\nלהמשיך?"
+  );
+  if (!wantsRestore) return;
+
+  const fullRestore = confirm(
+    "בחרי סוג שחזור:\n\n" +
+    "אישור = שחזור מלא: מחליף את כל נתוני העסק בגיבוי.\n\n" +
+    "ביטול = שחזור חסרים בלבד: מוסיף רק תנועות/לקוחות/נכסים/טיוטות שלא קיימים לפי מזהה, בלי למחוק נתונים קיימים."
+  );
+
+  try {
+    // רשת ביטחון: מורידים גיבוי של המצב הנוכחי לפני שינוי הנתונים בענן
+    await exportJSON();
+
+    const ledgerRef = doc(db, "ledgers", currentUid);
+    let finalLedger = backupLedger;
+
+    if (!fullRestore) {
+      const currentSnap = await getDoc(ledgerRef);
+      const currentLedger = currentSnap.exists() ? (currentSnap.data() || {}) : {};
+
+      finalLedger = {
+        ...currentLedger,
+        rows: mergeById(currentLedger.rows, backupLedger.rows),
+        customers: mergeById(currentLedger.customers, backupLedger.customers),
+        fixedAssets: mergeById(currentLedger.fixedAssets, backupLedger.fixedAssets),
+        documentDrafts: mergeById(currentLedger.documentDrafts, backupLedger.documentDrafts),
+        settings: currentLedger.settings || backupLedger.settings || getSettings(),
+        updatedAt: new Date().toISOString(),
+        restoredFromBackupAt: new Date().toISOString(),
+        restoredFromBackupMode: "merge_missing"
+      };
+    } else {
+      finalLedger = {
+        ...backupLedger,
+        updatedAt: new Date().toISOString(),
+        restoredFromBackupAt: new Date().toISOString(),
+        restoredFromBackupMode: "full_replace"
+      };
+    }
+
+    await setDoc(ledgerRef, finalLedger, { merge: false });
+
+    // רענון הזיכרון המקומי והמסך הראשי בלי לגעת בהתחברות
+    applyLedgerPayload(finalLedger);
+    cloudLoadedForUid = currentUid;
+    lastCloudSavedAt = finalLedger.updatedAt || null;
+    saveToLocal();
+    render();
+
+    alert(
+      "השחזור הושלם בהצלחה.\n\n" +
+      backupSummaryText(finalLedger) +
+      "\n\nמומלץ לרענן את העמוד ולבדוק שהנתונים מוצגים כראוי."
+    );
+  } catch (err) {
+    console.error("restore backup failed", err);
+    alert("השחזור נכשל. לא בוצע שינוי מלא בנתונים. כדאי לבדוק Console או לנסות שוב.");
+  } finally {
+    if (backupRestoreFile) backupRestoreFile.value = "";
+  }
+}
+
+
+
 function exportPDF() {
   if (!currentUid) return;
 
@@ -5195,15 +5394,17 @@ function initAppLogic(uid) {
 
     btnExportCSV.onclick  = () => exportCSV(rows);
     btnExportJSON.onclick = exportJSON;
+    if (btnRestoreJSON) btnRestoreJSON.onclick = () => backupRestoreFile?.click();
+    if (backupRestoreFile) backupRestoreFile.onchange = () => restoreBackupFromFile(backupRestoreFile.files?.[0]);
     btnExportPDF.onclick  = exportPDF;
-    if (btnImportIncome) btnImportIncome.onclick = openIncomeImportDialog;
+    if (btnImportIncome) btnImportIncome.onclick = () => { dataManageDialog?.close(); openIncomeImportDialog(); };
     if (btnImportIncomeClose) btnImportIncomeClose.onclick = () => importIncomeDialog?.close();
     if (importIncomeFile) importIncomeFile.onchange = handleIncomeImportFileChange;
     if (btnImportIncomeConfirm) btnImportIncomeConfirm.onclick = confirmIncomeImport;
 
     if (btnHomeOpen) btnHomeOpen.onclick = () => homeDashboard?.scrollIntoView({ behavior: "smooth", block: "start" });
     if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
-    if (homeGoImport) homeGoImport.onclick = openIncomeImportDialog;
+    if (homeGoImport) homeGoImport.onclick = () => dataManageDialog?.showModal();
     if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
     if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
