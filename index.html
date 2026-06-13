@@ -1324,12 +1324,27 @@ header.app-header{
 
 <dialog id="importIncomeDialog">
   <div class="dlg-hd">
-    <div>ייבוא נתונים מ-CSV / Excel</div>
+    <div>ייבוא נתונים מתוכנה קודמת</div>
     <button class="btn secondary small" type="button" id="btnImportIncomeClose">סגירה</button>
   </div>
   <div class="dlg-bd">
     <div class="grid2">
       <div style="grid-column:1 / -1">
+        <div class="hint" style="font-weight:700;margin-bottom:10px">תומך בקבצי CSV ו-Excel</div>
+        <div class="card" style="box-shadow:none;margin-bottom:14px;padding:16px;border-radius:18px;background:#f8fafc">
+          <h3 style="margin:0 0 8px;font-size:18px">מעבר מתוכנה קודמת?</h3>
+          <p class="hint" style="font-size:14px;line-height:1.8;margin:0">
+            ניתן לייבא נתוני הכנסות והוצאות מקובץ CSV או Excel שהופק מכל מערכת הנהלת חשבונות.
+          </p>
+          <div class="hint" style="font-size:14px;line-height:1.8;margin-top:10px">
+            <strong>מתאים עבור:</strong><br>
+            מעבר למערכת באמצע השנה · מעבר מתוכנה אחרת לעצמאי פלוס · ייבוא נתונים היסטוריים
+          </div>
+          <div class="hint" style="font-size:14px;line-height:1.8;margin-top:10px">
+            <strong>חשוב לדעת:</strong><br>
+            הייבוא אינו מוחק נתונים קיימים. לפני הקליטה תוצג תצוגה מקדימה של הנתונים.
+          </div>
+        </div>
         <label>בחירת קובץ</label>
         <input type="file" id="importIncomeFile" accept=".csv,.xlsx,.xls" />
         <div class="hint" style="margin-top:8px">המערכת תחפש אוטומטית עמודות תאריך, סוג מסמך, מס׳ מסמך, לקוח וסה״כ, ותציג תצוגה מקדימה לפני ייבוא. מסמכי זיכוי יחושבו אוטומטית במינוס.</div>
