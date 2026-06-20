@@ -375,6 +375,12 @@ async function issueDocument(){
     return;
   }
   const finalDoc=buildFinalDocument();
+  lastIssuedDocument=finalDoc;
+  previewFinal=true;
+  renderPreview();
+  finalDoc.previewHtml = $('docPreview')?.innerHTML || '';
+  finalDoc.printFooter = 'הופק על ידי מערכת עצמאי פלוס';
+  finalDoc.customerSearchKey = [finalDoc.customerName, finalDoc.customerSnapshot?.taxId, finalDoc.customerSnapshot?.email, finalDoc.customerSnapshot?.phone].filter(Boolean).join(' ').toLowerCase();
   const existingDocuments=Array.isArray(ledger.documents) ? ledger.documents : [];
   const existingRows=Array.isArray(ledger.rows) ? ledger.rows : [];
   const nextSettings={...settings, [finalDoc.type]: Number(settings[finalDoc.type] || 1) + 1};
