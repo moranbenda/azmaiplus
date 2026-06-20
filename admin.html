@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>פורטל מנהל - עצמאי פלוס</title>
+  <style>
+    :root{--blue:#1768e8;--navy:#0b1f3f;--muted:#6b7890;--line:#dbe7f5;--bg:#f5f9ff;--card:#fff;--green:#16a34a;--red:#dc2626;--amber:#d97706}
+    *{box-sizing:border-box} body{margin:0;font-family:Arial,'Noto Sans Hebrew',sans-serif;background:linear-gradient(180deg,#eef6ff,#fff);color:var(--navy);direction:rtl}
+    header{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+    .wrap{max-width:1220px;margin:auto;padding:18px}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{display:flex;align-items:center;gap:10px;font-weight:900;font-size:24px}.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,#1768e8,#19b36b);display:grid;place-items:center;color:white;font-weight:900}
+    .pill{border:1px solid var(--line);border-radius:999px;padding:8px 12px;background:#fff;color:var(--muted);font-size:14px}.btn{border:0;border-radius:14px;padding:12px 18px;background:var(--blue);color:white;font-weight:800;cursor:pointer;box-shadow:0 10px 20px rgba(23,104,232,.14)}.btn.secondary{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:none}.btn.danger{background:var(--red)}.btn:disabled{opacity:.5;cursor:not-allowed}
+    .grid{display:grid;gap:16px}.cards{grid-template-columns:repeat(4,minmax(0,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;box-shadow:0 18px 38px rgba(9,37,83,.07)}.stat .label{color:var(--muted);font-size:14px}.stat .num{font-size:34px;font-weight:900;margin-top:8px}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}.tab{padding:10px 16px;border:1px solid var(--line);border-radius:999px;background:white;cursor:pointer;font-weight:800;color:var(--navy)}.tab.active{background:var(--blue);color:white;border-color:var(--blue)}
+    input,select{width:100%;border:1px solid var(--line);border-radius:14px;padding:12px 14px;font-size:15px;background:white;color:var(--navy)}.filters{display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:10px;align-items:end}
+    table{width:100%;border-collapse:separate;border-spacing:0;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:white}th,td{padding:12px 10px;border-bottom:1px solid var(--line);text-align:right;font-size:14px;vertical-align:top}th{background:#f3f7fc;color:#374963;font-weight:900}tr:last-child td{border-bottom:0}.ltr{direction:ltr;text-align:left}.muted{color:var(--muted)}.ok{color:var(--green);font-weight:900}.bad{color:var(--red);font-weight:900}.warn{color:var(--amber);font-weight:900}.hidden{display:none!important}.empty{padding:34px;text-align:center;color:var(--muted)}
+    .login{max-width:440px;margin:9vh auto;background:white;border:1px solid var(--line);border-radius:26px;padding:26px;box-shadow:0 22px 50px rgba(9,37,83,.09);text-align:center}.login h1{margin-top:0}.login .btn{width:100%;margin-top:12px}.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:12px;margin-top:12px;text-align:right}
+    .small{font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;border-radius:999px;border:1px solid var(--line);padding:5px 9px;background:#fff;font-size:12px}.badge.green{border-color:#bbf7d0;background:#f0fdf4;color:#166534}.badge.red{border-color:#fecaca;background:#fef2f2;color:#991b1b}.badge.amber{border-color:#fde68a;background:#fffbeb;color:#92400e}
+    @media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}table{display:block;overflow:auto;white-space:nowrap}.wrap{padding:12px}.card{border-radius:18px}}
+  </style>
+</head>
+<body>
+  <header id="appHeader" class="hidden"><div class="wrap top"><div class="brand"><div class="logo">A+</div><div>פורטל מנהל</div></div><div class="actions"><span id="adminEmail" class="pill"></span><button id="btnRefresh" class="btn secondary">רענון</button><button id="btnSignOut" class="btn danger">יציאה</button></div></div></header>
+
+  <main class="wrap">
+    <section id="loginBox" class="login">
+      <div class="logo" style="margin:auto;width:62px;height:62px;font-size:22px">A+</div>
+      <h1>פורטל מנהל עצמאי פלוס</h1>
+      <p class="muted">כניסה למורשים בלבד. הפורטל לקריאה בלבד בשלב זה.</p>
+      <button id="btnGoogle" class="btn">כניסה עם Google</button>
+      <button id="btnEmailToggle" class="btn secondary">כניסה עם אימייל וסיסמה</button>
+      <div id="emailLogin" class="hidden" style="margin-top:12px;display:grid;gap:10px">
+        <input id="email" placeholder="אימייל" />
+        <input id="password" placeholder="סיסמה" type="password" />
+        <button id="btnEmailLogin" class="btn">כניסה</button>
+      </div>
+      <div id="loginError" class="notice hidden"></div>
+    </section>
+
+    <section id="app" class="hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="dashboard">דשבורד</button>
+        <button class="tab" data-tab="users">משתמשים</button>
+        <button class="tab" data-tab="audit">Audit Log</button>
+        <button class="tab" data-tab="leads">לידים</button>
+      </div>
+
+      <section id="dashboard" class="tabPane">
+        <div class="grid cards">
+          <div class="card stat"><div class="label">משתמשים</div><div id="statUsers" class="num">0</div></div>
+          <div class="card stat"><div class="label">לקוחות</div><div id="statCustomers" class="num">0</div></div>
+          <div class="card stat"><div class="label">מסמכים</div><div id="statDocuments" class="num">0</div></div>
+          <div class="card stat"><div class="label">פעולות Audit</div><div id="statAudit" class="num">0</div></div>
+        </div>
+        <div class="card" style="margin-top:16px"><h2>פעולות אחרונות</h2><div id="recentAudit"></div></div>
+      </section>
+
+      <section id="users" class="tabPane hidden">
+        <div class="card"><h2>משתמשים</h2><div class="filters"><input id="userSearch" placeholder="חיפוש לפי אימייל / שם עסק / UID" /><select id="statusFilter"><option value="">כל הסטטוסים</option><option value="trial">ניסיון</option><option value="active">פעיל</option><option value="readonly">קריאה בלבד</option><option value="payment_failed">כשל תשלום</option></select><div></div><button id="btnUsersFilter" class="btn secondary">סינון</button></div><div id="usersTable" style="margin-top:14px"></div></div>
+      </section>
+
+      <section id="audit" class="tabPane hidden">
+        <div class="card"><h2>Audit Log</h2><div class="filters"><input id="auditSearch" placeholder="חיפוש לפי פעולה / אימייל / תקציר / מזהה" /><select id="auditType"><option value="">כל הפעולות</option></select><input id="auditEmail" placeholder="אימייל משתמש" /><button id="btnAuditFilter" class="btn secondary">סינון</button></div><div id="auditTable" style="margin-top:14px"></div></div>
+      </section>
+
+      <section id="leads" class="tabPane hidden">
+        <div class="card"><h2>לידים מהאתר</h2><p class="muted">יופיעו כאן אחרי שנחבר Resend/טופס לידים ונשמור אותם גם ב-Firestore.</p><div id="leadsTable"></div></div>
+      </section>
+    </section>
+  </main>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { getFirestore, collection, collectionGroup, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authDomain:"freelance-accounting-6c3bb.firebaseapp.com", projectId:"freelance-accounting-6c3bb", storageBucket:"freelance-accounting-6c3bb.firebasestorage.app", messagingSenderId:"196974556694", appId:"1:196974556694:web:60ba710567f2a7c67c6737" };
+const ADMIN_EMAILS = ["moranbenda@gmail.com","moranbdcoil@gmail.com","azmaiplusapp@gmail.com"].map(x=>x.toLowerCase());
+const app = initializeApp(firebaseConfig); const auth=getAuth(app); const db=getFirestore(app);
+const $=id=>document.getElementById(id); let users=[],ledgers=[],audit=[],leads=[];
+function esc(v){return String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]))}
+function fmtDate(v){ if(!v)return '—'; const d = v?.toDate ? v.toDate() : new Date(v); if(isNaN(d)) return esc(v); return d.toLocaleString('he-IL'); }
+function money(n){return Number(n||0).toLocaleString('he-IL',{style:'currency',currency:'ILS'});}
+function trialStatus(u,l){ const status=u.subscriptionStatus||u.status||l.subscriptionStatus||''; if(status) return status; if(u.isPaid||l.isPaid) return 'active'; const created=u.createdAt||l.createdAt; if(!created) return 'unknown'; const d=new Date(created); const days=Math.floor((Date.now()-d.getTime())/86400000); return days<=14?'trial':'readonly'; }
+function badgeStatus(s){ const label={trial:'ניסיון',active:'פעיל',readonly:'קריאה בלבד',payment_failed:'כשל תשלום',unknown:'לא ידוע'}[s]||s; const cls=s==='active'?'green':s==='payment_failed'||s==='readonly'?'red':s==='trial'?'amber':''; return `<span class="badge ${cls}">${esc(label)}</span>`; }
+function showError(msg){ $('loginError').textContent=msg; $('loginError').classList.remove('hidden'); }
+function showApp(user){ $('loginBox').classList.add('hidden'); $('appHeader').classList.remove('hidden'); $('app').classList.remove('hidden'); $('adminEmail').textContent=user.email||''; loadAll(); }
+function block(){ $('loginBox').classList.remove('hidden'); $('appHeader').classList.add('hidden'); $('app').classList.add('hidden'); showError('אין הרשאת מנהל למייל הזה.'); }
+
+$('btnGoogle').onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>showError(e.message));
+$('btnEmailToggle').onclick=()=>$('emailLogin').classList.toggle('hidden');
+$('btnEmailLogin').onclick=()=>signInWithEmailAndPassword(auth,$('email').value,$('password').value).catch(e=>showError(e.message));
+$('btnSignOut').onclick=()=>signOut(auth);
+$('btnRefresh').onclick=()=>loadAll();
+onAuthStateChanged(auth,u=>{ if(!u){$('loginBox').classList.remove('hidden');$('appHeader').classList.add('hidden');$('app').classList.add('hidden');return;} if(!ADMIN_EMAILS.includes((u.email||'').toLowerCase())) return block(); showApp(u); });
+
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.tabPane').forEach(p=>p.classList.add('hidden'));$(b.dataset.tab).classList.remove('hidden');});
+
+async function loadAll(){ $('btnRefresh').disabled=true; try{ await Promise.all([loadUsers(),loadLedgers(),loadAudit(),loadLeads()]); renderAll(); }catch(e){ console.error(e); alert('שגיאה בטעינת פורטל מנהל: '+e.message); } finally{$('btnRefresh').disabled=false;} }
+async function loadUsers(){ const s=await getDocs(collection(db,'users')); users=s.docs.map(d=>({uid:d.id,...d.data()})); }
+async function loadLedgers(){ const s=await getDocs(collection(db,'ledgers')); ledgers=s.docs.map(d=>({uid:d.id,...d.data()})); }
+async function loadAudit(){ try{ const s=await getDocs(query(collectionGroup(db,'auditLogs'),limit(500))); audit=s.docs.map(d=>({id:d.id,path:d.ref.path,...d.data()})); audit.sort((a,b)=>String(b.createdAtIso||b.createdAt||'').localeCompare(String(a.createdAtIso||a.createdAt||''))); }catch(e){ console.warn(e); audit=[]; } }
+async function loadLeads(){ try{ const s=await getDocs(query(collection(db,'leads'),limit(200))); leads=s.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ leads=[]; } }
+function renderAll(){ renderDashboard(); renderUsers(); renderAudit(); renderLeads(); }
+function renderDashboard(){ const totalCustomers=ledgers.reduce((n,l)=>n+(Array.isArray(l.customers)?l.customers.length:0),0); const totalDocs=ledgers.reduce((n,l)=>n+(Array.isArray(l.documents)?l.documents.length:0),0); $('statUsers').textContent=users.length||ledgers.length; $('statCustomers').textContent=totalCustomers; $('statDocuments').textContent=totalDocs; $('statAudit').textContent=audit.length; $('recentAudit').innerHTML=renderAuditTable(audit.slice(0,8),false); }
+function renderUsers(){ const q=($('userSearch').value||'').toLowerCase(); const sf=$('statusFilter').value; const rows=ledgers.map(l=>{ const u=users.find(x=>x.uid===l.uid)||{}; return {uid:l.uid,u,l,status:trialStatus(u,l),customers:Array.isArray(l.customers)?l.customers.length:0,documents:Array.isArray(l.documents)?l.documents.length:0,rows:Array.isArray(l.rows)?l.rows.length:0}; }).filter(r=>{ const txt=[r.uid,r.u.email,r.u.businessName,r.l.businessName,r.u.displayName].join(' ').toLowerCase(); return (!q||txt.includes(q))&&(!sf||r.status===sf); }); if(!rows.length){$('usersTable').innerHTML='<div class="empty">אין משתמשים להצגה.</div>';return;} $('usersTable').innerHTML=`<table><thead><tr><th>משתמש</th><th>עסק</th><th>סטטוס</th><th>לקוחות</th><th>מסמכים</th><th>תנועות</th><th>נוצר</th><th>UID</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.u.email||r.l.email||'—')}</td><td>${esc(r.u.businessName||r.l.businessName||'—')}</td><td>${badgeStatus(r.status)}</td><td>${r.customers}</td><td>${r.documents}</td><td>${r.rows}</td><td>${fmtDate(r.u.createdAt||r.l.createdAt)}</td><td class="ltr small">${esc(r.uid)}</td></tr>`).join('')}</tbody></table>`; }
+$('btnUsersFilter').onclick=renderUsers; $('userSearch').oninput=renderUsers; $('statusFilter').onchange=renderUsers;
+function renderAudit(){ const actions=[...new Set(audit.map(a=>a.action).filter(Boolean))].sort(); $('auditType').innerHTML='<option value="">כל הפעולות</option>'+actions.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); $('btnAuditFilter').onclick=applyAudit; $('auditSearch').oninput=applyAudit; $('auditEmail').oninput=applyAudit; $('auditType').onchange=applyAudit; applyAudit(); }
+function applyAudit(){ const q=($('auditSearch').value||'').toLowerCase(); const email=($('auditEmail').value||'').toLowerCase(); const type=$('auditType').value; const rows=audit.filter(a=>{ const txt=[a.action,a.email,a.summary,a.entityType,a.entityId,JSON.stringify(a.details||{})].join(' ').toLowerCase(); return (!q||txt.includes(q))&&(!email||String(a.email||'').toLowerCase().includes(email))&&(!type||a.action===type); }); $('auditTable').innerHTML=renderAuditTable(rows,true); }
+function renderAuditTable(rows,showPath=true){ if(!rows.length)return '<div class="empty">אין פעולות להצגה.</div>'; return `<table><thead><tr><th>זמן</th><th>פעולה</th><th>משתמש</th><th>ישות</th><th>תקציר</th>${showPath?'<th>נתיב</th>':''}</tr></thead><tbody>${rows.map(a=>`<tr><td>${fmtDate(a.createdAtIso||a.createdAt)}</td><td><b>${esc(a.action||'—')}</b></td><td>${esc(a.email||'—')}</td><td>${esc(a.entityType||'—')}<br><span class="small muted ltr">${esc(a.entityId||'')}</span></td><td>${esc(a.summary||a.details?.summary||'—')}</td>${showPath?`<td class="ltr small">${esc(a.path||'')}</td>`:''}</tr>`).join('')}</tbody></table>`; }
+function renderLeads(){ if(!leads.length){$('leadsTable').innerHTML='<div class="empty">עדיין אין לידים שמורים בפיירסטור.</div>';return;} $('leadsTable').innerHTML=`<table><thead><tr><th>תאריך</th><th>שם</th><th>אימייל</th><th>טלפון</th><th>מקור</th></tr></thead><tbody>${leads.map(l=>`<tr><td>${fmtDate(l.createdAt||l.createdAtIso)}</td><td>${esc(l.name)}</td><td>${esc(l.email)}</td><td>${esc(l.phone)}</td><td>${esc(l.source||'website')}</td></tr>`).join('')}</tbody></table>`; }
+</script>
+</body>
+</html>
