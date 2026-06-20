@@ -281,6 +281,13 @@
   
     .document-history-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
     .small{padding:8px 12px;font-size:12px}
+    .docs-history-table-wrap{width:100%;overflow-x:auto;border:1px solid #dbe3ef;border-radius:16px;background:white}
+    .docs-history-table{width:100%;border-collapse:collapse;min-width:820px;font-size:13px}
+    .docs-history-table th,.docs-history-table td{padding:12px 10px;border-bottom:1px solid #e5edf7;text-align:right;vertical-align:middle}
+    .docs-history-table th{background:#f8fafc;color:#475569;font-weight:800;white-space:nowrap}
+    .docs-history-table tr:last-child td{border-bottom:0}
+    .docs-actions{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:118px}
+    .docs-actions .btn{padding:6px 10px;font-size:12px;min-height:auto;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -749,14 +756,16 @@ function documentHtmlForView(d){
 function openStoredDocument(docId, shouldPrint=false){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
   if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
-  const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+  const savedHtml = d.printHtml || null;
+  const html = savedHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
   <style>
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
-    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
-  </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div>${shouldPrint ? `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script>` : ""}</body></html>`;
+    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
+  </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
   const w = window.open("", "_blank");
   if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
-  w.document.open(); w.document.write(html); w.document.close();
+  const htmlToWrite = shouldPrint ? html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`) : html;
+  w.document.open(); w.document.write(htmlToWrite); w.document.close();
 }
 
 function resendStoredDocument(docId){
@@ -785,21 +794,39 @@ function renderSelected(){
       <span class="chip">סה״כ מסמכים כספיים: ${money(totalDocs)}</span>
       ${lastDoc ? `<span class="chip">מסמך אחרון: ${escapeHtml(documentDisplayType(lastDoc))} ${escapeHtml(lastDoc.number || "")}</span>` : ``}
     </div>
-    <div class="ledger-list">${docs.map(d => `
-      <div class="ledger-card">
-        <div class="ledger-title">${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</div>
-        <div class="ledger-grid">
-          <div><div class="k">תאריך</div><div>${escapeHtml(d.date || "—")}</div></div>
-          <div><div class="k">סכום</div><div>${money(documentDisplayTotal(d))}</div></div>
-          <div><div class="k">סטטוס</div><div>${escapeHtml(d.status || "issued")}</div></div>
-          <div><div class="k">מספר הקצאה</div><div>${escapeHtml(d.allocationNumber || "—")}</div></div>
-        </div>
-        <div class="selected-actions" style="margin-top:10px;justify-content:flex-start">
-          <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
-          <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
-          <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה חוזרת</button>
-        </div>
-      </div>`).join("")}</div>
+    <div class="docs-history-table-wrap">
+      <table class="docs-history-table">
+        <thead>
+          <tr>
+            <th>תאריך</th>
+            <th>מספר מסמך</th>
+            <th>סוג מסמך</th>
+            <th>סכום</th>
+            <th>סכום כולל מע״מ</th>
+            <th>מספר הקצאה</th>
+            <th>פעולות</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${docs.map(d => `
+            <tr>
+              <td>${escapeHtml(d.date || "—")}</td>
+              <td><b>${escapeHtml(d.number || "—")}</b></td>
+              <td>${escapeHtml(documentDisplayType(d))}</td>
+              <td>${money(Number(d.net ?? d.subtotal ?? documentDisplayTotal(d)))}</td>
+              <td><b>${money(documentDisplayTotal(d))}</b></td>
+              <td>${escapeHtml(d.allocationNumber || "—")}</td>
+              <td>
+                <div class="docs-actions">
+                  <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
+                  <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
+                  <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שלח ללקוח</button>
+                </div>
+              </td>
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
   ` : `<div class="empty">עדיין אין מסמכים ללקוח.</div>`;
 
   body.innerHTML = `
