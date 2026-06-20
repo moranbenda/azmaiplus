@@ -777,6 +777,46 @@ body.account-frozen .readonly-disabled{
 .billing-freeze-card p{margin:6px 0;color:var(--muted);line-height:1.65}
 .billing-freeze-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:12px}
 .billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:10px;color:var(--muted);font-size:14px}
+.google-auth-separator{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:14px 0 10px;
+  color:var(--muted);
+  font-size:13px;
+}
+.google-auth-separator:before,
+.google-auth-separator:after{
+  content:"";
+  height:1px;
+  background:var(--line);
+  flex:1;
+}
+.btn-google{
+  width:100%;
+  margin-top:0;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--text);
+  box-shadow:0 8px 18px rgba(15,23,42,.06);
+}
+.btn-google:hover{
+  border-color:#c7d7ee;
+  background:#f8fbff;
+}
+.google-g{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  margin-left:8px;
+  font-weight:900;
+  color:#4285f4;
+  background:#fff;
+}
+
 .readonly-toast{
   position:fixed;
   right:18px;
@@ -843,6 +883,8 @@ body.account-frozen .readonly-disabled{
         <button type="button" class="link-btn" id="btnResendVerification" hidden>שליחה מחדש של אימות מייל</button>
       </div>
       <button type="submit" class="btn" style="width:100%;margin-top:6px" id="authSubmitBtn">התחברות</button>
+      <div class="google-auth-separator">או</div>
+      <button type="button" class="btn btn-google" id="btnGoogleLogin"><span class="google-g">G</span>התחברות עם Google</button>
     </form>
 
     <div class="auth-notice" id="authInfo" hidden></div>
@@ -1542,7 +1584,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   sendPasswordResetEmail,
-  sendEmailVerification
+  sendEmailVerification,
+  GoogleAuthProvider,
+  signInWithPopup
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
 import {
@@ -1569,6 +1613,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
 
 /* ----------------------------------------------------------
    Google Drive receipts
@@ -1599,6 +1645,7 @@ const authError = document.getElementById("authError");
 const authInfo = document.getElementById("authInfo");
 const btnForgotPassword = document.getElementById("btnForgotPassword");
 const btnResendVerification = document.getElementById("btnResendVerification");
+const btnGoogleLogin = document.getElementById("btnGoogleLogin");
 
 const tabLogin = document.getElementById("tabLogin");
 const tabRegister = document.getElementById("tabRegister");
@@ -2155,6 +2202,54 @@ async function handleAuth(e) {
 // עדכון ה-Listeners בצורה בטוחה יותר:
 authForm.onsubmit = handleAuth; // זה יתפוס גם לחיצה על כפתור וגם Enter
 authSubmitBtn.onclick = handleAuth;
+
+btnGoogleLogin?.addEventListener("click", async () => {
+  authError.textContent = "";
+  setAuthInfo("");
+  btnGoogleLogin.disabled = true;
+  const originalText = btnGoogleLogin.innerHTML;
+  btnGoogleLogin.textContent = "מתחבר עם Google...";
+
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result.user;
+
+    if (user?.uid) {
+      const profileRef = doc(db, "users", user.uid);
+      const profileSnap = await getDoc(profileRef);
+
+      if (!profileSnap.exists()) {
+        await createDefaultProfile(user.uid, user.email || "", {
+          newTrial: true,
+          requireEmailVerification: false,
+          isExemptFromBilling: isBillingExemptEmail(user.email || ""),
+          displayName: user.displayName || ""
+        });
+      } else if (user.emailVerified) {
+        await setDoc(profileRef, {
+          email: user.email || "",
+          emailVerified: true,
+          emailVerifiedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    }
+  } catch (err) {
+    console.error("Google auth error:", err);
+    if (err.code === "auth/popup-closed-by-user") {
+      setAuthInfo("הכניסה עם Google בוטלה.", "error");
+    } else if (err.code === "auth/account-exists-with-different-credential") {
+      setAuthInfo("כבר קיים חשבון עם כתובת המייל הזו. התחברי עם אימייל וסיסמה, ובהמשך נוכל לקשר את Google לחשבון.", "error");
+    } else if (err.code === "auth/unauthorized-domain") {
+      setAuthInfo("הדומיין הנוכחי עדיין לא מורשה לכניסה עם Google ב-Firebase.", "error");
+    } else {
+      setAuthInfo("לא הצלחנו להתחבר עם Google כרגע. נסי שוב בעוד רגע.", "error");
+    }
+  } finally {
+    btnGoogleLogin.disabled = false;
+    btnGoogleLogin.innerHTML = originalText;
+  }
+});
+
 updateAuthAuxUI();
 
 btnForgotPassword?.addEventListener("click", async () => {
@@ -2947,10 +3042,15 @@ async function loadUserProfile(uid) {
   const snap = await getDoc(ref);
 
   if (!snap.exists()) {
-    await createDefaultProfile(uid, auth.currentUser?.email || "", { newTrial: false });
+    await createDefaultProfile(uid, auth.currentUser?.email || "", {
+      newTrial: true,
+      requireEmailVerification: false,
+      isExemptFromBilling: isBillingExemptEmail(auth.currentUser?.email || ""),
+      displayName: auth.currentUser?.displayName || ""
+    });
     userProfile = {
       email: auth.currentUser?.email || "",
-      displayName: "",
+      displayName: auth.currentUser?.displayName || "",
       businessName: "",
       businessId: "",
       phone: "",
