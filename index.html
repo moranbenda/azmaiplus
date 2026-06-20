@@ -1512,22 +1512,42 @@ const db = getFirestore(app);
 ---------------------------------------------------------- */
 async function writeAuditLog(action, entityType = "system", details = {}) {
   try {
-    if (!currentUid) return;
+    // משתמשים קודם כל ב-UID האמיתי של Firebase Auth, כדי לא ליפול על כפילות בפרופילי users.
+    const activeUid = auth.currentUser?.uid || currentUid;
+    if (!activeUid) return;
+
     const safeDetails = details && typeof details === "object" ? details : { value: String(details || "") };
-    await addDoc(collection(db, "ledgers", currentUid, "auditLogs"), {
+    const createdAtIso = new Date().toISOString();
+    const email = auth.currentUser?.email || userProfile?.email || null;
+
+    // רשת ביטחון: מבטיחים שמסמך ledger קיים לפני כתיבה לתת-אוסף auditLogs.
+    await setDoc(doc(db, "ledgers", activeUid), {
+      uid: activeUid,
+      email,
+      auditLogInitializedAt: createdAtIso,
+      lastAuditAt: createdAtIso
+    }, { merge: true });
+
+    await addDoc(collection(db, "ledgers", activeUid, "auditLogs"), {
       action,
       entityType,
       entityId: safeDetails.entityId || safeDetails.id || null,
       summary: safeDetails.summary || "",
       details: safeDetails,
-      uid: currentUid,
-      email: auth.currentUser?.email || userProfile?.email || null,
+      uid: activeUid,
+      email,
       createdAt: serverTimestamp(),
-      createdAtIso: new Date().toISOString(),
+      createdAtIso,
       userAgent: navigator.userAgent || ""
     });
   } catch (err) {
-    console.warn("audit log failed", err);
+    console.warn("audit log failed", {
+      message: err?.message || String(err),
+      code: err?.code || null,
+      uid: auth.currentUser?.uid || currentUid || null,
+      action,
+      entityType
+    });
   }
 }
 
