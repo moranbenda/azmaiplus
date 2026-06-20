@@ -1504,60 +1504,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-
-/* ----------------------------------------------------------
-   Audit Log - יומן פעולות רגולטורי
-   נשמר תחת: ledgers/{uid}/auditLogs/{logId}
-   כשל בכתיבה ליומן לא עוצר את הפעולה של המשתמש.
----------------------------------------------------------- */
-async function writeAuditLog(action, entityType = "system", details = {}) {
-  try {
-    // משתמשים קודם כל ב-UID האמיתי של Firebase Auth, כדי לא ליפול על כפילות בפרופילי users.
-    const activeUid = auth.currentUser?.uid || currentUid;
-    if (!activeUid) return;
-
-    const safeDetails = details && typeof details === "object" ? details : { value: String(details || "") };
-    const createdAtIso = new Date().toISOString();
-    const email = auth.currentUser?.email || userProfile?.email || null;
-
-    // רשת ביטחון: מבטיחים שמסמך ledger קיים לפני כתיבה לתת-אוסף auditLogs.
-    await setDoc(doc(db, "ledgers", activeUid), {
-      uid: activeUid,
-      email,
-      auditLogInitializedAt: createdAtIso,
-      lastAuditAt: createdAtIso
-    }, { merge: true });
-
-    await addDoc(collection(db, "ledgers", activeUid, "auditLogs"), {
-      action,
-      entityType,
-      entityId: safeDetails.entityId || safeDetails.id || null,
-      summary: safeDetails.summary || "",
-      details: safeDetails,
-      uid: activeUid,
-      email,
-      createdAt: serverTimestamp(),
-      createdAtIso,
-      userAgent: navigator.userAgent || ""
-    });
-  } catch (err) {
-    console.warn("audit log failed", {
-      message: err?.message || String(err),
-      code: err?.code || null,
-      uid: auth.currentUser?.uid || currentUid || null,
-      action,
-      entityType
-    });
-  }
-}
-
-function rowAuditSummary(row) {
-  if (!row) return "";
-  const typeLabel = row.type === "income" ? "הכנסה" : row.type === "expense" ? "הוצאה" : "תנועה";
-  const amount = Number(row.amount || 0).toLocaleString("he-IL", { maximumFractionDigits: 2 });
-  return `${typeLabel} ${amount} ₪ ${row.date ? `בתאריך ${row.date}` : ""}${row.desc ? ` - ${row.desc}` : ""}`.trim();
-}
-
 /* ----------------------------------------------------------
    Google Drive receipts
    החליפי את הערך הבא ב-Client ID שקיבלת מ-Google Cloud Console.
@@ -2110,10 +2056,6 @@ onAuthStateChanged(auth, async (user) => {
     if (btnResendVerification) btnResendVerification.hidden = true;
     renderAccountFlags();
     initAppLogic(user.uid);
-    writeAuditLog("כניסה למערכת", "התחברות", {
-      summary: "משתמש התחבר למערכת",
-      email: user.email || ""
-    });
     setTimeout(() => { maybeShowOnboarding(); }, 250);
 
   } catch (err) {
@@ -2863,12 +2805,6 @@ btnSaveProfile.onclick = async () => {
   try {
     const ref = doc(db, "users", currentUid);
     await setDoc(ref, payload, { merge: true });
-    writeAuditLog("נערך פרופיל עסק", "פרופיל", {
-      summary: "עודכנו פרטי העסק/המשתמש",
-      businessName: payload.businessName || "",
-      businessId: payload.businessId || "",
-      businessType: payload.businessType || ""
-    });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
     // אם הפרופיל היה חובה – לאפשר המשך
@@ -3930,14 +3866,6 @@ async function addRow() {
     }
 
     rows.push(row);
-    writeAuditLog("נוצרה תנועה", row.type === "income" ? "הכנסה" : "הוצאה", {
-      entityId: row.id,
-      summary: rowAuditSummary(row),
-      date: row.date,
-      amount: row.amount,
-      category: row.category || "",
-      source: "manual"
-    });
     saveToLocal();
     scheduleCloudSave();
 
@@ -3990,7 +3918,6 @@ function openEdit(id) {
 function saveEdit() {
   const r = rows.find(x => x.id === editingId);
   if (!r) return;
-  const beforeSummary = rowAuditSummary(r);
 
   r.date = eDate.value;
   r.type = eType.value;
@@ -4000,14 +3927,6 @@ function saveEdit() {
   r.incVat = !!eIncVAT.checked;
   r.deductPct = Math.max(0, Math.min(100, parseFloat(eDeduct.value || "100")));
 
-  writeAuditLog("נערכה תנועה", r.type === "income" ? "הכנסה" : "הוצאה", {
-    entityId: r.id,
-    summary: rowAuditSummary(r),
-    beforeSummary,
-    date: r.date,
-    amount: r.amount,
-    category: r.category || ""
-  });
   saveToLocal();
   scheduleCloudSave();
   render();
@@ -4016,17 +3935,7 @@ function saveEdit() {
 
 function deleteRow() {
   if (!confirm("למחוק את התנועה?")) return;
-  const deletedRow = rows.find(x => x.id === editingId);
   rows = rows.filter(x => x.id !== editingId);
-  if (deletedRow) {
-    writeAuditLog("נמחקה תנועה", deletedRow.type === "income" ? "הכנסה" : "הוצאה", {
-      entityId: deletedRow.id,
-      summary: rowAuditSummary(deletedRow),
-      date: deletedRow.date,
-      amount: deletedRow.amount,
-      category: deletedRow.category || ""
-    });
-  }
   saveToLocal();
   scheduleCloudSave();
   render();
@@ -4511,7 +4420,6 @@ function confirmIncomeImport() {
   }
   const kind = getImportKind();
   let imported = 0, skipped = 0;
-  const importedIds = [];
   const existingRows = rows.slice();
   for (const item of selected) {
     if (!item.date || !Number.isFinite(item.amount) || item.amount === 0) { skipped++; continue; }
@@ -4543,19 +4451,7 @@ function confirmIncomeImport() {
     };
     rows.push(newRow);
     existingRows.push(newRow);
-    importedIds.push(newRow.id);
     imported++;
-  }
-  if (imported || skipped) {
-    const label = kind === 'expense' ? 'הוצאות' : 'הכנסות';
-    writeAuditLog("יובאו נתונים", kind === 'expense' ? "ייבוא הוצאות" : "ייבוא הכנסות", {
-      summary: `יובאו ${imported} ${label}${skipped ? `, דולגו ${skipped}` : ''}`,
-      imported,
-      skipped,
-      importKind: kind,
-      source: 'csvImport',
-      importedIds: importedIds.slice(0, 50)
-    });
   }
   saveToLocal();
   scheduleCloudSave();
@@ -4623,14 +4519,6 @@ async function exportJSON() {
       `atzmai-plus-full-backup-${todayStr()}.json`,
       JSON.stringify(backup, null, 2)
     );
-    writeAuditLog("הופק גיבוי", "גיבוי", {
-      summary: "הורדת גיבוי מלא למחשב",
-      rowsCount: backup.ledger.rows.length,
-      customersCount: backup.ledger.customers.length,
-      fixedAssetsCount: backup.ledger.fixedAssets.length,
-      documentDraftsCount: backup.ledger.documentDrafts.length,
-      exportedAt: now
-    });
   } catch (err) {
     console.error("full JSON backup failed", err);
 
@@ -4772,14 +4660,6 @@ async function restoreBackupFromFile(file) {
     }
 
     await setDoc(ledgerRef, finalLedger, { merge: false });
-    writeAuditLog("שוחזר גיבוי", "שחזור", {
-      summary: fullRestore ? "שחזור מלא מגיבוי" : "שחזור חסרים בלבד מגיבוי",
-      mode: fullRestore ? "full_replace" : "merge_missing",
-      rowsCount: Array.isArray(finalLedger.rows) ? finalLedger.rows.length : 0,
-      customersCount: Array.isArray(finalLedger.customers) ? finalLedger.customers.length : 0,
-      fixedAssetsCount: Array.isArray(finalLedger.fixedAssets) ? finalLedger.fixedAssets.length : 0,
-      documentDraftsCount: Array.isArray(finalLedger.documentDrafts) ? finalLedger.documentDrafts.length : 0
-    });
 
     // רענון הזיכרון המקומי והמסך הראשי בלי לגעת בהתחברות
     applyLedgerPayload(finalLedger);
