@@ -478,7 +478,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -547,6 +547,31 @@ function showToast(msg, isError=false){
 }
 
 function clean(value){ return String(value ?? "").trim(); }
+
+function clean(s){ return String(s || "").trim(); }
+
+async function logAudit(action, details = {}){
+  try{
+    if(!currentUser) return;
+    const nowIso = new Date().toISOString();
+    await addDoc(collection(db, "ledgers", currentUser.uid, "auditLogs"), {
+      action,
+      createdAt: serverTimestamp(),
+      createdAtIso: nowIso,
+      entityType: details.entityType || "לקוחות",
+      entityId: details.entityId || null,
+      email: currentUser.email || "",
+      uid: currentUser.uid,
+      details: {
+        ...details,
+        summary: details.summary || action
+      },
+      userAgent: navigator.userAgent || ""
+    });
+  }catch(err){
+    console.warn("Audit log failed", err);
+  }
+}
 
 function customerFromForm(){
   return {
@@ -631,10 +656,24 @@ async function saveCurrentCustomer(){
     return;
   }
   const idx = customers.findIndex(x => x.id === c.id);
+  const wasUpdate = idx >= 0;
+  const previous = wasUpdate ? {...customers[idx]} : null;
   if (idx >= 0) customers[idx] = c;
   else customers.unshift(c);
   selectedId = c.id;
   await saveCustomers();
+  await logAudit(wasUpdate ? "לקוח עודכן" : "לקוח נוצר", {
+    entityType: "לקוח",
+    entityId: c.id,
+    customerId: c.id,
+    customerName: c.name,
+    customerType: c.type,
+    taxId: c.taxId || "",
+    email: c.email || "",
+    phone: c.phone || "",
+    previousName: previous?.name || "",
+    summary: `${wasUpdate ? "עודכן" : "נוצר"} לקוח: ${c.name}`
+  });
   render();
   closeForm();
   showToast("הלקוח נשמר ✅");
@@ -648,6 +687,15 @@ async function deleteCustomer(id){
   customers = customers.filter(x => x.id !== id);
   if (selectedId === id) selectedId = null;
   await saveCustomers();
+  await logAudit("לקוח נמחק", {
+    entityType: "לקוח",
+    entityId: c.id,
+    customerId: c.id,
+    customerName: c.name,
+    customerType: c.type,
+    taxId: c.taxId || "",
+    summary: `נמחק לקוח: ${c.name}`
+  });
   render();
   showToast("הלקוח נמחק");
 }
