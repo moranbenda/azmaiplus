@@ -325,7 +325,7 @@
           <div class="form-grid">
             <div class="full">
               <label>שם לקוח / שם עסק *</label>
-              <input id="cName" required placeholder="לדוגמה: מכללת הבונים" />
+              <input id="cName" required placeholder="שם לקוח / שם עסק" />
             </div>
             <div>
               <label>סוג לקוח</label>
@@ -410,12 +410,11 @@
 
     <section class="card">
       <div class="card-hd">
-        <h3>רשימת לקוחות</h3>
+        <h3>תוצאות חיפוש</h3>
         <div class="status" id="saveStatus">טוען…</div>
       </div>
       <div class="card-bd">
-        <div class="toolbar">
-          <input class="search" id="q" placeholder="חיפוש לפי שם, מייל, טלפון או מספר מזהה…" />
+        <div class="toolbar" style="justify-content:flex-start">
           <button class="btn secondary" id="btnExportCsv">ייצוא CSV</button>
           <button class="btn secondary" id="btnPrint">הדפסת רשימת לקוחות / PDF</button>
         </div>
@@ -639,15 +638,12 @@ function renderStats(){
 
 function getCustomerSearch(){
   const top = $("qTop");
-  const bottom = $("q");
-  return ((top && top.value) || (bottom && bottom.value) || "").trim();
+  return ((top && top.value) || "").trim();
 }
 
 function syncCustomerSearch(value){
-  ["qTop", "q"].forEach(id => {
-    const el = $(id);
-    if (el && el.value !== value) el.value = value;
-  });
+  const el = $("qTop");
+  if (el && el.value !== value) el.value = value;
 }
 
 function render(){
