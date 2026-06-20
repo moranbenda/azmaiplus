@@ -288,6 +288,21 @@
     .docs-history-table tr:last-child td{border-bottom:0}
     .docs-actions{display:flex;flex-direction:row;gap:6px;align-items:center;justify-content:flex-start;min-width:260px;flex-wrap:nowrap}
     .docs-actions .btn{padding:6px 10px;font-size:12px;min-height:auto;white-space:nowrap}
+
+    .customer-card{text-align:right;direction:rtl}
+    .customer-card .name,.customer-card .hint{text-align:right}
+    .customer-card .chips{justify-content:flex-start}
+    .doc-date-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+    .doc-view-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,23,42,.55)}
+    .doc-view-modal.show{display:flex}
+    .doc-view-box{width:min(980px,96vw);height:min(92vh,920px);background:white;border-radius:22px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #dbe3ef;overflow:hidden;display:flex;flex-direction:column;direction:rtl}
+    .doc-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5edf7;background:#f8fafc}
+    .doc-view-title{font-weight:900;color:#0f2748}
+    .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
+    .doc-view-close:hover{background:#eef6ff}
+    .doc-view-frame{border:0;width:100%;height:100%;background:white}
+    @media(max-width:760px){.doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}.docs-history-table{min-width:860px}.docs-actions{min-width:220px}}
+
 </style>
 </head>
 <body>
@@ -444,6 +459,16 @@
   </section>
 </main>
 
+
+<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
+  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
+    <div class="doc-view-head">
+      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
+      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
+    </div>
+    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -753,6 +778,40 @@ function documentHtmlForView(d){
   `;
 }
 
+
+function formatDisplayDate(value){
+  if (!value) return "—";
+  const str = String(value).trim();
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const d = new Date(str);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString("he-IL", { year:"numeric", month:"2-digit", day:"2-digit" });
+  }
+  return str;
+}
+
+function showStoredDocumentModal(html, title){
+  const modal = $("docViewModal");
+  const frame = $("docViewFrame");
+  const titleEl = $("docViewTitle");
+  if (!modal || !frame || !titleEl) return false;
+  titleEl.textContent = title || "צפייה במסמך";
+  frame.srcdoc = html;
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+  return true;
+}
+
+function closeStoredDocumentModal(){
+  const modal = $("docViewModal");
+  const frame = $("docViewFrame");
+  if (!modal || !frame) return;
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+  frame.srcdoc = "";
+}
+
 function openStoredDocument(docId, shouldPrint=false){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
   if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
@@ -762,6 +821,10 @@ function openStoredDocument(docId, shouldPrint=false){
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
     .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
   </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
+  if (!shouldPrint) {
+    const opened = showStoredDocumentModal(html, `${documentDisplayType(d)} ${d.number || ""}`.trim());
+    if (opened) return;
+  }
   const w = window.open("", "_blank");
   if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
   const htmlToWrite = shouldPrint ? html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`) : html;
@@ -810,7 +873,7 @@ function renderSelected(){
         <tbody>
           ${docs.map(d => `
             <tr>
-              <td>${escapeHtml(d.date || "—")}</td>
+              <td><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
               <td><b>${escapeHtml(d.number || "—")}</b></td>
               <td>${escapeHtml(documentDisplayType(d))}</td>
               <td>${money(Number(d.net ?? d.subtotal ?? documentDisplayTotal(d)))}</td>
@@ -884,7 +947,7 @@ function printCustomerLedger(id){
   const docs = Array.isArray(c.documents) ? c.documents : [];
   const rows = docs.map(d => `
     <tr>
-      <td>${escapeHtml(d.date || "")}</td>
+      <td><span style="direction:ltr;unicode-bidi:isolate">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
       <td>${escapeHtml(d.type || "מסמך")}</td>
       <td>${escapeHtml(d.number || "")}</td>
       <td>${Number(d.debit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
@@ -1036,6 +1099,13 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   await loadData();
 });
+
+
+const __docCloseBtn = $("docViewClose");
+if (__docCloseBtn) __docCloseBtn.addEventListener("click", closeStoredDocumentModal);
+const __docModal = $("docViewModal");
+if (__docModal) __docModal.addEventListener("click", (ev) => { if (ev.target === __docModal) closeStoredDocumentModal(); });
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeStoredDocumentModal(); });
 </script>
 </body>
 </html>
