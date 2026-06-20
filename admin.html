@@ -76,7 +76,7 @@ import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signI
 import { getFirestore, collection, collectionGroup, getDocs, query, limit } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authDomain:"freelance-accounting-6c3bb.firebaseapp.com", projectId:"freelance-accounting-6c3bb", storageBucket:"freelance-accounting-6c3bb.firebasestorage.app", messagingSenderId:"196974556694", appId:"1:196974556694:web:60ba710567f2a7c67c6737" };
-const ADMIN_EMAILS = ["moranbenda@gmail.com","moranbdcoil@gmail.com","azmaiplusapp@gmail.com"].map(x=>x.toLowerCase());
+const ADMIN_EMAILS = ["moranbenda@gmail.com"].map(x=>x.toLowerCase());
 const app = initializeApp(firebaseConfig); const auth=getAuth(app); const db=getFirestore(app);
 const $=id=>document.getElementById(id); let users=[],ledgers=[],audit=[],leads=[];
 function esc(v){return String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]))}
@@ -100,7 +100,19 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelect
 async function loadAll(){ $('btnRefresh').disabled=true; try{ await Promise.all([loadUsers(),loadLedgers(),loadAudit(),loadLeads()]); renderAll(); }catch(e){ console.error(e); alert('שגיאה בטעינת פורטל מנהל: '+e.message); } finally{$('btnRefresh').disabled=false;} }
 async function loadUsers(){ const s=await getDocs(collection(db,'users')); users=s.docs.map(d=>({uid:d.id,...d.data()})); }
 async function loadLedgers(){ const s=await getDocs(collection(db,'ledgers')); ledgers=s.docs.map(d=>({uid:d.id,...d.data()})); }
-async function loadAudit(){ try{ const s=await getDocs(query(collectionGroup(db,'auditLogs'),limit(500))); audit=s.docs.map(d=>({id:d.id,path:d.ref.path,...d.data()})); audit.sort((a,b)=>String(b.createdAtIso||b.createdAt||'').localeCompare(String(a.createdAtIso||a.createdAt||''))); }catch(e){ console.warn(e); audit=[]; } }
+async function loadAudit(){
+  const all=[];
+  for (const groupName of ['auditLogs','audit_logs']) {
+    try{
+      const s=await getDocs(query(collectionGroup(db, groupName),limit(500)));
+      all.push(...s.docs.map(d=>({id:d.id,path:d.ref.path,sourceCollection:groupName,...d.data()})));
+    }catch(e){
+      console.warn('Audit load failed for', groupName, e);
+    }
+  }
+  audit=all;
+  audit.sort((a,b)=>String(b.createdAtIso||b.createdAt||'').localeCompare(String(a.createdAtIso||a.createdAt||'')));
+}
 async function loadLeads(){ try{ const s=await getDocs(query(collection(db,'leads'),limit(200))); leads=s.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ leads=[]; } }
 function renderAll(){ renderDashboard(); renderUsers(); renderAudit(); renderLeads(); }
 function renderDashboard(){ const totalCustomers=ledgers.reduce((n,l)=>n+(Array.isArray(l.customers)?l.customers.length:0),0); const totalDocs=ledgers.reduce((n,l)=>n+(Array.isArray(l.documents)?l.documents.length:0),0); $('statUsers').textContent=users.length||ledgers.length; $('statCustomers').textContent=totalCustomers; $('statDocuments').textContent=totalDocs; $('statAudit').textContent=audit.length; $('recentAudit').innerHTML=renderAuditTable(audit.slice(0,8),false); }
