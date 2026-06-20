@@ -288,6 +288,7 @@
     .docs-history-table tr:last-child td{border-bottom:0}
     .docs-actions{display:flex;flex-direction:row;gap:6px;align-items:center;justify-content:flex-start;min-width:260px;flex-wrap:nowrap}
     .docs-actions .btn{padding:6px 10px;font-size:12px;min-height:auto;white-space:nowrap}
+    .docs-mobile-title{display:none}
 
     .customer-card{text-align:right;direction:rtl}
     .customer-card .name,.customer-card .hint{text-align:right}
@@ -301,7 +302,20 @@
     .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
     .doc-view-close:hover{background:#eef6ff}
     .doc-view-frame{border:0;width:100%;height:100%;background:white}
-    @media(max-width:760px){.doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}.docs-history-table{min-width:860px}.docs-actions{min-width:220px}}
+    @media(max-width:760px){
+      .doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}
+      .docs-history-table-wrap{overflow-x:visible;border:0;background:transparent}
+      .docs-history-table{min-width:0;width:100%;border-collapse:separate;border-spacing:0 10px}
+      .docs-history-table thead{display:none}
+      .docs-history-table tbody,.docs-history-table tr,.docs-history-table td{display:block;width:100%}
+      .docs-history-table tr{background:white;border:1px solid #dbe3ef;border-radius:16px;padding:10px 12px;box-shadow:0 10px 24px rgba(15,39,72,.06)}
+      .docs-history-table td{border-bottom:1px solid #eef3f8;padding:7px 0;text-align:right;display:flex;align-items:center;justify-content:space-between;gap:12px}
+      .docs-history-table td:last-child{border-bottom:0;display:block;padding-top:10px}
+      .docs-history-table td::before{content:attr(data-label);font-size:12px;font-weight:800;color:#64748b;white-space:nowrap}
+      .docs-history-table td:last-child::before{display:none}
+      .docs-actions{min-width:0;width:100%;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+      .docs-actions .btn{width:100%;padding:8px 6px;font-size:12px}
+    }
 
 </style>
 </head>
@@ -900,13 +914,13 @@ function renderSelected(){
         <tbody>
           ${docs.map(d => `
             <tr>
-              <td><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
-              <td><b>${escapeHtml(d.number || "—")}</b></td>
-              <td>${escapeHtml(documentDisplayType(d))}</td>
-              <td>${money(Number(d.net ?? d.subtotal ?? documentDisplayTotal(d)))}</td>
-              <td><b>${money(documentDisplayTotal(d))}</b></td>
-              <td>${escapeHtml(d.allocationNumber || "—")}</td>
-              <td>
+              <td data-label="תאריך"><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
+              <td data-label="מספר מסמך"><b>${escapeHtml(d.number || "—")}</b></td>
+              <td data-label="סוג מסמך">${escapeHtml(documentDisplayType(d))}</td>
+              <td data-label="סכום">${money(Number(d.net ?? d.subtotal ?? documentDisplayTotal(d)))}</td>
+              <td data-label="סכום כולל מע״מ"><b>${money(documentDisplayTotal(d))}</b></td>
+              <td data-label="מספר הקצאה">${escapeHtml(d.allocationNumber || "—")}</td>
+              <td data-label="פעולות">
                 <div class="docs-actions">
                   <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
                   <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
