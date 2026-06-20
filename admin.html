@@ -18,7 +18,8 @@
     .login{max-width:440px;margin:9vh auto;background:white;border:1px solid var(--line);border-radius:26px;padding:26px;box-shadow:0 22px 50px rgba(9,37,83,.09);text-align:center}.login h1{margin-top:0}.login .btn{width:100%;margin-top:12px}.notice{background:#fff7ed;border:1px solid #fed7aa;color:#9a3412;border-radius:16px;padding:12px;margin-top:12px;text-align:right}
     .small{font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap}.badge{display:inline-flex;border-radius:999px;border:1px solid var(--line);padding:5px 9px;background:#fff;font-size:12px}.badge.green{border-color:#bbf7d0;background:#f0fdf4;color:#166534}.badge.red{border-color:#fecaca;background:#fef2f2;color:#991b1b}.badge.amber{border-color:#fde68a;background:#fffbeb;color:#92400e}
     @media(max-width:850px){.cards{grid-template-columns:repeat(2,1fr)}.filters{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}table{display:block;overflow:auto;white-space:nowrap}.wrap{padding:12px}.card{border-radius:18px}}
-  </style>
+  @media(max-width:900px){.grid[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}.cards{grid-template-columns:1fr 1fr!important}}
+</style>
 </head>
 <body>
   <header id="appHeader" class="hidden"><div class="wrap top"><div class="brand"><div class="logo">A+</div><div>פורטל מנהל</div></div><div class="actions"><span id="adminEmail" class="pill"></span><button id="btnRefresh" class="btn secondary">רענון</button><button id="btnSignOut" class="btn danger">יציאה</button></div></div></header>
@@ -48,12 +49,15 @@
 
       <section id="dashboard" class="tabPane">
         <div class="grid cards">
-          <div class="card stat"><div class="label">משתמשים</div><div id="statUsers" class="num">0</div></div>
-          <div class="card stat"><div class="label">לקוחות</div><div id="statCustomers" class="num">0</div></div>
-          <div class="card stat"><div class="label">מסמכים</div><div id="statDocuments" class="num">0</div></div>
-          <div class="card stat"><div class="label">פעולות Audit</div><div id="statAudit" class="num">0</div></div>
+          <div class="card stat"><div class="label">משתמשים</div><div id="statUsers" class="num">0</div><div id="statUsersSub" class="small muted"></div></div>
+          <div class="card stat"><div class="label">לקוחות</div><div id="statCustomers" class="num">0</div><div id="statCustomersSub" class="small muted"></div></div>
+          <div class="card stat"><div class="label">מסמכים</div><div id="statDocuments" class="num">0</div><div id="statDocumentsSub" class="small muted"></div></div>
+          <div class="card stat"><div class="label">פעולות Audit</div><div id="statAudit" class="num">0</div><div id="statAuditSub" class="small muted"></div></div>
         </div>
-        <div class="card" style="margin-top:16px"><h2>פעולות אחרונות</h2><div id="recentAudit"></div></div>
+        <div class="grid" style="grid-template-columns:1fr 1fr; margin-top:16px">
+          <div class="card"><h2>סטטוס משתמשים</h2><div id="statusBreakdown"></div></div>
+          <div class="card"><h2>פעילות אחרונה</h2><div id="recentAudit"></div></div>
+        </div>
       </section>
 
       <section id="users" class="tabPane hidden">
@@ -82,8 +86,19 @@ const $=id=>document.getElementById(id); let users=[],ledgers=[],audit=[],leads=
 function esc(v){return String(v??'').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]))}
 function fmtDate(v){ if(!v)return '—'; const d = v?.toDate ? v.toDate() : new Date(v); if(isNaN(d)) return esc(v); return d.toLocaleString('he-IL'); }
 function money(n){return Number(n||0).toLocaleString('he-IL',{style:'currency',currency:'ILS'});}
-function trialStatus(u,l){ const status=u.subscriptionStatus||u.status||l.subscriptionStatus||''; if(status) return status; if(u.isPaid||l.isPaid) return 'active'; const created=u.createdAt||l.createdAt; if(!created) return 'unknown'; const d=new Date(created); const days=Math.floor((Date.now()-d.getTime())/86400000); return days<=14?'trial':'readonly'; }
-function badgeStatus(s){ const label={trial:'ניסיון',active:'פעיל',readonly:'קריאה בלבד',payment_failed:'כשל תשלום',unknown:'לא ידוע'}[s]||s; const cls=s==='active'?'green':s==='payment_failed'||s==='readonly'?'red':s==='trial'?'amber':''; return `<span class="badge ${cls}">${esc(label)}</span>`; }
+const MANUAL_ALLOWED_EMAILS=['moranbdcoil@gmail.com','moranbenda@gmail.com'];
+function trialStatus(u,l){
+  const email=String(u.email||l.email||'').toLowerCase();
+  if (MANUAL_ALLOWED_EMAILS.includes(email) || u.isExemptFromBilling || l.isExemptFromBilling) return 'manual_allowed';
+  const status=u.subscriptionStatus||u.status||l.subscriptionStatus||''; if(status) return status;
+  if(u.isPaid||l.isPaid) return 'active';
+  const created=u.createdAt||l.createdAt||u.createdAtIso||l.createdAtIso;
+  if(!created) return 'unknown';
+  const d=created?.toDate ? created.toDate() : new Date(created);
+  if(isNaN(d)) return 'unknown';
+  const days=Math.floor((Date.now()-d.getTime())/86400000); return days<=14?'trial':'readonly';
+}
+function badgeStatus(s){ const label={trial:'ניסיון',active:'פעיל',manual_allowed:'מורשה ידני',readonly:'קריאה בלבד',payment_failed:'כשל תשלום',unknown:'לא ידוע'}[s]||s; const cls=s==='active'||s==='manual_allowed'?'green':s==='payment_failed'||s==='readonly'?'red':s==='trial'?'amber':''; return `<span class="badge ${cls}">${esc(label)}</span>`; }
 function showError(msg){ $('loginError').textContent=msg; $('loginError').classList.remove('hidden'); }
 function showApp(user){ $('loginBox').classList.add('hidden'); $('appHeader').classList.remove('hidden'); $('app').classList.remove('hidden'); $('adminEmail').textContent=user.email||''; loadAll(); }
 function block(){ $('loginBox').classList.remove('hidden'); $('appHeader').classList.add('hidden'); $('app').classList.add('hidden'); showError('אין הרשאת מנהל למייל הזה.'); }
@@ -97,26 +112,83 @@ onAuthStateChanged(auth,u=>{ if(!u){$('loginBox').classList.remove('hidden');$('
 
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');document.querySelectorAll('.tabPane').forEach(p=>p.classList.add('hidden'));$(b.dataset.tab).classList.remove('hidden');});
 
-async function loadAll(){ $('btnRefresh').disabled=true; try{ await Promise.all([loadUsers(),loadLedgers(),loadAudit(),loadLeads()]); renderAll(); }catch(e){ console.error(e); alert('שגיאה בטעינת פורטל מנהל: '+e.message); } finally{$('btnRefresh').disabled=false;} }
+async function loadAll(){ $('btnRefresh').disabled=true; try{ await Promise.all([loadUsers(),loadLedgers(),loadLeads()]); await loadAudit(); renderAll(); }catch(e){ console.error(e); alert('שגיאה בטעינת פורטל מנהל: '+e.message); } finally{$('btnRefresh').disabled=false;} }
 async function loadUsers(){ const s=await getDocs(collection(db,'users')); users=s.docs.map(d=>({uid:d.id,...d.data()})); }
 async function loadLedgers(){ const s=await getDocs(collection(db,'ledgers')); ledgers=s.docs.map(d=>({uid:d.id,...d.data()})); }
 async function loadAudit(){
   const all=[];
+
+  // קודם מנסים collectionGroup. אם אין אינדקס/הרשאה מתאימה, עוברים לקריאה ישירה לפי כל ledger.
   for (const groupName of ['auditLogs','audit_logs']) {
     try{
-      const s=await getDocs(query(collectionGroup(db, groupName),limit(500)));
-      all.push(...s.docs.map(d=>({id:d.id,path:d.ref.path,sourceCollection:groupName,...d.data()})));
+      const s=await getDocs(query(collectionGroup(db, groupName),limit(800)));
+      all.push(...s.docs.map(d=>normalizeAudit(d, groupName)));
     }catch(e){
-      console.warn('Audit load failed for', groupName, e);
+      console.warn('Audit collectionGroup failed for', groupName, e);
     }
   }
-  audit=all;
-  audit.sort((a,b)=>String(b.createdAtIso||b.createdAt||'').localeCompare(String(a.createdAtIso||a.createdAt||'')));
+
+  // גיבוי בטוח: קריאה ישירה מתוך כל משתמש. זה פותר מצב שבו collectionGroup מחזיר 0/נכשל.
+  if (!all.length && ledgers.length) {
+    for (const l of ledgers) {
+      for (const groupName of ['auditLogs','audit_logs']) {
+        try{
+          const s=await getDocs(query(collection(db,'ledgers',l.uid,groupName),limit(250)));
+          all.push(...s.docs.map(d=>normalizeAudit(d, groupName, l.uid)));
+        }catch(e){
+          console.warn('Direct audit load failed for', l.uid, groupName, e);
+        }
+      }
+    }
+  }
+
+  const seen=new Set();
+  audit=all.filter(a=>{ const key=a.path||`${a.uid}:${a.id}`; if(seen.has(key)) return false; seen.add(key); return true; });
+  audit.sort((a,b)=>auditTime(b)-auditTime(a));
 }
+function normalizeAudit(d, groupName, forcedUid=''){
+  const data=d.data();
+  const parts=d.ref.path.split('/');
+  const uid=forcedUid || parts[1] || data.uid || '';
+  return {id:d.id,path:d.ref.path,sourceCollection:groupName,uid,...data,email:data.email||data.details?.email||findEmailByUid(uid)};
+}
+function auditTime(a){
+  const v=a?.createdAtIso||a?.createdAt||a?.timestamp||a?.date;
+  if(!v) return 0;
+  const d=v?.toDate ? v.toDate() : new Date(v);
+  return isNaN(d)?0:d.getTime();
+}
+function findEmailByUid(uid){ const u=users.find(x=>x.uid===uid)||{}; const l=ledgers.find(x=>x.uid===uid)||{}; return u.email||l.email||''; }
 async function loadLeads(){ try{ const s=await getDocs(query(collection(db,'leads'),limit(200))); leads=s.docs.map(d=>({id:d.id,...d.data()})); }catch(e){ leads=[]; } }
 function renderAll(){ renderDashboard(); renderUsers(); renderAudit(); renderLeads(); }
-function renderDashboard(){ const totalCustomers=ledgers.reduce((n,l)=>n+(Array.isArray(l.customers)?l.customers.length:0),0); const totalDocs=ledgers.reduce((n,l)=>n+(Array.isArray(l.documents)?l.documents.length:0),0); $('statUsers').textContent=users.length||ledgers.length; $('statCustomers').textContent=totalCustomers; $('statDocuments').textContent=totalDocs; $('statAudit').textContent=audit.length; $('recentAudit').innerHTML=renderAuditTable(audit.slice(0,8),false); }
-function renderUsers(){ const q=($('userSearch').value||'').toLowerCase(); const sf=$('statusFilter').value; const rows=ledgers.map(l=>{ const u=users.find(x=>x.uid===l.uid)||{}; return {uid:l.uid,u,l,status:trialStatus(u,l),customers:Array.isArray(l.customers)?l.customers.length:0,documents:Array.isArray(l.documents)?l.documents.length:0,rows:Array.isArray(l.rows)?l.rows.length:0}; }).filter(r=>{ const txt=[r.uid,r.u.email,r.u.businessName,r.l.businessName,r.u.displayName].join(' ').toLowerCase(); return (!q||txt.includes(q))&&(!sf||r.status===sf); }); if(!rows.length){$('usersTable').innerHTML='<div class="empty">אין משתמשים להצגה.</div>';return;} $('usersTable').innerHTML=`<table><thead><tr><th>משתמש</th><th>עסק</th><th>סטטוס</th><th>לקוחות</th><th>מסמכים</th><th>תנועות</th><th>נוצר</th><th>UID</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.u.email||r.l.email||'—')}</td><td>${esc(r.u.businessName||r.l.businessName||'—')}</td><td>${badgeStatus(r.status)}</td><td>${r.customers}</td><td>${r.documents}</td><td>${r.rows}</td><td>${fmtDate(r.u.createdAt||r.l.createdAt)}</td><td class="ltr small">${esc(r.uid)}</td></tr>`).join('')}</tbody></table>`; }
+function getUserRows(){
+  const ids=[...new Set([...users.map(u=>u.uid),...ledgers.map(l=>l.uid)])].filter(Boolean);
+  return ids.map(uid=>{ const u=users.find(x=>x.uid===uid)||{}; const l=ledgers.find(x=>x.uid===uid)||{}; return {uid,u,l,email:u.email||l.email||'',business:u.businessName||l.businessName||u.displayName||'',status:trialStatus(u,l),customers:Array.isArray(l.customers)?l.customers.length:0,documents:Array.isArray(l.documents)?l.documents.length:0,rows:Array.isArray(l.rows)?l.rows.length:0,lastActivity:lastActivityForUid(uid)}; });
+}
+function lastActivityForUid(uid){ const items=audit.filter(a=>a.uid===uid); return items.length ? items[0] : null; }
+function isToday(v){ const t=auditTime({createdAtIso:v,createdAt:v}); if(!t)return false; const d=new Date(t), n=new Date(); return d.getFullYear()===n.getFullYear()&&d.getMonth()===n.getMonth()&&d.getDate()===n.getDate(); }
+function renderDashboard(){
+  const rows=getUserRows();
+  const totalCustomers=rows.reduce((n,r)=>n+r.customers,0);
+  const totalDocs=rows.reduce((n,r)=>n+r.documents,0);
+  const active=rows.filter(r=>r.status==='active'||r.status==='manual_allowed').length;
+  const trial=rows.filter(r=>r.status==='trial').length;
+  const readonly=rows.filter(r=>r.status==='readonly').length;
+  const docsToday=ledgers.reduce((n,l)=>n+(Array.isArray(l.documents)?l.documents.filter(d=>isToday(d.createdAt||d.date||d.issueDate)).length:0),0);
+  const auditToday=audit.filter(a=>isToday(a.createdAtIso||a.createdAt)).length;
+  $('statUsers').textContent=rows.length;
+  $('statUsersSub').textContent=`פעילים/מורשים: ${active} · ניסיון: ${trial} · קריאה בלבד: ${readonly}`;
+  $('statCustomers').textContent=totalCustomers;
+  $('statCustomersSub').textContent='סה״כ לקוחות בכל החשבונות';
+  $('statDocuments').textContent=totalDocs;
+  $('statDocumentsSub').textContent=`הופקו היום: ${docsToday}`;
+  $('statAudit').textContent=audit.length;
+  $('statAuditSub').textContent=`פעולות היום: ${auditToday}`;
+  const statusCounts=rows.reduce((m,r)=>(m[r.status]=(m[r.status]||0)+1,m),{});
+  $('statusBreakdown').innerHTML=`<div class="grid" style="gap:10px">${Object.entries(statusCounts).map(([s,n])=>`<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0"><span>${badgeStatus(s)}</span><b>${n}</b></div>`).join('')||'<div class="empty">אין נתונים.</div>'}</div>`;
+  $('recentAudit').innerHTML=renderAuditTable(audit.slice(0,8),false);
+}
+function renderUsers(){ const q=($('userSearch').value||'').toLowerCase(); const sf=$('statusFilter').value; const rows=getUserRows().filter(r=>{ const txt=[r.uid,r.email,r.business,r.u.displayName].join(' ').toLowerCase(); return (!q||txt.includes(q))&&(!sf||r.status===sf); }); if(!rows.length){$('usersTable').innerHTML='<div class="empty">אין משתמשים להצגה.</div>';return;} $('usersTable').innerHTML=`<table><thead><tr><th>משתמש</th><th>עסק</th><th>סטטוס</th><th>לקוחות</th><th>מסמכים</th><th>תנועות</th><th>פעילות אחרונה</th><th>UID</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.email||'—')}</td><td>${esc(r.business||'—')}</td><td>${badgeStatus(r.status)}</td><td>${r.customers}</td><td>${r.documents}</td><td>${r.rows}</td><td>${r.lastActivity?`${fmtDate(r.lastActivity.createdAtIso||r.lastActivity.createdAt)}<br><span class="small muted">${esc(r.lastActivity.action||'')}</span>`:'—'}</td><td class="ltr small">${esc(r.uid)}</td></tr>`).join('')}</tbody></table>`; }
 $('btnUsersFilter').onclick=renderUsers; $('userSearch').oninput=renderUsers; $('statusFilter').onchange=renderUsers;
 function renderAudit(){ const actions=[...new Set(audit.map(a=>a.action).filter(Boolean))].sort(); $('auditType').innerHTML='<option value="">כל הפעולות</option>'+actions.map(a=>`<option value="${esc(a)}">${esc(a)}</option>`).join(''); $('btnAuditFilter').onclick=applyAudit; $('auditSearch').oninput=applyAudit; $('auditEmail').oninput=applyAudit; $('auditType').onchange=applyAudit; applyAudit(); }
 function applyAudit(){ const q=($('auditSearch').value||'').toLowerCase(); const email=($('auditEmail').value||'').toLowerCase(); const type=$('auditType').value; const rows=audit.filter(a=>{ const txt=[a.action,a.email,a.summary,a.entityType,a.entityId,JSON.stringify(a.details||{})].join(' ').toLowerCase(); return (!q||txt.includes(q))&&(!email||String(a.email||'').toLowerCase().includes(email))&&(!type||a.action===type); }); $('auditTable').innerHTML=renderAuditTable(rows,true); }
