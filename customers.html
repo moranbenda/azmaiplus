@@ -391,7 +391,7 @@
             <div class="full">
               <label class="chip" style="display:inline-flex;align-items:center;gap:8px;width:auto">
                 <input type="checkbox" id="cAutoSend" style="width:auto" />
-                לשלוח מסמכים אוטומטית למייל כשהמודול יהיה פעיל
+                שליחת מסמכים אוטומטית למייל הלקוח
               </label>
             </div>
             <div class="full">
@@ -656,6 +656,12 @@ function render(){
   const filtered = customers.filter(c => customerMatches(c, q));
   const list = $("customersList");
 
+  if (!q) {
+    list.innerHTML = `<div class="empty">הקלידו שם, מייל, טלפון או מספר מזהה כדי להציג לקוחות.</div>`;
+    renderSelected();
+    return;
+  }
+
   if (!filtered.length) {
     list.innerHTML = `<div class="empty">${customers.length ? "לא נמצאו לקוחות בחיפוש." : "עדיין אין לקוחות. לחצו על הוספת לקוח חדש כדי להתחיל."}</div>`;
     renderSelected();
@@ -721,7 +727,7 @@ function renderSelected(){
         <div><div class="k">זיכוי</div><div>${Number(d.credit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</div></div>
         <div><div class="k">יתרה</div><div>${Number(d.balance || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</div></div>
       </div>
-    </div>`).join("") : `<div class="empty">עדיין אין מסמכים ללקוח. הכרטסת תתמלא אוטומטית כשמודול המסמכים יהיה פעיל.</div>`;
+    </div>`).join("") : `<div class="empty">עדיין אין מסמכים ללקוח.</div>`;
 
   body.innerHTML = `
     <div class="customer-card">
@@ -730,7 +736,7 @@ function renderSelected(){
       <div class="chips">
         ${c.email ? `<span class="chip ok">מייל: ${escapeHtml(c.email)}</span>` : `<span class="chip">אין מייל</span>`}
         ${c.phone ? `<span class="chip">טלפון: ${escapeHtml(c.phone)}</span>` : `<span class="chip">אין טלפון</span>`}
-        ${c.autoSendDocuments ? `<span class="chip ok">שליחה אוטומטית בהמשך</span>` : ``}
+        ${c.autoSendDocuments ? `<span class="chip ok">שליחה אוטומטית פעילה</span>` : ``}
       </div>
     </div>
     <div class="split">
