@@ -743,6 +743,40 @@ header.app-header{
   #tbody tr:not(.open) td:last-child{padding-top:5px;padding-bottom:7px}
 }
 
+
+
+/* חסימת חשבון לאחר תום תקופת ניסיון: הנתונים נשמרים, השימוש נעצר עד חידוש מנוי */
+body.account-frozen main#app{
+  pointer-events:none;
+  user-select:none;
+  opacity:.28;
+  filter:grayscale(.25);
+}
+.billing-freeze-overlay[hidden]{display:none!important}
+.billing-freeze-overlay{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(15,23,42,.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.billing-freeze-card{
+  width:min(620px,96vw);
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:24px;
+  box-shadow:0 30px 80px rgba(15,23,42,.28);
+  padding:26px;
+  text-align:right;
+}
+.billing-freeze-card h2{margin:0 0 10px;font-size:24px;color:var(--text)}
+.billing-freeze-card p{margin:8px 0;color:var(--muted);line-height:1.7}
+.billing-freeze-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:18px}
+.billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:14px;color:var(--muted);font-size:14px}
+
 </style>
 </head>
 <body>
@@ -829,6 +863,21 @@ header.app-header{
       </div>
     </div>
   </header>
+
+  <div id="billingFreezeOverlay" class="billing-freeze-overlay" hidden>
+    <div class="billing-freeze-card" role="dialog" aria-modal="true" aria-labelledby="billingFreezeTitle">
+      <h2 id="billingFreezeTitle">תקופת הניסיון הסתיימה</h2>
+      <p id="billingFreezeText">אפשר להתחבר לחשבון ולחדש מנוי, אך לא ניתן להשתמש במערכת עד להפעלת מנוי.</p>
+      <div class="billing-freeze-note">
+        הנתונים שנשמרו במערכת לא נמחקים. לאחר חידוש המנוי, החשבון יחזור לפעילות מלאה עם הנתונים הקיימים.
+      </div>
+      <div class="billing-freeze-actions">
+        <button class="btn" type="button" id="btnBillingRenew">פנייה לחידוש מנוי</button>
+        <button class="btn secondary" type="button" id="btnBillingProfile">צפייה בפרופיל</button>
+        <button class="btn secondary" type="button" id="btnBillingLogout">התנתקות</button>
+      </div>
+    </div>
+  </div>
 
   <main class="wrap" id="app">
 
@@ -1572,6 +1621,12 @@ const businessHint = document.getElementById("businessHint");
 const userEmailTag = document.getElementById("userEmailTag");
 const accountFlags = document.getElementById("accountFlags");
 
+const billingFreezeOverlay = document.getElementById("billingFreezeOverlay");
+const billingFreezeText = document.getElementById("billingFreezeText");
+const btnBillingRenew = document.getElementById("btnBillingRenew");
+const btnBillingProfile = document.getElementById("btnBillingProfile");
+const btnBillingLogout = document.getElementById("btnBillingLogout");
+
 /* כפתור קטגוריות */
 const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
 const categoriesDialog = document.getElementById("categoriesDialog");
@@ -1804,7 +1859,7 @@ function maybeShowOnboarding() {
 
 
 function computeAccessState(profile, user) {
-  const state = { blocked: false, reason: "", flags: [] };
+  const state = { blocked: false, reason: "", kind: "", flags: [] };
   if (!profile) return state;
 
   if (profile.requireEmailVerification === true) {
@@ -1831,7 +1886,8 @@ function computeAccessState(profile, user) {
     const daysLeft = daysBetweenCeil(new Date().toISOString(), profile.trialEndsAt);
     if (daysLeft <= 0) {
       state.blocked = true;
-      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. כדי להמשיך להשתמש במערכת צריך להפעיל מנוי.";
+      state.kind = "trial_expired";
+      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. אפשר להתחבר לחשבון, אך השימוש במערכת ייפתח רק לאחר חידוש מנוי.";
       return state;
     }
     state.flags.push({ text: `ניסיון: ${daysLeft} ימים`, cls: "warn" });
@@ -1839,6 +1895,44 @@ function computeAccessState(profile, user) {
 
   return state;
 }
+
+
+
+function showBillingFreezeOverlay(reason = "") {
+  document.body.classList.add("account-frozen");
+  if (billingFreezeText) {
+    billingFreezeText.textContent = reason || "אפשר להתחבר לחשבון ולחדש מנוי, אך לא ניתן להשתמש במערכת עד להפעלת מנוי.";
+  }
+  if (billingFreezeOverlay) billingFreezeOverlay.hidden = false;
+}
+
+function hideBillingFreezeOverlay() {
+  document.body.classList.remove("account-frozen");
+  if (billingFreezeOverlay) billingFreezeOverlay.hidden = true;
+}
+
+btnBillingLogout?.addEventListener("click", async () => {
+  try { await signOut(auth); }
+  catch (err) { console.error("Billing logout error:", err); }
+});
+
+btnBillingProfile?.addEventListener("click", () => {
+  profileDialog?.showModal();
+});
+
+btnBillingRenew?.addEventListener("click", () => {
+  const email = auth.currentUser?.email || userProfile?.email || "";
+  const bizName = userProfile?.businessName || userProfile?.displayName || "";
+  const subject = encodeURIComponent("חידוש מנוי לעצמאי פלוס");
+  const body = encodeURIComponent(`שלום,
+אבקש לחדש מנוי לעצמאי פלוס.
+
+אימייל משתמש: ${email}
+שם עסק: ${bizName}
+
+תודה`);
+  window.location.href = `mailto:moranbenda@gmail.com?subject=${subject}&body=${body}`;
+});
 
 function renderAccountFlags() {
   if (!accountFlags) return;
@@ -2025,6 +2119,7 @@ document.body.classList.remove("logged-in");
 onAuthStateChanged(auth, async (user) => {
   try {
     if (!user) {
+      hideBillingFreezeOverlay();
       document.body.classList.remove("logged-in");
       clearPendingSaves();
       currentUid = null;
@@ -2044,6 +2139,16 @@ onAuthStateChanged(auth, async (user) => {
     const accessState = computeAccessState(userProfile, user);
 
     if (accessState.blocked) {
+      if (accessState.kind === "trial_expired") {
+        setAuthInfo("");
+        if (btnResendVerification) btnResendVerification.hidden = true;
+        renderAccountFlags();
+        initAppLogic(user.uid);
+        setTimeout(() => { showBillingFreezeOverlay(accessState.reason); }, 250);
+        return;
+      }
+
+      hideBillingFreezeOverlay();
       document.body.classList.remove("logged-in");
       authPassword.value = "";
       authError.textContent = "";
@@ -2052,6 +2157,7 @@ onAuthStateChanged(auth, async (user) => {
       return;
     }
 
+    hideBillingFreezeOverlay();
     setAuthInfo("");
     if (btnResendVerification) btnResendVerification.hidden = true;
     renderAccountFlags();
