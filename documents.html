@@ -312,6 +312,10 @@ function documentLedgerEntry(finalDoc){
     debit: finalDoc.gross || 0,
     credit: 0,
     balance: finalDoc.gross || 0,
+    net: finalDoc.net || 0,
+    vat: finalDoc.vat || 0,
+    gross: finalDoc.gross || 0,
+    allocationNumber: finalDoc.allocationNumber || '',
     status: 'issued',
     createdAt: finalDoc.createdAt
   };
@@ -357,6 +361,13 @@ function buildFinalDocument(){
     createdAt: new Date().toISOString()
   };
 }
+function printableDocumentHtml(content){
+  return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>מסמך - עצמאי פלוס</title>
+  <style>
+    body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
+    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
+  </style></head><body>${content}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
+}
 async function issueDocument(){
   const c=getSelectedCustomer();
   if(!c){
@@ -379,6 +390,7 @@ async function issueDocument(){
   previewFinal=true;
   renderPreview();
   finalDoc.previewHtml = $('docPreview')?.innerHTML || '';
+  finalDoc.printHtml = printableDocumentHtml(finalDoc.previewHtml);
   finalDoc.printFooter = 'הופק על ידי מערכת עצמאי פלוס';
   finalDoc.customerSearchKey = [finalDoc.customerName, finalDoc.customerSnapshot?.taxId, finalDoc.customerSnapshot?.email, finalDoc.customerSnapshot?.phone].filter(Boolean).join(' ').toLowerCase();
   const existingDocuments=Array.isArray(ledger.documents) ? ledger.documents : [];
@@ -423,11 +435,7 @@ function printPreviewOnly(){
   renderPreview();
   const content=$('docPreview')?.innerHTML || '';
   if(!content.trim()) return setStatus($('draftStatus'),'אין מסמך להצגה/הדפסה','err');
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>מסמך - עצמאי פלוס</title>
-  <style>
-    body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
-    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{margin-top:20px;text-align:center;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:14px;padding:12px}@page{size:A4 portrait;margin:14mm}
-  </style></head><body>${content}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body></html>`;
+  const html = printableDocumentHtml(content).replace('</body>', `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
   const w=window.open('', '_blank');
   if(!w) return setStatus($('draftStatus'),'הדפדפן חסם את חלון ההדפסה','err');
   w.document.open(); w.document.write(html); w.document.close();
