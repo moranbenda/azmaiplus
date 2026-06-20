@@ -1617,6 +1617,85 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
 /* ----------------------------------------------------------
+   Audit Log – יומן פעולות בסיסי
+   נשמר כתת־קולקשן: ledgers/{uid}/audit_logs
+   הכישלון בכתיבת לוג לא חוסם את האפליקציה ולא משנה נתונים קיימים.
+---------------------------------------------------------- */
+
+function compactAuditValue(value, depth = 0) {
+  if (value === null || value === undefined) return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "string") {
+    const str = String(value);
+    return str.length > 500 ? str.slice(0, 500) + "…" : value;
+  }
+  if (Array.isArray(value)) {
+    return value.slice(0, 20).map(v => compactAuditValue(v, depth + 1));
+  }
+  if (typeof value === "object") {
+    if (depth > 2) return "[object]";
+    const out = {};
+    Object.entries(value).slice(0, 40).forEach(([k, v]) => {
+      if (/dataUrl|base64|logo|file|blob/i.test(k)) return;
+      out[k] = compactAuditValue(v, depth + 1);
+    });
+    return out;
+  }
+  return String(value);
+}
+
+function rowAuditSummary(row = {}) {
+  return compactAuditValue({
+    id: row.id || null,
+    type: row.type || null,
+    date: row.date || null,
+    category: row.category || "",
+    desc: row.desc || "",
+    amount: Number(row.amount || 0),
+    docNumber: row.docNumber || "",
+    source: row.source || "",
+    createdAt: row.createdAt || null
+  });
+}
+
+function writeAuditLog(action, entityType = "system", entityId = "", details = {}) {
+  const uid = currentUid || auth.currentUser?.uid;
+  if (!uid || !action) return;
+
+  const currentUser = auth.currentUser;
+  const auditDoc = {
+    action,
+    entityType,
+    entityId: entityId || null,
+    details: compactAuditValue(details || {}),
+    userId: uid,
+    email: currentUser?.email || userProfile?.email || "",
+    displayName: currentUser?.displayName || userProfile?.displayName || "",
+    businessName: userProfile?.businessName || "",
+    businessId: userProfile?.businessId || "",
+    createdAt: serverTimestamp(),
+    createdAtClient: new Date().toISOString(),
+    userAgent: navigator.userAgent || "",
+    appVersion: "trial_readonly_google_audit_v1"
+  };
+
+  addDoc(collection(db, "ledgers", uid, "audit_logs"), auditDoc)
+    .catch(err => console.warn("audit log failed", err));
+}
+
+function writeLoginAuditOnce(kind = "login") {
+  const uid = auth.currentUser?.uid || currentUid;
+  if (!uid) return;
+  const key = `auditLogin_${uid}_${new Date().toISOString().slice(0,10)}`;
+  if (sessionStorage.getItem(key) === "1") return;
+  sessionStorage.setItem(key, "1");
+  writeAuditLog(kind, "auth", uid, {
+    providers: (auth.currentUser?.providerData || []).map(p => p.providerId),
+    emailVerified: !!auth.currentUser?.emailVerified
+  });
+}
+
+
+/* ----------------------------------------------------------
    Google Drive receipts
    החליפי את הערך הבא ב-Client ID שקיבלת מ-Google Cloud Console.
    בפיתוח מקומי הוסיפי גם את http://localhost:5173 או את הכתובת המקומית שלך
@@ -2327,6 +2406,7 @@ document.body.classList.remove("logged-in");
 onAuthStateChanged(auth, async (user) => {
   try {
     if (!user) {
+      if (currentUid) writeAuditLog("logout", "auth", currentUid, {});
       hideBillingFreezeOverlay();
       document.body.classList.remove("logged-in");
       clearPendingSaves();
@@ -2352,6 +2432,7 @@ onAuthStateChanged(auth, async (user) => {
         if (btnResendVerification) btnResendVerification.hidden = true;
         renderAccountFlags();
         initAppLogic(user.uid);
+        writeLoginAuditOnce("login_readonly_trial_expired");
         setTimeout(() => { showBillingFreezeOverlay(accessState.reason); }, 250);
         return;
       }
@@ -2370,6 +2451,7 @@ onAuthStateChanged(auth, async (user) => {
     if (btnResendVerification) btnResendVerification.hidden = true;
     renderAccountFlags();
     initAppLogic(user.uid);
+    writeLoginAuditOnce("login");
     setTimeout(() => { maybeShowOnboarding(); }, 250);
 
   } catch (err) {
@@ -3124,6 +3206,11 @@ btnSaveProfile.onclick = async () => {
   try {
     const ref = doc(db, "users", currentUid);
     await setDoc(ref, payload, { merge: true });
+    writeAuditLog("profile_update", "user_profile", currentUid, {
+      fields: Object.keys(payload),
+      businessType: payload.businessType || "",
+      vatRate: payload.vatRate || 0
+    });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
     // אם הפרופיל היה חובה – לאפשר המשך
@@ -4187,6 +4274,9 @@ async function addRow() {
     rows.push(row);
     saveToLocal();
     scheduleCloudSave();
+    writeAuditLog("transaction_create", row.type || "transaction", row.id, {
+      row: rowAuditSummary(row)
+    });
 
     // לא מאפסים את טווח החודשים שנבחר על ידי המשתמש.
     // אם השורה לא מופיעה מיד, היא תופיע כשמשנים את הטווח המתאים.
@@ -4238,6 +4328,8 @@ function saveEdit() {
   const r = rows.find(x => x.id === editingId);
   if (!r) return;
 
+  const before = rowAuditSummary(r);
+
   r.date = eDate.value;
   r.type = eType.value;
   r.category = eCategory.value;
@@ -4248,15 +4340,25 @@ function saveEdit() {
 
   saveToLocal();
   scheduleCloudSave();
+  writeAuditLog("transaction_update", r.type || "transaction", r.id, {
+    before,
+    after: rowAuditSummary(r)
+  });
   render();
   editDialog.close();
 }
 
 function deleteRow() {
+  const deleted = rows.find(x => x.id === editingId);
   if (!confirm("למחוק את התנועה?")) return;
   rows = rows.filter(x => x.id !== editingId);
   saveToLocal();
   scheduleCloudSave();
+  if (deleted) {
+    writeAuditLog("transaction_delete", deleted.type || "transaction", deleted.id, {
+      row: rowAuditSummary(deleted)
+    });
+  }
   render();
   editDialog.close();
 }
@@ -4774,6 +4876,11 @@ function confirmIncomeImport() {
   }
   saveToLocal();
   scheduleCloudSave();
+  writeAuditLog("transactions_import", kind === "expense" ? "expense" : "income", "", {
+    kind,
+    imported,
+    skipped
+  });
   render();
   importIncomeDialog?.close();
   const label = kind === 'expense' ? 'הוצאות' : 'הכנסות';
@@ -4979,6 +5086,11 @@ async function restoreBackupFromFile(file) {
     }
 
     await setDoc(ledgerRef, finalLedger, { merge: false });
+    writeAuditLog("backup_restore", "ledger", currentUid, {
+      mode: fullRestore ? "full_replace" : "merge_missing",
+      rowsCount: Array.isArray(finalLedger.rows) ? finalLedger.rows.length : 0,
+      restoredFromBackupMode: finalLedger.restoredFromBackupMode || ""
+    });
 
     // רענון הזיכרון המקומי והמסך הראשי בלי לגעת בהתחברות
     applyLedgerPayload(finalLedger);
@@ -5832,6 +5944,14 @@ if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOC
   };
   docs.push(docRec);
   saveDocs(currentUid, docs);
+  writeAuditLog("document_create", docType || "document", docRec.id, {
+    type: docType,
+    number,
+    date,
+    customerId,
+    amount,
+    gross
+  });
 
   // הוספה אוטומטית להכנסות בהתאם לסוג המסמך
   if (docType !== "quote") {
@@ -5852,6 +5972,12 @@ if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOCS && btnDocCreate) if (ENABLE_DOC
     });
 
     persistAndRender();
+    writeAuditLog("transaction_create_from_document", "income", docRec.id, {
+      documentId: docRec.id,
+      docType,
+      number,
+      amount: incomeAmount
+    });
   }
 
   // תצוגה מקדימה + פעולות
