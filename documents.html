@@ -17,7 +17,7 @@
     .metric{border:1px solid var(--line);border-radius:18px;background:#fff;padding:16px}.metric .k{font-size:13px;color:var(--muted)}.metric .v{font-size:26px;font-weight:900;margin-top:5px}
     label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:16px;padding:12px;background:#fbfcff;color:var(--text);font:inherit}textarea{min-height:92px;resize:vertical}.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.form-grid .wide{grid-column:1/-1}.footer{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px}
     .split{display:grid;grid-template-columns:1.05fr .95fr;gap:18px;align-items:start}.settings-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:7px 10px;background:#fff;color:var(--muted);font-size:13px}.status{font-size:14px;color:var(--muted)}.status.ok{color:var(--green)}.status.err{color:var(--red)}
-    .preview{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;min-height:640px}.doc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid var(--line);padding-bottom:16px}.doc-logo{width:92px;max-height:92px;object-fit:contain}.doc-title{text-align:left}.doc-title h2{font-size:30px;margin:0}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px;color:var(--text)}.allocation-number{font-size:12px;color:var(--muted);margin-top:4px}.doc-meta{margin-top:8px;color:var(--muted);font-size:13px}.doc-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}.doc-parties-single{grid-template-columns:minmax(240px,48%) 1fr}.customer-box{min-height:86px}.box{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fbfcff}.box h3{margin:0 0 8px;font-size:16px}.items{width:100%;border-collapse:collapse;margin-top:20px}.items th,.items td{border-bottom:1px solid var(--line);padding:10px;text-align:right}.items th{background:#f2f5fa}.totals{width:min(360px,100%);margin:20px 0 0 auto;border:1px solid var(--line);border-radius:16px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}.totals div:last-child{border-bottom:0;font-weight:900;background:#f6f8fc}.draft-watermark{margin-top:18px;color:#8a94a6;font-weight:800;border:1px dashed var(--line);border-radius:14px;padding:10px;text-align:center}
+    .preview{background:#fff;border:1px solid var(--line);border-radius:22px;padding:26px;min-height:640px}.doc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:2px solid var(--line);padding-bottom:16px}.doc-logo{width:92px;max-height:92px;object-fit:contain}.doc-title{text-align:left}.doc-title h2{font-size:30px;margin:0}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px;color:var(--text)}.allocation-number{font-size:12px;color:var(--muted);margin-top:4px}.doc-meta{margin-top:8px;color:var(--muted);font-size:13px}.doc-parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}.doc-parties-single{grid-template-columns:minmax(240px,48%) 1fr}.doc-parties-single .customer-box{grid-column:1;justify-self:end}.customer-box{min-height:86px;text-align:right;direction:rtl}.box{border:1px solid var(--line);border-radius:18px;padding:14px;background:#fbfcff}.box h3{margin:0 0 8px;font-size:16px}.items{width:100%;border-collapse:collapse;margin-top:20px}.items th,.items td{border-bottom:1px solid var(--line);padding:10px;text-align:right}.items th{background:#f2f5fa}.totals{width:min(360px,100%);margin:20px 0 0 auto;border:1px solid var(--line);border-radius:16px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}.totals div:last-child{border-bottom:0;font-weight:900;background:#f6f8fc}.draft-watermark{margin-top:18px;color:#8a94a6;font-weight:800;border:1px dashed var(--line);border-radius:14px;padding:10px;text-align:center}
     .drafts-list{display:grid;gap:10px}.draft-card{border:1px solid var(--line);border-radius:18px;background:#fff;padding:14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}.draft-card b{font-size:16px}.empty{border:1px dashed var(--line);border-radius:18px;padding:20px;text-align:center;color:var(--muted);background:#fff}
     @media(max-width:900px){.split,.grid,.grid3,.grid4,.form-grid,.settings-row,.doc-parties{grid-template-columns:1fr}.wrap{padding:14px}.card{padding:16px;border-radius:20px}.preview{padding:16px}.doc-head{flex-direction:column}.doc-title{text-align:right}.actions .btn{flex:1}.metric .v{font-size:22px}}
     @media print{body{background:#fff}.topbar,.no-print,.card.form-card,.card.settings-card,.card.drafts-card{display:none!important}.wrap{max-width:none;padding:0}.preview{border:0;box-shadow:none;border-radius:0}.card{box-shadow:none;border:0}.split{display:block}.draft-watermark{display:none}}
@@ -139,7 +139,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authDomain:"freelance-accounting-6c3bb.firebaseapp.com", projectId:"freelance-accounting-6c3bb", storageBucket:"freelance-accounting-6c3bb.firebasestorage.app", messagingSenderId:"196974556694", appId:"1:196974556694:web:60ba710567f2a7c67c6737" };
 const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
 const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1, deal_invoice:1 };
@@ -292,6 +292,28 @@ function renderPreview(){
 }
 async function loadAll(){ const u=auth.currentUser; uid=u.uid; $('userEmailPill').textContent=u.email||''; const [pSnap,lSnap]=await Promise.all([getDoc(doc(db,'users',uid)), getDoc(doc(db,'ledgers',uid))]); profile=pSnap.exists()?pSnap.data():{email:u.email}; ledger=lSnap.exists()?lSnap.data():{}; customers=normalizeCustomers(ledger.customers); drafts=Array.isArray(ledger.documentDrafts)?ledger.documentDrafts:[]; hydrateSettings(); renderCustomerOptions(); $('docDate').value=today(); $('docVatRate').value=Number(profile.vatRate||18); docLines=[makeLine({desc:'',qty:1,netPrice:0})]; renderLinesEditor(); updateDocNumber(); updatePaymentVisibility(); syncStats(); renderDrafts(); const params=new URLSearchParams(location.search); const preCustomerId=params.get('customerId'); if(preCustomerId){ const c=customers.find(x=>String(x.id)===String(preCustomerId)); if(c) setSelectedCustomer(c); } renderPreview(); }
 async function saveLedgerPatch(patch){ if(!uid)return; await setDoc(doc(db,'ledgers',uid), patch, {merge:true}); ledger={...ledger,...patch}; }
+async function logAudit(action, details = {}){
+  try{
+    if(!uid) return;
+    const nowIso = new Date().toISOString();
+    await addDoc(collection(db, "ledgers", uid, "auditLogs"), {
+      action,
+      createdAt: serverTimestamp(),
+      createdAtIso: nowIso,
+      entityType: details.entityType || "מסמכים",
+      entityId: details.entityId || null,
+      email: auth.currentUser?.email || "",
+      uid,
+      details: {
+        ...details,
+        summary: details.summary || action
+      },
+      userAgent: navigator.userAgent || ""
+    });
+  }catch(err){
+    console.warn("Audit log failed", err);
+  }
+}
 function draftFromForm(){ const t=totals(); const allocation=allocationCheck(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentMethod:$('paymentMethod')?.value||'', paymentRef:$('paymentRef')?.value||'', vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, allocationStatus:allocation.status, allocationRequired:allocation.required, allocationThreshold:allocation.threshold, allocationNumber:'', allocationRequestedAt:'', allocationReceivedAt:'', source:'draft', createdAt:new Date().toISOString() }; }
 function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(d.date||'')} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><div class="draft-actions"><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button><button class="btn danger small" data-delete-draft="${escapeHtml(d.id)}">מחיקה</button></div></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); box.querySelectorAll('[data-delete-draft]').forEach(btn=>btn.onclick=()=>deleteDraft(btn.dataset.deleteDraft)); }
 async function deleteDraft(id){ const d=drafts.find(x=>String(x.id)===String(id)); if(!d)return; if(!confirm('למחוק את הטיוטה?'))return; const prev=drafts; drafts=drafts.filter(x=>String(x.id)!==String(id)); try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נמחקה','ok'); }catch(e){ console.error(e); drafts=prev; renderDrafts(); setStatus($('draftStatus'),'שגיאה במחיקת טיוטה','err'); } }
@@ -365,7 +387,7 @@ function printableDocumentHtml(content){
   return `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>מסמך - עצמאי פלוס</title>
   <style>
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
-    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-end}.doc-parties .box{width:46%;margin-left:auto;margin-right:0}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:0!important;margin-left:auto!important;text-align:right}@page{size:A4 portrait;margin:14mm}
+    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{display:block!important;direction:rtl;text-align:right;margin-bottom:18px}.doc-parties .box,.customer-box{display:block!important;width:46%;min-width:240px;margin-right:0!important;margin-left:auto!important;text-align:right!important;direction:rtl!important}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}@page{size:A4 portrait;margin:14mm}
   </style></head><body>${content}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
 }
 async function issueDocument(){
@@ -415,6 +437,22 @@ async function issueDocument(){
   }
   try{
     await saveLedgerPatch(patch);
+    await logAudit("מסמך הופק", {
+      entityType: "מסמך",
+      entityId: finalDoc.id,
+      documentId: finalDoc.id,
+      documentType: finalDoc.type,
+      documentTypeLabel: finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || finalDoc.type,
+      documentNumber: finalDoc.number,
+      customerId: finalDoc.customerId,
+      customerName: finalDoc.customerName,
+      amount: finalDoc.gross || 0,
+      net: finalDoc.net || 0,
+      vat: finalDoc.vat || 0,
+      incomeCreated: shouldCreateIncomeForDoc(finalDoc.type),
+      incomeRowId: finalDoc.incomeRowId || null,
+      summary: `הופק ${finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || "מסמך"} ${finalDoc.number || ""} ללקוח ${finalDoc.customerName || ""} בסך ${money(finalDoc.gross || 0)}`
+    });
     customers=updatedCustomers;
     settings=nextSettings;
     settingsLocked=true;
@@ -447,7 +485,7 @@ $('btnPrint').onclick=printPreviewOnly;
 $('btnGoCustomer').onclick=()=>{ const c=getSelectedCustomer(); if(!c?.id) return setStatus($('draftStatus'),'יש לבחור לקוח כדי לעבור לכרטיס הלקוח','err'); location.href='/customers.html?customerId='+encodeURIComponent(c.id); };
 $('btnIssueDocument').onclick=issueDocument;
 $('btnSaveSettings').onclick=async()=>{ if(settingsLocked)return; settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings, documentSettingsLocked:true, documentSettingsLockedAt:new Date().toISOString()}); settingsLocked=true; renderNumberingSettings(); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
-$('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
+$('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); await logAudit("טיוטת מסמך נשמרה", {entityType:"מסמך", entityId:d.id, documentId:d.id, documentType:d.type, documentTypeLabel:TYPE_LABELS[d.type]||d.type, customerId:d.customerId||'', amount:totals().gross||0, summary:`נשמרה טיוטת ${TYPE_LABELS[d.type]||'מסמך'}`}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
 $('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
 </script>
