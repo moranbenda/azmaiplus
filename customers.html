@@ -459,16 +459,6 @@
   </section>
 </main>
 
-
-<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
-  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
-    <div class="doc-view-head">
-      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
-      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
-    </div>
-    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
-  </div>
-</div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -795,7 +785,7 @@ function showStoredDocumentModal(html, title){
   const modal = $("docViewModal");
   const frame = $("docViewFrame");
   const titleEl = $("docViewTitle");
-  if (!modal || !frame || !titleEl) return false;
+  if (!modal || !frame) return false;
   titleEl.textContent = title || "צפייה במסמך";
   frame.srcdoc = html;
   modal.classList.add("show");
@@ -812,23 +802,60 @@ function closeStoredDocumentModal(){
   frame.srcdoc = "";
 }
 
+
+function normalizeStoredDocumentHtml(html, d){
+  const title = `${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}`.trim();
+  const customerRightFix = `
+    <style id="azmai-customer-right-fix">
+      html,body{direction:rtl!important;text-align:right!important;}
+      .doc-parties{display:block!important;direction:rtl!important;text-align:right!important;margin-bottom:18px!important;}
+      .doc-parties .box,.doc-parties .customer-box,.customer-box{
+        display:block!important;
+        float:right!important;
+        clear:both!important;
+        width:46%!important;
+        min-width:240px!important;
+        margin:0!important;
+        text-align:right!important;
+        direction:rtl!important;
+      }
+      .doc-parties:after{content:"";display:block;clear:both;}
+      .customer-box *{text-align:right!important;direction:rtl!important;}
+      .doc-date-ltr{direction:ltr!important;unicode-bidi:isolate!important;display:inline-block!important;}
+    </style>`;
+
+  let out = String(html || "");
+  if (!out.trim().toLowerCase().startsWith("<!doctype") && !out.trim().toLowerCase().startsWith("<html")) {
+    out = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${title}</title></head><body>${out}</body></html>`;
+  }
+  if (out.includes('</head>')) out = out.replace('</head>', `${customerRightFix}</head>`);
+  else out = customerRightFix + out;
+  return out;
+}
+
 function openStoredDocument(docId, shouldPrint=false){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
   if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
-  const savedHtml = d.printHtml || null;
-  const html = savedHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+
+  const baseHtml = d.printHtml || d.previewHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
   <style>
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
-    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
+    .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}.customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}.doc-parties:after{content:"";display:block;clear:both}.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}@page{size:A4 portrait;margin:14mm}
   </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
+
+  const html = normalizeStoredDocumentHtml(baseHtml, d);
+  const title = `${documentDisplayType(d)} ${d.number || ""}`.trim();
+
   if (!shouldPrint) {
-    const opened = showStoredDocumentModal(html, `${documentDisplayType(d)} ${d.number || ""}`.trim());
-    if (opened) return;
+    return showStoredDocumentModal(html, title);
   }
+
   const w = window.open("", "_blank");
   if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
-  const htmlToWrite = shouldPrint ? html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`) : html;
-  w.document.open(); w.document.write(htmlToWrite); w.document.close();
+  const printHtml = html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
+  w.document.open();
+  w.document.write(printHtml);
+  w.document.close();
 }
 
 function resendStoredDocument(docId){
@@ -955,10 +982,35 @@ function printCustomerLedger(id){
       <td>${Number(d.balance || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
     </tr>`).join("");
   const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>כרטסת לקוח</title>
-  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}</style></head><body>
+  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}
+    .customer-card{text-align:right;direction:rtl}
+    .customer-card .name,.customer-card .hint{text-align:right}
+    .customer-card .chips{justify-content:flex-start}
+    .doc-date-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+    .doc-view-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,23,42,.55)}
+    .doc-view-modal.show{display:flex}
+    .doc-view-box{width:min(980px,96vw);height:min(92vh,920px);background:white;border-radius:22px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #dbe3ef;overflow:hidden;display:flex;flex-direction:column;direction:rtl}
+    .doc-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5edf7;background:#f8fafc}
+    .doc-view-title{font-weight:900;color:#0f2748}
+    .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
+    .doc-view-close:hover{background:#eef6ff}
+    .doc-view-frame{border:0;width:100%;height:100%;background:white}
+    @media(max-width:760px){.doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}.docs-history-table{min-width:860px}.docs-actions{min-width:220px}}
+
+</style></head><body>
   <h1>כרטסת לקוח</h1><div class="meta"><b>${escapeHtml(c.name)}</b>${c.taxId ? ` · ${escapeHtml(c.taxId)}` : ""}<br>הופק בתאריך ${formatDateForPrint()}</div>
   <table><thead><tr><th>תאריך</th><th>סוג מסמך</th><th>מספר</th><th>חיוב</th><th>זיכוי</th><th>יתרה</th></tr></thead><tbody>${rows || `<tr><td colspan="6">אין מסמכים להצגה.</td></tr>`}</tbody></table>
-  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body></html>`;
+  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script>
+<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
+  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
+    <div class="doc-view-head">
+      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
+      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
+    </div>
+    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
+  </div>
+</div>
+</body></html>`;
   const w = window.open("", "_blank");
   if (!w) return showToast("הדפדפן חסם את חלון ההדפסה.", true);
   w.document.open(); w.document.write(html); w.document.close();
@@ -1020,7 +1072,22 @@ function printCustomersList(){
       h1{margin:0;font-size:24px}.meta{font-size:12px;color:#64748b;line-height:1.7}.summary{font-weight:700;margin:10px 0 14px}
       table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right;vertical-align:top}th{background:#f1f5f9}span{color:#64748b;font-size:11px}
       @page{size:A4 portrait;margin:14mm}
-    </style>
+    
+    .customer-card{text-align:right;direction:rtl}
+    .customer-card .name,.customer-card .hint{text-align:right}
+    .customer-card .chips{justify-content:flex-start}
+    .doc-date-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+    .doc-view-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,23,42,.55)}
+    .doc-view-modal.show{display:flex}
+    .doc-view-box{width:min(980px,96vw);height:min(92vh,920px);background:white;border-radius:22px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #dbe3ef;overflow:hidden;display:flex;flex-direction:column;direction:rtl}
+    .doc-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5edf7;background:#f8fafc}
+    .doc-view-title{font-weight:900;color:#0f2748}
+    .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
+    .doc-view-close:hover{background:#eef6ff}
+    .doc-view-frame{border:0;width:100%;height:100%;background:white}
+    @media(max-width:760px){.doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}.docs-history-table{min-width:860px}.docs-actions{min-width:220px}}
+
+</style>
   </head>
   <body>
     <div class="head">
@@ -1040,7 +1107,17 @@ function printCustomersList(){
       <tbody>${rows || `<tr><td colspan="7">אין לקוחות להצגה.</td></tr>`}</tbody>
     </table>
     <script>window.onload = () => { window.print(); setTimeout(() => window.close(), 300); };<\/script>
-  </body>
+  
+<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
+  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
+    <div class="doc-view-head">
+      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
+      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
+    </div>
+    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
+  </div>
+</div>
+</body>
   </html>`;
 
   const w = window.open("", "_blank");
@@ -1106,6 +1183,17 @@ if (__docCloseBtn) __docCloseBtn.addEventListener("click", closeStoredDocumentMo
 const __docModal = $("docViewModal");
 if (__docModal) __docModal.addEventListener("click", (ev) => { if (ev.target === __docModal) closeStoredDocumentModal(); });
 document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeStoredDocumentModal(); });
+
 </script>
+
+<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
+  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
+    <div class="doc-view-head">
+      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
+      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
+    </div>
+    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
+  </div>
+</div>
 </body>
 </html>
