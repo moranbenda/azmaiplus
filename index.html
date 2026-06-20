@@ -745,37 +745,52 @@ header.app-header{
 
 
 
-/* חסימת חשבון לאחר תום תקופת ניסיון: הנתונים נשמרים, השימוש נעצר עד חידוש מנוי */
+/* מצב קריאה בלבד לאחר תום תקופת ניסיון: הנתונים נשמרים ונשארים לצפייה, פעולות שינוי נחסמות עד חידוש מנוי */
 body.account-frozen main#app{
-  pointer-events:none;
-  user-select:none;
-  opacity:.28;
-  filter:grayscale(.25);
+  opacity:1;
+  filter:none;
+}
+body.account-frozen .readonly-disabled{
+  opacity:.55!important;
+  cursor:not-allowed!important;
 }
 .billing-freeze-overlay[hidden]{display:none!important}
 .billing-freeze-overlay{
-  position:fixed;
-  inset:0;
-  z-index:9999;
-  background:rgba(15,23,42,.55);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
+  position:sticky;
+  top:76px;
+  z-index:999;
+  background:linear-gradient(90deg,#fff7e6,#eef6ff);
+  border-bottom:1px solid #f1d08a;
+  padding:12px 20px;
 }
 .billing-freeze-card{
-  width:min(620px,96vw);
+  width:min(1180px,92vw);
+  margin:0 auto;
   background:#fff;
-  border:1px solid var(--line);
-  border-radius:24px;
-  box-shadow:0 30px 80px rgba(15,23,42,.28);
-  padding:26px;
+  border:1px solid #f1d08a;
+  border-radius:18px;
+  box-shadow:0 10px 28px rgba(15,23,42,.10);
+  padding:16px 18px;
   text-align:right;
 }
-.billing-freeze-card h2{margin:0 0 10px;font-size:24px;color:var(--text)}
-.billing-freeze-card p{margin:8px 0;color:var(--muted);line-height:1.7}
-.billing-freeze-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:18px}
-.billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:16px;padding:12px;margin-top:14px;color:var(--muted);font-size:14px}
+.billing-freeze-card h2{margin:0 0 6px;font-size:20px;color:var(--text)}
+.billing-freeze-card p{margin:6px 0;color:var(--muted);line-height:1.65}
+.billing-freeze-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:12px}
+.billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:10px;color:var(--muted);font-size:14px}
+.readonly-toast{
+  position:fixed;
+  right:18px;
+  bottom:18px;
+  z-index:10000;
+  background:#10223f;
+  color:#fff;
+  border-radius:14px;
+  padding:12px 16px;
+  box-shadow:0 16px 38px rgba(15,23,42,.26);
+  font-size:14px;
+  display:none;
+}
+.readonly-toast.show{display:block}
 
 </style>
 </head>
@@ -867,7 +882,7 @@ body.account-frozen main#app{
   <div id="billingFreezeOverlay" class="billing-freeze-overlay" hidden>
     <div class="billing-freeze-card" role="dialog" aria-modal="true" aria-labelledby="billingFreezeTitle">
       <h2 id="billingFreezeTitle">תקופת הניסיון הסתיימה</h2>
-      <p id="billingFreezeText">אפשר להתחבר לחשבון ולחדש מנוי, אך לא ניתן להשתמש במערכת עד להפעלת מנוי.</p>
+      <p id="billingFreezeText">החשבון פתוח לצפייה בנתונים קיימים, אך פעולות הוספה, עריכה, מחיקה, ייבוא ושחזור חסומות עד לחידוש מנוי.</p>
       <div class="billing-freeze-note">
         הנתונים שנשמרו במערכת לא נמחקים. לאחר חידוש המנוי, החשבון יחזור לפעילות מלאה עם הנתונים הקיימים.
       </div>
@@ -878,6 +893,8 @@ body.account-frozen main#app{
       </div>
     </div>
   </div>
+
+  <div id="readonlyToast" class="readonly-toast">החשבון במצב צפייה בלבד עד לחידוש מנוי.</div>
 
   <main class="wrap" id="app">
 
@@ -1626,6 +1643,8 @@ const billingFreezeText = document.getElementById("billingFreezeText");
 const btnBillingRenew = document.getElementById("btnBillingRenew");
 const btnBillingProfile = document.getElementById("btnBillingProfile");
 const btnBillingLogout = document.getElementById("btnBillingLogout");
+const readonlyToast = document.getElementById("readonlyToast");
+let accountReadOnlyMode = false;
 
 /* כפתור קטגוריות */
 const btnCategoriesOpen = document.getElementById("btnCategoriesOpen");
@@ -1887,7 +1906,7 @@ function computeAccessState(profile, user) {
     if (daysLeft <= 0) {
       state.blocked = true;
       state.kind = "trial_expired";
-      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. אפשר להתחבר לחשבון, אך השימוש במערכת ייפתח רק לאחר חידוש מנוי.";
+      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. אפשר לצפות בנתונים קיימים, אך פעולות הוספה, עריכה, מחיקה, ייבוא ושחזור חסומות עד לחידוש מנוי.";
       return state;
     }
     state.flags.push({ text: `ניסיון: ${daysLeft} ימים`, cls: "warn" });
@@ -1898,16 +1917,110 @@ function computeAccessState(profile, user) {
 
 
 
+const READ_ONLY_ALLOWED_IDS = new Set([
+  "btnLogout", "btnBillingRenew", "btnBillingProfile", "btnBillingLogout",
+  "btnProfileOpen", "btnProfileClose", "btnHomeOpen",
+  "btnReportsOpen", "btnReportsClose", "btnReportCsv", "btnReportPdf",
+  "btnExportCSV", "btnExportPDF", "btnExportJSON",
+  "btnDataManageOpen", "btnDataManageClose",
+  "btnSupportOpen", "btnSupportClose", "btnSupportSend",
+  "btnVatLink", "btnHomeApplyRange", "btnHomeClearDates",
+  "btnPrev", "btnNext", "btnReset",
+  "homeGoLedger", "homeGoReports", "homeGoVat", "homeGoProfile"
+]);
+
+const READ_ONLY_BLOCKED_IDS = new Set([
+  "btnAdd", "btnSaveEdit", "btnDelete", "btnClear",
+  "btnSaveProfile", "btnRemoveBusinessLogo",
+  "btnImportIncome", "btnRestoreJSON", "btnImportIncomeConfirm",
+  "btnReceiptReviewApply", "btnCustomerCard", "ccSave", "ccDelete",
+  "btnDocCreate", "btnDocEmail", "btnDocWhatsapp"
+]);
+
+function showReadOnlyToast(message = "החשבון במצב צפייה בלבד עד לחידוש מנוי.") {
+  if (!readonlyToast) return;
+  readonlyToast.textContent = message;
+  readonlyToast.classList.add("show");
+  window.clearTimeout(showReadOnlyToast._timer);
+  showReadOnlyToast._timer = window.setTimeout(() => {
+    readonlyToast.classList.remove("show");
+  }, 2600);
+}
+
+function isReadOnlyAllowedElement(el) {
+  if (!el) return true;
+  if (el.closest("#billingFreezeOverlay")) return true;
+  if (el.closest("#authScreen")) return true;
+  const id = el.id || "";
+  if (READ_ONLY_ALLOWED_IDS.has(id)) return true;
+  if (el.matches?.("summary")) return true;
+  if (el.closest?.("#reportsDialog") && !READ_ONLY_BLOCKED_IDS.has(id)) return true;
+  return false;
+}
+
+function blockReadOnlyEvent(ev, message) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  if (typeof ev.stopImmediatePropagation === "function") ev.stopImmediatePropagation();
+  showReadOnlyToast(message);
+}
+
+function applyReadOnlyUi(enabled) {
+  accountReadOnlyMode = enabled === true;
+  document.querySelectorAll("button, input[type='file']").forEach(el => {
+    const id = el.id || "";
+    const shouldDisable = accountReadOnlyMode && READ_ONLY_BLOCKED_IDS.has(id);
+    if (shouldDisable) {
+      if (!el.dataset.prevDisabled) el.dataset.prevDisabled = el.disabled ? "1" : "0";
+      el.disabled = true;
+      el.classList.add("readonly-disabled");
+      el.title = "החשבון במצב צפייה בלבד עד לחידוש מנוי";
+    } else if (el.dataset.prevDisabled) {
+      el.disabled = el.dataset.prevDisabled === "1";
+      delete el.dataset.prevDisabled;
+      el.classList.remove("readonly-disabled");
+      el.removeAttribute("title");
+    }
+  });
+}
+
+document.addEventListener("click", (ev) => {
+  if (!accountReadOnlyMode) return;
+  const el = ev.target.closest("button, a, input[type='file'], summary, [data-act]");
+  if (!el) return;
+  if (isReadOnlyAllowedElement(el)) return;
+  if (el.dataset?.act === "edit" || el.tagName === "BUTTON" || el.tagName === "A" || el.matches?.("input[type='file']")) {
+    blockReadOnlyEvent(ev, "החשבון במצב צפייה בלבד. כדי לבצע שינויים יש לחדש מנוי.");
+  }
+}, true);
+
+document.addEventListener("submit", (ev) => {
+  if (!accountReadOnlyMode) return;
+  if (ev.target.closest("#authScreen") || ev.target.closest("#supportDialog")) return;
+  blockReadOnlyEvent(ev, "החשבון במצב צפייה בלבד. כדי לבצע שינויים יש לחדש מנוי.");
+}, true);
+
+document.addEventListener("change", (ev) => {
+  if (!accountReadOnlyMode) return;
+  const el = ev.target;
+  if (!el) return;
+  if (el.matches("input[type='file']")) {
+    blockReadOnlyEvent(ev, "העלאת קבצים חסומה עד לחידוש מנוי.");
+  }
+}, true);
+
 function showBillingFreezeOverlay(reason = "") {
   document.body.classList.add("account-frozen");
+  applyReadOnlyUi(true);
   if (billingFreezeText) {
-    billingFreezeText.textContent = reason || "אפשר להתחבר לחשבון ולחדש מנוי, אך לא ניתן להשתמש במערכת עד להפעלת מנוי.";
+    billingFreezeText.textContent = reason || "החשבון פתוח לצפייה בנתונים קיימים, אך פעולות הוספה, עריכה, מחיקה, ייבוא ושחזור חסומות עד לחידוש מנוי.";
   }
   if (billingFreezeOverlay) billingFreezeOverlay.hidden = false;
 }
 
 function hideBillingFreezeOverlay() {
   document.body.classList.remove("account-frozen");
+  applyReadOnlyUi(false);
   if (billingFreezeOverlay) billingFreezeOverlay.hidden = true;
 }
 
