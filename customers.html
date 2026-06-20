@@ -278,7 +278,10 @@
       .card,.hero{box-shadow:none;border:1px solid #ddd}
       main{padding:0}
     }
-  </style>
+  
+    .document-history-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+    .small{padding:8px 12px;font-size:12px}
+</style>
 </head>
 <body>
 <header>
@@ -462,6 +465,7 @@ const toast = $("toast");
 let currentUser = null;
 let userProfile = {};
 let customers = [];
+let ledgerDocuments = [];
 let editingId = null;
 let selectedId = null;
 
@@ -702,6 +706,65 @@ function render(){
   renderSelected();
 }
 
+
+function money(value){
+  return Number(value || 0).toLocaleString("he-IL", {style:"currency", currency:"ILS"});
+}
+
+function docsForCustomer(customer){
+  const fullDocs = ledgerDocuments.filter(d => String(d.customerId || "") === String(customer.id || ""));
+  const summaryDocs = Array.isArray(customer.documents) ? customer.documents : [];
+  const byKey = new Map();
+  fullDocs.forEach(d => byKey.set(String(d.id || `${d.type}-${d.number}`), d));
+  summaryDocs.forEach(d => {
+    const key = String(d.id || `${d.type}-${d.number}`);
+    if (!byKey.has(key)) byKey.set(key, d);
+  });
+  return Array.from(byKey.values()).sort((a,b) => String(b.issuedAt || b.createdAt || b.date || "").localeCompare(String(a.issuedAt || a.createdAt || a.date || "")));
+}
+
+function documentDisplayType(d){
+  return d.typeLabel || d.type || "מסמך";
+}
+
+function documentDisplayTotal(d){
+  return Number(d.gross ?? d.total ?? d.debit ?? d.balance ?? 0);
+}
+
+function documentHtmlForView(d){
+  if (d.previewHtml) return d.previewHtml;
+  return `
+    <div class="doc-head">
+      <div></div>
+      <div class="doc-title">
+        <h2>${escapeHtml(documentDisplayType(d))}</h2>
+        <div class="doc-meta doc-number">מספר: <b>${escapeHtml(d.number || "")}</b><br>תאריך: ${escapeHtml(d.date || "")}</div>
+      </div>
+    </div>
+    <div class="doc-parties doc-parties-single"><div class="box customer-box"><h3>לכבוד</h3><b>${escapeHtml(d.customerName || "")}</b></div></div>
+    <div class="totals"><div><span>סה״כ</span><span>${money(documentDisplayTotal(d))}</span></div></div>
+  `;
+}
+
+function openStoredDocument(docId, shouldPrint=false){
+  const d = ledgerDocuments.find(x => String(x.id) === String(docId));
+  if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
+  const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+  <style>
+    body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
+    .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head,.doc-parties{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{justify-content:flex-start}.doc-parties .box{width:46%}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}.customer-box{margin-right:auto}@page{size:A4 portrait;margin:14mm}
+  </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div>${shouldPrint ? `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script>` : ""}</body></html>`;
+  const w = window.open("", "_blank");
+  if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+function resendStoredDocument(docId){
+  const d = ledgerDocuments.find(x => String(x.id) === String(docId));
+  if (!d) return showToast("לא נמצא מסמך לשליחה.", true);
+  showToast("שליחה חוזרת במייל תופעל לאחר חיבור Resend.");
+}
+
 function renderSelected(){
   const c = customers.find(x => x.id === selectedId);
   const status = $("selectedStatus");
@@ -713,17 +776,31 @@ function renderSelected(){
   }
   status.textContent = c.name;
 
-  const docs = Array.isArray(c.documents) ? c.documents : [];
-  const docsHtml = docs.length ? docs.map(d => `
-    <div class="ledger-card">
-      <div class="ledger-title">${escapeHtml(d.type || "מסמך")} ${escapeHtml(d.number || "")}</div>
-      <div class="ledger-grid">
-        <div><div class="k">תאריך</div><div>${escapeHtml(d.date || "—")}</div></div>
-        <div><div class="k">חיוב</div><div>${Number(d.debit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</div></div>
-        <div><div class="k">זיכוי</div><div>${Number(d.credit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</div></div>
-        <div><div class="k">יתרה</div><div>${Number(d.balance || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</div></div>
-      </div>
-    </div>`).join("") : `<div class="empty">עדיין אין מסמכים ללקוח.</div>`;
+  const docs = docsForCustomer(c);
+  const totalDocs = docs.reduce((sum,d) => sum + documentDisplayTotal(d), 0);
+  const lastDoc = docs[0];
+  const docsHtml = docs.length ? `
+    <div class="document-history-summary">
+      <span class="chip ok">סה״כ מסמכים: ${docs.length}</span>
+      <span class="chip">סה״כ מסמכים כספיים: ${money(totalDocs)}</span>
+      ${lastDoc ? `<span class="chip">מסמך אחרון: ${escapeHtml(documentDisplayType(lastDoc))} ${escapeHtml(lastDoc.number || "")}</span>` : ``}
+    </div>
+    <div class="ledger-list">${docs.map(d => `
+      <div class="ledger-card">
+        <div class="ledger-title">${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</div>
+        <div class="ledger-grid">
+          <div><div class="k">תאריך</div><div>${escapeHtml(d.date || "—")}</div></div>
+          <div><div class="k">סכום</div><div>${money(documentDisplayTotal(d))}</div></div>
+          <div><div class="k">סטטוס</div><div>${escapeHtml(d.status || "issued")}</div></div>
+          <div><div class="k">מספר הקצאה</div><div>${escapeHtml(d.allocationNumber || "—")}</div></div>
+        </div>
+        <div class="selected-actions" style="margin-top:10px;justify-content:flex-start">
+          <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
+          <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
+          <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה חוזרת</button>
+        </div>
+      </div>`).join("")}</div>
+  ` : `<div class="empty">עדיין אין מסמכים ללקוח.</div>`;
 
   body.innerHTML = `
     <div class="customer-card">
@@ -752,7 +829,7 @@ function renderSelected(){
     </div>
     <div class="info-box" style="margin-top:12px">
       <h4>כרטסת לקוח</h4>
-      <div class="ledger-list">${docsHtml}</div>
+      ${docsHtml}
     </div>
     <div class="selected-actions">
       <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
@@ -768,6 +845,9 @@ function renderSelected(){
   $("btnPrintLedgerSelected").addEventListener("click", () => printCustomerLedger(c.id));
   $("btnEditSelected").addEventListener("click", () => openForm(c));
   $("btnDeleteSelected").addEventListener("click", () => deleteCustomer(c.id));
+  body.querySelectorAll("[data-view-doc]").forEach(btn => btn.addEventListener("click", () => openStoredDocument(btn.dataset.viewDoc, false)));
+  body.querySelectorAll("[data-print-doc]").forEach(btn => btn.addEventListener("click", () => openStoredDocument(btn.dataset.printDoc, true)));
+  body.querySelectorAll("[data-send-doc]").forEach(btn => btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc)));
 }
 
 
@@ -895,6 +975,7 @@ async function loadData(){
     const ledgerSnap = await getDoc(doc(db, "ledgers", currentUser.uid));
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
+    ledgerDocuments = Array.isArray(data.documents) ? data.documents : [];
     saveStatus.textContent = `נטענו ${customers.length} לקוחות`;
     render();
   } catch (err) {
