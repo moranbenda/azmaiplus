@@ -1025,108 +1025,70 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
 
     await waitForFrameImages(frameDocument);
 
-    // Rebuild the business/customer details as explicit label/value rows.
-    // This prevents Hebrew punctuation and LTR values (email/phone/ID)
-    // from changing order when html2canvas renders the PDF on mobile.
-    const rebuildDetailBlock = (container, preserveHeading = false) => {
-      if (!container) return;
+    // Preserve the customer block exactly as in the last good version.
+    frameDocument.querySelectorAll(".customer-box").forEach(container => {
+      const walker = frameDocument.createTreeWalker(
+        container,
+        frameWindow.NodeFilter.SHOW_TEXT
+      );
 
-      const heading = preserveHeading
-        ? container.querySelector("h3")?.outerHTML || ""
-        : "";
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
 
-      const working = container.cloneNode(true);
-      if (preserveHeading) working.querySelector("h3")?.remove();
+      textNodes.forEach(node => {
+        node.nodeValue = String(node.nodeValue || "")
+          .replace(/ /g, "\u00A0")
+          .replace(/:/g, ":\u200F");
+      });
+    });
 
-      const segments = working.innerHTML
+    // Fix only the business email line. Mixed Hebrew + an LTR email address
+    // otherwise causes the label and colon to jump to the wrong side.
+    const businessMeta = frameDocument.querySelector(
+      ".doc-head > div:first-child .doc-meta"
+    );
+
+    if (businessMeta) {
+      const parts = businessMeta.innerHTML
         .split(/<br\s*\/?\s*>/i)
         .map(part => part.trim())
         .filter(Boolean);
 
-      const rows = segments.map(segment => {
+      businessMeta.innerHTML = parts.map(part => {
         const holder = frameDocument.createElement("div");
-        holder.innerHTML = segment;
+        holder.innerHTML = part;
+        const plain = String(holder.textContent || "").trim();
 
-        const plainText = String(holder.textContent || "").trim();
-        const colonIndex = plainText.indexOf(":");
-
-        if (colonIndex < 0) {
-          return `<div class="azmai-detail-name">${segment}</div>`;
+        if (/^מייל\s*:/.test(plain)) {
+          const email = plain.replace(/^מייל\s*:\s*/, "").trim();
+          return `<span dir="rtl" style="white-space:nowrap">
+            מייל:&nbsp;<span dir="ltr"
+              style="display:inline-block;unicode-bidi:isolate">${escapeHtml(email)}</span>
+          </span>`;
         }
 
-        const label = plainText.slice(0, colonIndex).trim();
-        const value = plainText.slice(colonIndex + 1).trim();
-        const isLtrValue =
-          /@/.test(value) ||
-          /^[+\d\s().\/-]+$/.test(value) ||
-          /^[A-Za-z0-9._%+\-@]+$/.test(value);
+        // Keep the original markup and only protect intended spaces.
+        return part.replace(/ /g, "&nbsp;");
+      }).join("<br>");
+    }
 
-        return `
-          <div class="azmai-detail-row">
-            <span class="azmai-detail-label">${escapeHtml(label)}:</span>
-            <span class="azmai-detail-value"
-                  dir="${isLtrValue ? "ltr" : "rtl"}">${escapeHtml(value)}</span>
-          </div>`;
-      }).join("");
+    // Preserve spaces only in the description column, without touching
+    // quantities, prices or totals.
+    frameDocument
+      .querySelectorAll(".items tbody tr td:first-child")
+      .forEach(cell => {
+        const walker = frameDocument.createTreeWalker(
+          cell,
+          frameWindow.NodeFilter.SHOW_TEXT
+        );
 
-      container.innerHTML = `${heading}${rows}`;
-    };
+        const textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
 
-    rebuildDetailBlock(
-      frameDocument.querySelector(".doc-head > div:first-child .doc-meta"),
-      false
-    );
-    rebuildDetailBlock(
-      frameDocument.querySelector(".customer-box"),
-      true
-    );
-
-    // Preserve every intended space in item descriptions.
-    frameDocument.querySelectorAll(".items td").forEach(cell => {
-      const walker = frameDocument.createTreeWalker(
-        cell,
-        frameWindow.NodeFilter.SHOW_TEXT
-      );
-      const nodes = [];
-      while (walker.nextNode()) nodes.push(walker.currentNode);
-
-      nodes.forEach(node => {
-        node.nodeValue = String(node.nodeValue || "").replace(/ /g, "\u00A0");
+        textNodes.forEach(node => {
+          node.nodeValue = String(node.nodeValue || "").replace(/ /g, "\u00A0");
+        });
       });
-    });
-
-    const bidiStyle = frameDocument.createElement("style");
-    bidiStyle.textContent = `
-      .azmai-detail-row{
-        display:flex!important;
-        flex-direction:row!important;
-        justify-content:flex-start!important;
-        align-items:baseline!important;
-        gap:5px!important;
-        direction:rtl!important;
-        text-align:right!important;
-        white-space:nowrap!important;
-      }
-      .azmai-detail-label{
-        direction:rtl!important;
-        unicode-bidi:isolate!important;
-        flex:0 0 auto!important;
-      }
-      .azmai-detail-value{
-        unicode-bidi:isolate!important;
-        display:inline-block!important;
-        flex:0 1 auto!important;
-      }
-      .azmai-detail-name{
-        direction:rtl!important;
-        text-align:right!important;
-        white-space:nowrap!important;
-      }
-      .items td{
-        white-space:pre-wrap!important;
-      }
-    `;
-    frameDocument.head.appendChild(bidiStyle);
 
     // Load html2pdf inside the iframe itself. Rendering a document from the
     // parent window can produce a blank PDF on mobile browsers.
