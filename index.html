@@ -583,6 +583,50 @@ header.app-header{
   margin-bottom:14px;
 }
 .home-hero h2{ margin:0 0 6px; font-size:22px; }
+
+.home-hero-toggle{
+  width:100%;
+  border:0;
+  padding:0;
+  margin:0 0 6px;
+  background:transparent;
+  color:var(--text);
+  font:inherit;
+  font-size:22px;
+  font-weight:800;
+  text-align:right;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  cursor:default;
+}
+.home-hero-chevron{display:none}
+.home-hero-content{display:block}
+
+@media(max-width:560px){
+  .home-hero{
+    margin-bottom:10px;
+    padding:14px 15px;
+  }
+  .home-hero-toggle{
+    margin:0;
+    font-size:20px;
+    cursor:pointer;
+  }
+  .home-hero-chevron{
+    display:inline-block;
+    font-size:24px;
+    line-height:1;
+    transition:transform .2s ease;
+  }
+  .home-hero-content{
+    display:none;
+    padding-top:10px;
+  }
+  .home-hero.is-open .home-hero-content{display:block}
+  .home-hero.is-open .home-hero-chevron{transform:rotate(180deg)}
+  .home-hero .hint{margin-bottom:0}
+}
 .home-hero .hint{ font-size:13px; }
 .home-summary{
   display:grid;
@@ -941,13 +985,24 @@ body.account-frozen .readonly-disabled{
   <main class="wrap" id="app">
 
     <section class="home-dashboard" id="homeDashboard">
-      <div class="home-hero">
-        <h2>מה עושים היום?</h2>
-        <div class="hint">
-          מרכז עבודה מהיר לעצמאים — הזנת הוצאות, ייבוא הכנסות, דוחות, מע״מ ומודולים מתקדמים בהמשך.
-          <span id="homeRangeLabel">הטווח נשמר עד שינוי ידני.</span>
-        </div>
-        <div class="home-range-panel">
+      <div class="home-hero" id="homeHero">
+        <button
+          type="button"
+          class="home-hero-toggle"
+          id="homeHeroToggle"
+          aria-expanded="false"
+          aria-controls="homeHeroContent"
+        >
+          <span>מה עושים היום?</span>
+          <span class="home-hero-chevron" aria-hidden="true">⌄</span>
+        </button>
+
+        <div class="home-hero-content" id="homeHeroContent">
+          <div class="hint">
+            בחרו טווח חודשים לתצוגה
+            <span id="homeRangeLabel" hidden></span>
+          </div>
+          <div class="home-range-panel">
           <div class="home-range-title">תקופת עבודה</div>
           <div class="home-range-controls">
             <label>חודש<br><input type="month" id="homeMonth" /></label>
@@ -968,11 +1023,12 @@ body.account-frozen .readonly-disabled{
             <button type="button" class="btn secondary small" id="btnHomeClearDates">ניקוי תאריכים</button>
           </div>
         </div>
-        <div class="home-summary" id="homeSummaryCards">
-          <div class="metric"><div class="k">הכנסות בתקופה</div><div class="v income" id="homeIncGross">₪ 0.00</div></div>
-          <div class="metric"><div class="k">הוצאות בתקופה</div><div class="v expense" id="homeExpGross">₪ 0.00</div></div>
-          <div class="metric"><div class="k">מע״מ לתשלום</div><div class="v" id="homeVatNet">₪ 0.00</div></div>
-          <div class="metric"><div class="k">רווח משוער</div><div class="v" id="homeProfit">₪ 0.00</div></div>
+          <div class="home-summary" id="homeSummaryCards">
+            <div class="metric"><div class="k">הכנסות בתקופה</div><div class="v income" id="homeIncGross">₪ 0.00</div></div>
+            <div class="metric"><div class="k">הוצאות בתקופה</div><div class="v expense" id="homeExpGross">₪ 0.00</div></div>
+            <div class="metric"><div class="k">מע״מ לתשלום</div><div class="v" id="homeVatNet">₪ 0.00</div></div>
+            <div class="metric"><div class="k">רווח משוער</div><div class="v" id="homeProfit">₪ 0.00</div></div>
+          </div>
         </div>
       </div>
 
@@ -5193,6 +5249,44 @@ function exportPDF() {
     
   
 <div id="appToast" class="app-toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const hero = document.getElementById("homeHero");
+  const toggle = document.getElementById("homeHeroToggle");
+  if (!hero || !toggle) return;
+
+  const mobileQuery = window.matchMedia("(max-width: 560px)");
+
+  const syncState = () => {
+    if (mobileQuery.matches) {
+      const isOpen = hero.classList.contains("is-open");
+      toggle.setAttribute("aria-expanded", String(isOpen));
+    } else {
+      hero.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "true");
+    }
+  };
+
+  toggle.addEventListener("click", () => {
+    if (!mobileQuery.matches) return;
+    hero.classList.toggle("is-open");
+    toggle.setAttribute(
+      "aria-expanded",
+      String(hero.classList.contains("is-open"))
+    );
+  });
+
+  if (typeof mobileQuery.addEventListener === "function") {
+    mobileQuery.addEventListener("change", syncState);
+  } else if (typeof mobileQuery.addListener === "function") {
+    mobileQuery.addListener(syncState);
+  }
+
+  syncState();
+})();
+</script>
+
 </body>
   </html>
   `;
