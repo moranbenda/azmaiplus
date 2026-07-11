@@ -447,9 +447,9 @@
       </div>
     </section>
 
-    <section class="card">
+    <section class="card" id="customersSection">
       <div class="card-hd">
-        <h3>תוצאות חיפוש</h3>
+        <h3>רשימת לקוחות</h3>
         <div class="status" id="saveStatus">טוען…</div>
       </div>
       <div class="card-bd">
@@ -462,10 +462,13 @@
     </section>
   </div>
 
-  <section class="card" style="margin-top:14px" id="selectedCard">
+  <section class="card" style="margin-top:14px;display:none" id="selectedCard">
     <div class="card-hd">
       <h3>כרטיס לקוח</h3>
-      <div class="status" id="selectedStatus">בחרו לקוח מהרשימה</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="status" id="selectedStatus">בחרו לקוח מהרשימה</div>
+        <button class="btn secondary small" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
+      </div>
     </div>
     <div class="card-bd" id="selectedBody">
       <div class="empty">לא נבחר לקוח.</div>
@@ -474,6 +477,8 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -497,6 +502,8 @@ const $ = (id) => document.getElementById(id);
 const userTag = $("userTag");
 const saveStatus = $("saveStatus");
 const toast = $("toast");
+
+$("btnBackToCustomers")?.addEventListener("click", showCustomerList);
 
 let currentUser = null;
 let userProfile = {};
@@ -698,8 +705,23 @@ async function deleteCustomer(id){
 
 function selectCustomer(id){
   selectedId = id;
+  const listSection = $("customersSection");
+  const selectedCard = $("selectedCard");
+  if (listSection) listSection.style.display = "none";
+  if (selectedCard) selectedCard.style.display = "";
   renderSelected();
-  document.getElementById("selectedCard").scrollIntoView({behavior:"smooth", block:"start"});
+  selectedCard?.scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function showCustomerList(){
+  selectedId = null;
+  syncCustomerSearch("");
+  const listSection = $("customersSection");
+  const selectedCard = $("selectedCard");
+  if (selectedCard) selectedCard.style.display = "none";
+  if (listSection) listSection.style.display = "";
+  render();
+  listSection?.scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 function customerMatches(c, q){
@@ -732,60 +754,50 @@ function syncCustomerSearch(value){
 
 function render(){
   renderStats();
-  const q = getCustomerSearch();
-  const filtered = customers.filter(c => customerMatches(c, q));
-  const list = $("customersList");
 
-  if (!q) {
-    list.innerHTML = `<div class="empty">הקלידו שם, מייל, טלפון או מספר מזהה כדי להציג לקוחות.</div>`;
+  if (selectedId && customers.some(c => c.id === selectedId)) {
+    const listSection = $("customersSection");
+    const selectedCard = $("selectedCard");
+    if (listSection) listSection.style.display = "none";
+    if (selectedCard) selectedCard.style.display = "";
     renderSelected();
     return;
   }
+
+  const q = getCustomerSearch();
+  const filtered = (q
+    ? customers.filter(c => customerMatches(c, q))
+    : customers.slice()
+  ).sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "he"));
+
+  const list = $("customersList");
+  const listSection = $("customersSection");
+  const selectedCard = $("selectedCard");
+
+  if (listSection) listSection.style.display = "";
+  if (selectedCard) selectedCard.style.display = "none";
 
   if (!filtered.length) {
     list.innerHTML = `<div class="empty">${customers.length ? "לא נמצאו לקוחות בחיפוש." : "עדיין אין לקוחות. לחצו על הוספת לקוח חדש כדי להתחיל."}</div>`;
-    renderSelected();
     return;
   }
 
-  const cards = filtered.map(c => {
-    const isActive = selectedId === c.id ? " active" : "";
-    const contactBits = [
-      c.contact ? `איש קשר: ${escapeHtml(c.contact)}` : "",
-      c.phone ? `טלפון: ${escapeHtml(c.phone)}` : "",
-      c.email ? `מייל: ${escapeHtml(c.email)}` : ""
-    ].filter(Boolean);
-    return `
-      <div class="customer-list-card${isActive}" data-action="select" data-id="${escapeHtml(c.id)}" role="button" tabindex="0" aria-label="פתיחת כרטיס לקוח ${escapeHtml(c.name)}">
-        <button class="customer-name-link" type="button" data-action="select" data-id="${escapeHtml(c.id)}">${escapeHtml(c.name)}</button>
-        <div class="hint">${escapeHtml(customerTypeLabels[c.type] || "אחר")}${c.taxId ? " · " + escapeHtml(c.taxId) : ""}</div>
-        <div class="customer-meta">
-          ${c.city ? `<span class="meta-item">${escapeHtml(c.city)}</span>` : ``}
-          ${c.paymentTerms ? `<span class="meta-item">${escapeHtml(termsLabels[c.paymentTerms] || c.paymentTerms)}</span>` : ``}
-          ${contactBits.length ? contactBits.slice(0,3).map(x => `<span class="meta-item ok">${x}</span>`).join("") : `<span class="meta-item">אין פרטי קשר</span>`}
-        </div>
-      </div>
-    `;
-  }).join("");
+  const rows = filtered.map(c => `
+    <button class="customer-list-card customer-name-link"
+            type="button"
+            data-action="select"
+            data-id="${escapeHtml(c.id)}"
+            aria-label="פתיחת כרטיס לקוח ${escapeHtml(c.name)}">
+      ${escapeHtml(c.name)}
+    </button>
+  `).join("");
 
-  list.innerHTML = `<div class="customer-list-grid">${cards}</div>`;
+  list.innerHTML = `<div class="customer-list-grid">${rows}</div>`;
 
   list.querySelectorAll("[data-action='select']").forEach(el => {
-    el.addEventListener("click", (ev) => {
-      ev.stopPropagation();
-      selectCustomer(el.dataset.id);
-    });
-    el.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        selectCustomer(el.dataset.id);
-      }
-    });
+    el.addEventListener("click", () => selectCustomer(el.dataset.id));
   });
-
-  renderSelected();
 }
-
 
 function money(value){
   return Number(value || 0).toLocaleString("he-IL", {style:"currency", currency:"ILS"});
@@ -916,6 +928,108 @@ function openStoredDocument(docId, shouldPrint=false){
   w.document.close();
 }
 
+async function waitForFrameImages(frameDocument){
+  const images = Array.from(frameDocument?.images || []);
+  await Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener("load", resolve, {once:true});
+      img.addEventListener("error", resolve, {once:true});
+    });
+  }));
+}
+
+async function documentHtmlToPdfBase64(documentHtml, fileName){
+  if (!window.html2pdf) {
+    throw new Error("רכיב יצירת ה־PDF לא נטען. יש לרענן את העמוד ולנסות שוב.");
+  }
+
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.left = "-10000px";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
+  iframe.style.opacity = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.srcdoc = documentHtml;
+  document.body.appendChild(iframe);
+
+  try {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("טעינת המסמך ל־PDF נמשכה זמן רב מדי.")), 15000);
+      iframe.addEventListener("load", () => {
+        clearTimeout(timeout);
+        resolve();
+      }, {once:true});
+    });
+
+    const frameDocument = iframe.contentDocument;
+    if (!frameDocument?.body) {
+      throw new Error("לא ניתן היה להכין את המסמך ל־PDF.");
+    }
+
+    await waitForFrameImages(frameDocument);
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const dataUri = await window.html2pdf()
+      .set({
+        margin: [8, 8, 10, 8],
+        filename: fileName,
+        image: {type: "jpeg", quality: 0.98},
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: 794
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait"
+        },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: ["tr", ".box", ".totals"]
+        }
+      })
+      .from(frameDocument.body)
+      .outputPdf("datauristring");
+
+    const base64 = String(dataUri || "").split(",")[1];
+    if (!base64) {
+      throw new Error("יצירת קובץ ה־PDF נכשלה.");
+    }
+
+    return base64;
+  } finally {
+    iframe.remove();
+  }
+}
+
+function businessNameForEmail(){
+  return clean(
+    userProfile.businessName ||
+    userProfile.business ||
+    userProfile.companyName ||
+    userProfile.fullName ||
+    currentUser?.displayName ||
+    "עצמאי פלוס"
+  );
+}
+
+function businessLogoForEmail(){
+  return clean(
+    userProfile.businessLogoDataUrl ||
+    userProfile.businessLogo ||
+    userProfile.logoDataUrl ||
+    ""
+  );
+}
+
 async function resendStoredDocument(docId){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
 
@@ -937,115 +1051,51 @@ async function resendStoredDocument(docId){
     return showToast("ללקוח לא מוגדרת כתובת מייל.", true);
   }
 
-  const baseHtml = `<!doctype html>
-  <html lang="he" dir="rtl">
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
-      <style>
-        body{
-          font-family:Arial,"Segoe UI",sans-serif;
-          direction:rtl;
-          color:#111827;
-          margin:24px;
-          background:#ffffff;
-        }
-        .print-footer{
-          position:fixed;
-          bottom:8mm;
-          left:0;
-          right:0;
-          text-align:center;
-          font-size:11px;
-          color:#64748b;
-        }
-        .doc-head{
-          display:flex;
-          justify-content:space-between;
-          gap:16px;
-          margin-bottom:18px;
-        }
-        .doc-title{text-align:left}
-        .doc-number{font-size:16px;line-height:1.8}
-        .doc-number b{font-size:22px}
-        h2{margin:0 0 8px;font-size:30px}
-        h3{margin:0 0 8px;font-size:14px}
-        .doc-meta{font-size:12px;color:#334155;line-height:1.7}
-        .box{
-          border:1px solid #dbe3ef;
-          border-radius:14px;
-          padding:14px;
-          min-height:70px;
-        }
-        .doc-parties{
-          display:block;
-          direction:rtl;
-          text-align:right;
-          margin-bottom:18px;
-        }
-        .customer-box{
-          display:block;
-          float:right;
-          width:46%;
-          min-width:240px;
-          margin:0;
-          text-align:right;
-          direction:rtl;
-        }
-        .doc-parties:after{
-          content:"";
-          display:block;
-          clear:both;
-        }
-        .items{
-          width:100%;
-          border-collapse:collapse;
-          margin-top:14px;
-        }
-        th,td{
-          border-bottom:1px solid #e5edf7;
-          padding:10px;
-          text-align:right;
-        }
-        th{background:#f1f5f9}
-        .totals{
-          margin-top:16px;
-          margin-right:auto;
-          width:280px;
-          border:1px solid #dbe3ef;
-          border-radius:14px;
-          overflow:hidden;
-        }
-        .totals div{
-          display:flex;
-          justify-content:space-between;
-          padding:10px 12px;
-          border-bottom:1px solid #e5edf7;
-        }
-        .totals div:last-child{
-          border-bottom:0;
-          font-weight:700;
-          background:#f8fafc;
-        }
-        @page{
-          size:A4 portrait;
-          margin:14mm;
-        }
-      </style>
-    </head>
-    <body>
-      ${documentHtmlForView(d)}
-      <div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div>
-    </body>
-  </html>`;
+  const baseHtml =
+    d.printHtml ||
+    `<!doctype html>
+    <html lang="he" dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+        <style>
+          body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:#fff}
+          .print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
+          .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}
+          .doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}
+          h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}
+          .doc-meta{font-size:12px;color:#334155;line-height:1.7}
+          .box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}
+          .doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}
+          .customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}
+          .doc-parties:after{content:"";display:block;clear:both}
+          .items{width:100%;border-collapse:collapse;margin-top:14px}
+          th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}
+          th{background:#f1f5f9}
+          .totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}
+          .totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}
+          .totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}
+          @page{size:A4 portrait;margin:14mm}
+        </style>
+      </head>
+      <body>
+        ${documentHtmlForView(d)}
+        <div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div>
+      </body>
+    </html>`;
 
   const documentHtml = normalizeStoredDocumentHtml(baseHtml, d);
+  const safeType = documentDisplayType(d);
+  const pdfFileName = `${safeType}-${d.number || "document"}.pdf`;
 
   try {
-    showToast("שולח את המסמך במייל…");
+    showToast("מכין PDF ושולח את המסמך במייל…");
 
-    const idToken = await currentUser.getIdToken();
+    const [idToken, pdfBase64] = await Promise.all([
+      currentUser.getIdToken(),
+      documentHtmlToPdfBase64(documentHtml, pdfFileName)
+    ]);
 
     const response = await fetch("/api/send-document-email", {
       method: "POST",
@@ -1056,11 +1106,13 @@ async function resendStoredDocument(docId){
       body: JSON.stringify({
         to: recipientEmail,
         customerName: customer?.name || d.customerName || "לקוח/ה",
-        documentType: documentDisplayType(d),
+        documentType: safeType,
         documentNumber: d.number || "",
-        documentHtml,
-        fileName: `${documentDisplayType(d)}-${d.number || "document"}.html`,
-        businessName: "עצמאי פלוס"
+        attachmentBase64: pdfBase64,
+        attachmentMimeType: "application/pdf",
+        fileName: pdfFileName,
+        businessName: businessNameForEmail(),
+        businessLogoDataUrl: businessLogoForEmail()
       })
     });
 
@@ -1070,7 +1122,7 @@ async function resendStoredDocument(docId){
       throw new Error(result.error || "שליחת המייל נכשלה.");
     }
 
-    showToast(`המסמך נשלח בהצלחה ל־${recipientEmail} ✅`);
+    showToast(`המסמך נשלח בהצלחה ל־${recipientEmail} כ־PDF ✅`);
   } catch (error) {
     console.error("Document email error:", error);
     showToast(error?.message || "אירעה שגיאה בשליחת המסמך.", true);
@@ -1082,10 +1134,12 @@ function renderSelected(){
   const status = $("selectedStatus");
   const body = $("selectedBody");
   if (!c) {
+    $("selectedCard").style.display = "none";
     status.textContent = "בחרו לקוח מהרשימה";
     body.innerHTML = `<div class="empty">לא נבחר לקוח. לחיצה על שם לקוח ברשימה תפתח את הכרטיס שלו.</div>`;
     return;
   }
+  $("selectedCard").style.display = "";
   status.textContent = c.name;
 
   const docs = docsForCustomer(c);
