@@ -905,7 +905,8 @@ function polishHebrewPdfHtml(html){
         white-space:nowrap;
       }
       .doc-meta,.customer-box{
-        unicode-bidi:plaintext;
+        unicode-bidi:embed;
+        direction:rtl;
       }
     </style>`;
 
@@ -1023,6 +1024,24 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
     }
 
     await waitForFrameImages(frameDocument);
+
+    // Preserve Hebrew spaces and punctuation in the customer/business details
+    // before html2canvas rasterizes the document on mobile browsers.
+    frameDocument.querySelectorAll(".customer-box, .doc-meta").forEach(container => {
+      const walker = frameDocument.createTreeWalker(
+        container,
+        frameWindow.NodeFilter.SHOW_TEXT
+      );
+
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      textNodes.forEach(node => {
+        node.nodeValue = String(node.nodeValue || "")
+          .replace(/ /g, "\u00A0")
+          .replace(/:/g, ":\u200F");
+      });
+    });
 
     // Load html2pdf inside the iframe itself. Rendering a document from the
     // parent window can produce a blank PDF on mobile browsers.
