@@ -996,7 +996,7 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
 
     const dataUri = await frameWindow.html2pdf()
       .set({
-        margin: [8, 8, 10, 8],
+        margin: 8,
         filename: fileName,
         image: {type: "jpeg", quality: 0.98},
         html2canvas: {
