@@ -1025,23 +1025,108 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
 
     await waitForFrameImages(frameDocument);
 
-    // Preserve Hebrew spaces and punctuation in the customer/business details
-    // before html2canvas rasterizes the document on mobile browsers.
-    frameDocument.querySelectorAll(".customer-box, .doc-meta").forEach(container => {
+    // Rebuild the business/customer details as explicit label/value rows.
+    // This prevents Hebrew punctuation and LTR values (email/phone/ID)
+    // from changing order when html2canvas renders the PDF on mobile.
+    const rebuildDetailBlock = (container, preserveHeading = false) => {
+      if (!container) return;
+
+      const heading = preserveHeading
+        ? container.querySelector("h3")?.outerHTML || ""
+        : "";
+
+      const working = container.cloneNode(true);
+      if (preserveHeading) working.querySelector("h3")?.remove();
+
+      const segments = working.innerHTML
+        .split(/<br\s*\/?\s*>/i)
+        .map(part => part.trim())
+        .filter(Boolean);
+
+      const rows = segments.map(segment => {
+        const holder = frameDocument.createElement("div");
+        holder.innerHTML = segment;
+
+        const plainText = String(holder.textContent || "").trim();
+        const colonIndex = plainText.indexOf(":");
+
+        if (colonIndex < 0) {
+          return `<div class="azmai-detail-name">${segment}</div>`;
+        }
+
+        const label = plainText.slice(0, colonIndex).trim();
+        const value = plainText.slice(colonIndex + 1).trim();
+        const isLtrValue =
+          /@/.test(value) ||
+          /^[+\d\s().\/-]+$/.test(value) ||
+          /^[A-Za-z0-9._%+\-@]+$/.test(value);
+
+        return `
+          <div class="azmai-detail-row">
+            <span class="azmai-detail-label">${escapeHtml(label)}:</span>
+            <span class="azmai-detail-value"
+                  dir="${isLtrValue ? "ltr" : "rtl"}">${escapeHtml(value)}</span>
+          </div>`;
+      }).join("");
+
+      container.innerHTML = `${heading}${rows}`;
+    };
+
+    rebuildDetailBlock(
+      frameDocument.querySelector(".doc-head > div:first-child .doc-meta"),
+      false
+    );
+    rebuildDetailBlock(
+      frameDocument.querySelector(".customer-box"),
+      true
+    );
+
+    // Preserve every intended space in item descriptions.
+    frameDocument.querySelectorAll(".items td").forEach(cell => {
       const walker = frameDocument.createTreeWalker(
-        container,
+        cell,
         frameWindow.NodeFilter.SHOW_TEXT
       );
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
 
-      const textNodes = [];
-      while (walker.nextNode()) textNodes.push(walker.currentNode);
-
-      textNodes.forEach(node => {
-        node.nodeValue = String(node.nodeValue || "")
-          .replace(/ /g, "\u00A0")
-          .replace(/:/g, ":\u200F");
+      nodes.forEach(node => {
+        node.nodeValue = String(node.nodeValue || "").replace(/ /g, "\u00A0");
       });
     });
+
+    const bidiStyle = frameDocument.createElement("style");
+    bidiStyle.textContent = `
+      .azmai-detail-row{
+        display:flex!important;
+        flex-direction:row!important;
+        justify-content:flex-start!important;
+        align-items:baseline!important;
+        gap:5px!important;
+        direction:rtl!important;
+        text-align:right!important;
+        white-space:nowrap!important;
+      }
+      .azmai-detail-label{
+        direction:rtl!important;
+        unicode-bidi:isolate!important;
+        flex:0 0 auto!important;
+      }
+      .azmai-detail-value{
+        unicode-bidi:isolate!important;
+        display:inline-block!important;
+        flex:0 1 auto!important;
+      }
+      .azmai-detail-name{
+        direction:rtl!important;
+        text-align:right!important;
+        white-space:nowrap!important;
+      }
+      .items td{
+        white-space:pre-wrap!important;
+      }
+    `;
+    frameDocument.head.appendChild(bidiStyle);
 
     // Load html2pdf inside the iframe itself. Rendering a document from the
     // parent window can produce a blank PDF on mobile browsers.
