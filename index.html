@@ -3315,20 +3315,93 @@ function saveToLocal() {
   }
 }
 
+let pendingCloudSave = false;
+
+function mergeLedgerRows(...rowLists){
+  const byId = new Map();
+
+  rowLists.flat().forEach(row => {
+    if (!row || typeof row !== "object") return;
+
+    const fallbackId = [
+      row.type || "",
+      row.date || "",
+      row.amount ?? "",
+      row.desc || "",
+      row.docNumber || ""
+    ].join("|");
+
+    const key = String(row.id || fallbackId);
+    const previous = byId.get(key);
+
+    if (!previous) {
+      byId.set(key, row);
+      return;
+    }
+
+    const previousTime = Number(previous.updatedAt || previous.createdAt || 0);
+    const currentTime = Number(row.updatedAt || row.createdAt || 0);
+
+    if (currentTime >= previousTime) byId.set(key, row);
+  });
+
+  return Array.from(byId.values());
+}
+
+function readLocalRecoveryPayloads(uid){
+  const payloads = [];
+  if (!uid) return payloads;
+
+  try {
+    const currentRaw = localStorage.getItem(ledgerKey(uid));
+    if (currentRaw) payloads.push(JSON.parse(currentRaw));
+  } catch (e) {
+    console.warn("current local ledger recovery read failed", e);
+  }
+
+  try {
+    const backups = JSON.parse(
+      localStorage.getItem(ledgerBackupKey(uid)) || "[]"
+    );
+
+    backups.forEach(entry => {
+      if (entry?.payload && typeof entry.payload === "object") {
+        payloads.push(entry.payload);
+      }
+    });
+  } catch (e) {
+    console.warn("local ledger backups recovery read failed", e);
+  }
+
+  return payloads;
+}
+
 async function saveToCloud() {
-  if (!currentUid || isHydratingLedger || cloudLoadedForUid !== currentUid) return;
+  if (!currentUid) return false;
+
+  if (isHydratingLedger || cloudLoadedForUid !== currentUid) {
+    pendingCloudSave = true;
+    return false;
+  }
+
   try {
     const updatedAt = new Date().toISOString();
     localLedgerMeta.updatedAt = updatedAt;
     const ref = doc(db, "ledgers", currentUid);
+
     await setDoc(ref, {
       rows,
       settings: getSettings(),
       updatedAt
     }, { merge: true });
+
     lastCloudSavedAt = updatedAt;
+    pendingCloudSave = false;
+    return true;
   } catch (e) {
+    pendingCloudSave = true;
     console.error("cloud save error", e);
+    return false;
   }
 }
 
@@ -3351,18 +3424,24 @@ function saveToCloudDebounced() {
   cloudSaveTimer = setTimeout(() => { saveToCloud(); }, 400);
 }
 async function loadFromCloudFirst() {
-  if (!currentUid) { rows = []; localLedgerMeta = { updatedAt: null }; cloudLoadedForUid = null; return; }
+  if (!currentUid) {
+    rows = [];
+    localLedgerMeta = { updatedAt: null };
+    cloudLoadedForUid = null;
+    return;
+  }
 
   const uid = currentUid;
   clearPendingSaves();
   isHydratingLedger = true;
   cloudLoadedForUid = null;
-  loadFromLocal();
-  const localSnapshot = {
-    rows: rows.slice(),
-    settings: getSettings(),
-    updatedAt: localLedgerMeta.updatedAt
-  };
+
+  const recoveryPayloads = readLocalRecoveryPayloads(uid);
+  const recoveredLocalRows = mergeLedgerRows(
+    ...recoveryPayloads.map(payload => Array.isArray(payload?.rows) ? payload.rows : [])
+  );
+
+  let cloudObj = null;
 
   try {
     const ref = doc(db, "ledgers", uid);
@@ -3370,34 +3449,40 @@ async function loadFromCloudFirst() {
 
     if (currentUid !== uid) return;
 
-    if (snap.exists()) {
-      const cloudObj = snap.data() || {};
-      applyLedgerPayload(cloudObj);
-      cloudLoadedForUid = uid;
-      lastCloudSavedAt = cloudObj.updatedAt || null;
-      saveToLocal();
-      return;
-    }
+    cloudObj = snap.exists() ? (snap.data() || {}) : {};
+    const cloudRows = Array.isArray(cloudObj.rows) ? cloudObj.rows : [];
 
-    if (localSnapshot.rows.length) {
-      rows = localSnapshot.rows;
-      localLedgerMeta.updatedAt = localSnapshot.updatedAt || new Date().toISOString();
-      cloudLoadedForUid = uid;
-      await saveToCloud();
-      return;
-    }
+    rows = mergeLedgerRows(cloudRows, recoveredLocalRows);
 
-    rows = [];
-    localLedgerMeta = { updatedAt: null };
+    const cloudSettings = cloudObj.settings || {};
+    applyLedgerPayload({
+      rows,
+      settings: cloudSettings,
+      updatedAt: new Date().toISOString()
+    });
+
     cloudLoadedForUid = uid;
+    lastCloudSavedAt = cloudObj.updatedAt || null;
+
+    // Save the merged result locally first, then back to Firestore.
+    saveToLocal();
   } catch (e) {
     console.error("cloud load error", e);
     if (currentUid !== uid) return;
-    rows = localSnapshot.rows;
-    localLedgerMeta.updatedAt = localSnapshot.updatedAt;
+
+    rows = recoveredLocalRows;
+    localLedgerMeta.updatedAt = new Date().toISOString();
     cloudLoadedForUid = uid;
+    saveToLocal();
   } finally {
-    if (currentUid === uid) isHydratingLedger = false;
+    if (currentUid === uid) {
+      isHydratingLedger = false;
+
+      // Never lose a save that happened while the account was loading.
+      if (pendingCloudSave || rows.length) {
+        await saveToCloud();
+      }
+    }
   }
 }
 
@@ -4275,7 +4360,8 @@ async function addRow() {
     saveToLocal();
     scheduleCloudSave();
     writeAuditLog("transaction_create", row.type || "transaction", row.id, {
-      row: rowAuditSummary(row)
+      row: rowAuditSummary(row),
+      rowData: { ...row }
     });
 
     // לא מאפסים את טווח החודשים שנבחר על ידי המשתמש.
