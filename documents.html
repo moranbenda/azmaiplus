@@ -325,37 +325,51 @@ function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.inner
 async function deleteDraft(id){ const d=drafts.find(x=>String(x.id)===String(id)); if(!d)return; if(!confirm('למחוק את הטיוטה?'))return; const prev=drafts; drafts=drafts.filter(x=>String(x.id)!==String(id)); try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נמחקה','ok'); }catch(e){ console.error(e); drafts=prev; renderDrafts(); setStatus($('draftStatus'),'שגיאה במחיקת טיוטה','err'); } }
 function loadDraft(id){ const d=drafts.find(x=>x.id===id); if(!d)return; $('docType').value=d.type; $('docNumber').value=d.number; $('docDate').value=d.date; $('docCustomer').value=d.customerId||''; const c=getSelectedCustomer(); $('docCustomerSearch').value=c?customerName(c):(d.customerName||''); renderSelectedCustomerHint(); docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:d.itemDesc||'',qty:d.qty||1,netPrice:d.price||0})]; $('docDiscountPct').value=d.discountPct||0; $('paymentMethod').value=d.paymentMethod||''; $('paymentRef').value=d.paymentRef||''; $('docVatRate').value=d.vatRate||profile.vatRate||18; $('docNotes').value=d.notes||''; updatePaymentVisibility(); renderLinesEditor(); renderPreview(); window.scrollTo({top:0,behavior:'smooth'}); }
 
-function shouldCreateIncomeForDoc(type){
+function documentIncomeEffect(type){
   const businessType = String(profile.businessType || '').toLowerCase();
-  if(type === 'tax_invoice' || type === 'tax_invoice_receipt') return true;
-  if(type === 'receipt' && businessType === 'ptor') return true;
-  return false;
+
+  if(type === 'credit_note') return -1;
+  if(type === 'tax_invoice' || type === 'tax_invoice_receipt') return 1;
+  if(type === 'receipt' && businessType === 'ptor') return 1;
+
+  return 0;
+}
+
+function shouldCreateIncomeForDoc(type){
+  return documentIncomeEffect(type) !== 0;
 }
 function documentLedgerEntry(finalDoc){
+  const effect = documentIncomeEffect(finalDoc.type);
+  const signedGross = Number(finalDoc.gross || 0) * (effect === -1 ? -1 : 1);
+  const signedNet = Number(finalDoc.net || 0) * (effect === -1 ? -1 : 1);
+  const signedVat = Number(finalDoc.vat || 0) * (effect === -1 ? -1 : 1);
+
   return {
     id: finalDoc.id,
     type: finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || finalDoc.type,
     number: finalDoc.number,
     date: finalDoc.date,
-    debit: finalDoc.gross || 0,
-    credit: 0,
-    balance: finalDoc.gross || 0,
-    net: finalDoc.net || 0,
-    vat: finalDoc.vat || 0,
-    gross: finalDoc.gross || 0,
+    debit: effect === -1 ? 0 : signedGross,
+    credit: effect === -1 ? Math.abs(signedGross) : 0,
+    balance: signedGross,
+    net: signedNet,
+    vat: signedVat,
+    gross: signedGross,
     allocationNumber: finalDoc.allocationNumber || '',
     status: 'issued',
     createdAt: finalDoc.createdAt
   };
 }
 function incomeRowFromDocument(finalDoc){
+  const effect = documentIncomeEffect(finalDoc.type);
+
   return {
     id: finalDoc.incomeRowId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())),
     type: 'income',
     date: finalDoc.date,
     desc: `${finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || 'מסמך'} ${finalDoc.number || ''} - ${finalDoc.customerName || ''}`.trim(),
     category: 'מסמכים',
-    amount: Number(finalDoc.gross || 0),
+    amount: Number(finalDoc.gross || 0) * effect,
     incVat: Number(finalDoc.vat || 0) > 0,
     vatRate: Number(finalDoc.vatRate || 0),
     source: 'document',
@@ -396,6 +410,296 @@ function printableDocumentHtml(content){
     .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-parties{display:block!important;direction:rtl;text-align:right;margin-bottom:18px}.doc-parties .box,.customer-box{display:block!important;width:46%;min-width:240px;margin-right:0!important;margin-left:auto!important;text-align:right!important;direction:rtl!important}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.allocation-number{margin-top:6px;color:#334155}@page{size:A4 portrait;margin:14mm}
   </style></head><body>${content}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
 }
+
+function polishHebrewPdfHtml(html){
+  let out = String(html || "");
+
+  const replacements = [
+    ["הצעת מחיר", "הצעת&nbsp;מחיר"],
+    ["חשבונית מס/קבלה", "חשבונית&nbsp;מס/קבלה"],
+    ["חשבונית מס", "חשבונית&nbsp;מס"],
+    ["חשבונית זיכוי", "חשבונית&nbsp;זיכוי"],
+    ["חשבונית עסקה", "חשבונית&nbsp;עסקה"],
+    ["מספר עוסק/ח.פ:", "מספר&nbsp;עוסק/ח.פ:"],
+    ["מספר מזהה:", "מספר&nbsp;מזהה:"],
+    ["איש קשר:", "איש&nbsp;קשר:"],
+    ["מחיר לפני מע״מ", "מחיר&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לפני מע״מ", "סה״כ&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לאחר הנחה לפני מע״מ", "סה״כ&nbsp;לאחר&nbsp;הנחה&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לתשלום", "סה״כ&nbsp;לתשלום"]
+  ];
+
+  replacements.forEach(([from, to]) => {
+    out = out.split(from).join(to);
+  });
+
+  const pdfTextFix = `
+    <style id="azmai-pdf-hebrew-text-fix">
+      h2,h3,th,td,.doc-meta,.customer-box,.totals span{
+        word-spacing:.12em;
+      }
+      h2,h3,.azmai-nowrap{
+        white-space:nowrap;
+      }
+      .doc-meta,.customer-box{
+        unicode-bidi:embed;
+        direction:rtl;
+      }
+    </style>`;
+
+  if (out.includes("</head>")) {
+    out = out.replace("</head>", `${pdfTextFix}</head>`);
+  } else {
+    out = pdfTextFix + out;
+  }
+
+  return out;
+}
+
+async function waitForFrameImages(frameDocument){
+  const images = Array.from(frameDocument?.images || []);
+  await Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener("load", resolve, {once:true});
+      img.addEventListener("error", resolve, {once:true});
+    });
+  }));
+}
+
+async function documentHtmlToPdfBase64(documentHtml, fileName){
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.left = "0";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
+  iframe.style.opacity = "1";
+  iframe.style.visibility = "visible";
+  iframe.style.zIndex = "2147483647";
+  iframe.style.background = "#ffffff";
+  iframe.style.border = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.srcdoc = documentHtml;
+  document.body.appendChild(iframe);
+
+  try {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("טעינת המסמך ל־PDF נמשכה זמן רב מדי.")),
+        15000
+      );
+
+      iframe.addEventListener("load", () => {
+        clearTimeout(timeout);
+        resolve();
+      }, {once:true});
+    });
+
+    const frameDocument = iframe.contentDocument;
+    const frameWindow = iframe.contentWindow;
+
+    if (!frameDocument?.body || !frameWindow) {
+      throw new Error("לא ניתן היה להכין את המסמך ל־PDF.");
+    }
+
+    await waitForFrameImages(frameDocument);
+
+    // Preserve the customer block exactly as in the last good version.
+    frameDocument.querySelectorAll(".customer-box").forEach(container => {
+      const walker = frameDocument.createTreeWalker(
+        container,
+        frameWindow.NodeFilter.SHOW_TEXT
+      );
+
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      textNodes.forEach(node => {
+        node.nodeValue = String(node.nodeValue || "")
+          .replace(/ /g, "\u00A0")
+          .replace(/:/g, ":\u200F");
+      });
+    });
+
+    // Fix only the business email line. Mixed Hebrew + an LTR email address
+    // otherwise causes the label and colon to jump to the wrong side.
+    const businessMeta = frameDocument.querySelector(
+      ".doc-head > div:first-child .doc-meta"
+    );
+
+    if (businessMeta) {
+      const parts = businessMeta.innerHTML
+        .split(/<br\s*\/?\s*>/i)
+        .map(part => part.trim())
+        .filter(Boolean);
+
+      businessMeta.innerHTML = parts.map(part => {
+        const holder = frameDocument.createElement("div");
+        holder.innerHTML = part;
+        const plain = String(holder.textContent || "").trim();
+
+        if (/^מייל\s*:/.test(plain)) {
+          const email = plain.replace(/^מייל\s*:\s*/, "").trim();
+          return `<span dir="rtl" style="white-space:nowrap">
+            מייל:&nbsp;<span dir="ltr"
+              style="display:inline-block;unicode-bidi:isolate">${escapeHtml(email)}</span>
+          </span>`;
+        }
+
+        // Keep the original markup and only protect intended spaces.
+        return part.replace(/ /g, "&nbsp;");
+      }).join("<br>");
+    }
+
+    // Preserve spaces only in the description column, without touching
+    // quantities, prices or totals.
+    frameDocument
+      .querySelectorAll(".items tbody tr td:first-child")
+      .forEach(cell => {
+        const walker = frameDocument.createTreeWalker(
+          cell,
+          frameWindow.NodeFilter.SHOW_TEXT
+        );
+
+        const textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+        textNodes.forEach(node => {
+          node.nodeValue = String(node.nodeValue || "").replace(/ /g, "\u00A0");
+        });
+      });
+
+    // Load html2pdf inside the iframe itself. Rendering a document from the
+    // parent window can produce a blank PDF on mobile browsers.
+    if (!frameWindow.html2pdf) {
+      await new Promise((resolve, reject) => {
+        const script = frameDocument.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
+        script.onload = resolve;
+        script.onerror = () => reject(
+          new Error("רכיב יצירת ה־PDF לא נטען בתוך המסמך.")
+        );
+        frameDocument.head.appendChild(script);
+      });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    const dataUri = await frameWindow.html2pdf()
+      .set({
+        margin: 8,
+        filename: fileName,
+        image: {type: "jpeg", quality: 0.98},
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: 794,
+          windowHeight: Math.max(
+            1123,
+            frameDocument.documentElement.scrollHeight || 1123
+          )
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait"
+        },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: ["tr", ".box", ".totals"]
+        }
+      })
+      .from(frameDocument.body)
+      .outputPdf("datauristring");
+
+    const base64 = String(dataUri || "").split(",")[1];
+
+    if (!base64) {
+      throw new Error("יצירת קובץ ה־PDF נכשלה.");
+    }
+
+    return base64;
+  } finally {
+    iframe.remove();
+  }
+}
+
+function businessNameForEmail(){
+  return String(
+    profile.businessName ||
+    profile.business ||
+    profile.companyName ||
+    profile.fullName ||
+    auth.currentUser?.displayName ||
+    "עצמאי פלוס"
+  ).trim();
+}
+
+function businessLogoForEmail(){
+  return String(
+    profile.businessLogoDataUrl ||
+    profile.businessLogo ||
+    profile.logoDataUrl ||
+    ""
+  ).trim();
+}
+
+function pdfFileNameForDocument(finalDoc){
+  const type = finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || "מסמך";
+  const number = finalDoc.number || "document";
+  return `${type}-${number}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
+}
+
+async function sendIssuedDocumentEmail(finalDoc, customer){
+  const recipientEmail = String(
+    customer?.email ||
+    finalDoc.customerSnapshot?.email ||
+    ""
+  ).trim();
+
+  if(!recipientEmail){
+    throw new Error("ללקוח לא מוגדרת כתובת מייל.");
+  }
+
+  const fileName = pdfFileNameForDocument(finalDoc);
+  const polishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
+  const [idToken, pdfBase64] = await Promise.all([
+    auth.currentUser.getIdToken(),
+    documentHtmlToPdfBase64(polishedHtml, fileName)
+  ]);
+
+  const response = await fetch("/api/send-document-email", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${idToken}`
+    },
+    body: JSON.stringify({
+      to: recipientEmail,
+      customerName: finalDoc.customerName || customerName(customer),
+      documentType: finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || "מסמך",
+      documentNumber: finalDoc.number || "",
+      attachmentBase64: pdfBase64,
+      attachmentMimeType: "application/pdf",
+      fileName,
+      businessName: businessNameForEmail(),
+      businessLogoDataUrl: businessLogoForEmail()
+    })
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if(!response.ok || !result.ok){
+    throw new Error(result.error || "שליחת המייל נכשלה.");
+  }
+
+  return result;
+}
+
 async function issueDocument(){
   const c=getSelectedCustomer();
   if(!c){
@@ -468,7 +772,49 @@ async function issueDocument(){
     renderCustomerOptions();
     syncStats();
     renderPreview();
-    setStatus($('draftStatus'), shouldCreateIncomeForDoc(finalDoc.type) ? 'המסמך הופק ונרשם כהכנסה ✅' : 'המסמך הופק ✅', 'ok');
+
+    const baseSuccessMessage = shouldCreateIncomeForDoc(finalDoc.type)
+      ? 'המסמך הופק ונרשם כהכנסה ✅'
+      : 'המסמך הופק ✅';
+
+    if(c.autoSendDocuments){
+      if(!c.email){
+        setStatus(
+          $('draftStatus'),
+          `${baseSuccessMessage} השליחה האוטומטית לא בוצעה כי ללקוח אין כתובת מייל.`,
+          'err'
+        );
+      }else{
+        try{
+          setStatus($('draftStatus'), `${baseSuccessMessage} מכין PDF ושולח ללקוח…`, 'ok');
+          await sendIssuedDocumentEmail(finalDoc, c);
+          setStatus(
+            $('draftStatus'),
+            `${baseSuccessMessage} המסמך נשלח ל־${c.email} ✅`,
+            'ok'
+          );
+          await logAudit("מסמך נשלח במייל", {
+            entityType: "מסמך",
+            entityId: finalDoc.id,
+            documentId: finalDoc.id,
+            customerId: finalDoc.customerId,
+            customerName: finalDoc.customerName,
+            recipientEmail: c.email,
+            summary: `המסמך ${finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || ""} ${finalDoc.number || ""} נשלח ל־${c.email}`
+          });
+        }catch(mailError){
+          console.error("Automatic document email failed", mailError);
+          setStatus(
+            $('draftStatus'),
+            `${baseSuccessMessage} המסמך נשמר, אך השליחה במייל נכשלה: ${mailError?.message || 'שגיאה לא ידועה'}`,
+            'err'
+          );
+        }
+      }
+    }else{
+      setStatus($('draftStatus'), baseSuccessMessage, 'ok');
+    }
+
     updateDocNumber();
   }catch(e){
     console.error(e);
