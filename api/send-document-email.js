@@ -4,11 +4,10 @@
  * Required Vercel environment variables:
  * - RESEND_API_KEY
  * - FIREBASE_WEB_API_KEY
- * - RESEND_FROM_EMAIL (optional)
+ * - RESEND_FROM_EMAIL (optional; defaults to documents@azmaiplus.co.il)
  */
 
 module.exports = async function handler(req, res) {
-  // Allow only POST requests.
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({
@@ -37,7 +36,6 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Verify that the request came from a signed-in Firebase user.
     const authorization = req.headers.authorization || "";
     const idToken = authorization.startsWith("Bearer ")
       ? authorization.slice(7).trim()
@@ -78,9 +76,11 @@ module.exports = async function handler(req, res) {
       customerName,
       documentType,
       documentNumber,
-      documentHtml,
+      attachmentBase64,
+      attachmentMimeType,
       fileName,
       businessName,
+      businessLogoDataUrl,
     } = req.body || {};
 
     const recipientEmail = String(to || "").trim();
@@ -92,18 +92,22 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    if (!documentHtml || typeof documentHtml !== "string") {
+    const normalizedAttachment = String(attachmentBase64 || "")
+      .replace(/^data:[^;]+;base64,/, "")
+      .replace(/\s+/g, "");
+
+    if (!normalizedAttachment) {
       return res.status(400).json({
         ok: false,
-        error: "לא נמצא תוכן מסמך לשליחה.",
+        error: "לא נמצא קובץ PDF לשליחה.",
       });
     }
 
-    // Prevent unexpectedly large requests.
-    if (documentHtml.length > 2_000_000) {
+    // Keep the request safely below common serverless payload limits.
+    if (normalizedAttachment.length > 7_500_000) {
       return res.status(413).json({
         ok: false,
-        error: "המסמך גדול מדי לשליחה במייל.",
+        error: "קובץ ה־PDF גדול מדי לשליחה במייל.",
       });
     }
 
@@ -124,25 +128,66 @@ module.exports = async function handler(req, res) {
     } מאת ${safeBusinessName}`;
 
     const attachmentName =
-      String(fileName || "").trim() ||
-      `${safeDocumentType}-${safeDocumentNumber || "document"}.html`;
+      sanitizeFileName(fileName) ||
+      `${sanitizeFileName(safeDocumentType)}-${
+        sanitizeFileName(safeDocumentNumber) || "document"
+      }.pdf`;
 
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL ||
-      "עצמאי פלוס <documents@azmaiplus.co.il>";
+    const fromAddress =
+      process.env.RESEND_FROM_EMAIL || "documents@azmaiplus.co.il";
 
-    const attachmentContent = Buffer.from(
-      documentHtml,
-      "utf8"
-    ).toString("base64");
+    const fromName = safeBusinessName
+      .replace(/[\r\n<>"]/g, "")
+      .trim() || "עצמאי פלוס";
+
+    const inlineLogo = parseImageDataUrl(businessLogoDataUrl);
+    const attachments = [
+      {
+        filename: attachmentName,
+        content: normalizedAttachment,
+        content_type: attachmentMimeType || "application/pdf",
+      },
+    ];
+
+    let logoHtml = "";
+
+    if (inlineLogo) {
+      attachments.push({
+        filename: inlineLogo.filename,
+        content: inlineLogo.base64,
+        content_id: "business-logo",
+        content_type: inlineLogo.mimeType,
+      });
+
+      logoHtml = `
+        <div style="text-align:center;margin-bottom:20px">
+          <img src="cid:business-logo"
+               alt="${escapeHtml(fromName)}"
+               style="display:inline-block;max-width:140px;max-height:90px;object-fit:contain">
+        </div>
+      `;
+    } else {
+      logoHtml = `
+        <div style="text-align:center;margin-bottom:20px">
+          <img src="https://azmaiplus.co.il/logo.png"
+               alt="עצמאי פלוס"
+               style="display:inline-block;width:72px;height:72px;border-radius:18px">
+        </div>
+      `;
+    }
 
     const emailHtml = `
-      <div dir="rtl" style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#172033;line-height:1.7">
-        <h2 style="margin-bottom:8px">${escapeHtml(safeDocumentType)}${
-          safeDocumentNumber
-            ? ` ${escapeHtml(safeDocumentNumber)}`
-            : ""
-        }</h2>
+      <div dir="rtl"
+           style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#172033;line-height:1.7;padding:24px">
+        ${logoHtml}
+
+        <h2 style="margin:0 0 8px;text-align:right">
+          ${escapeHtml(safeDocumentType)}${
+            safeDocumentNumber
+              ? ` ${escapeHtml(safeDocumentNumber)}`
+              : ""
+          }
+        </h2>
 
         <p>שלום ${escapeHtml(safeCustomerName)},</p>
 
@@ -152,7 +197,7 @@ module.exports = async function handler(req, res) {
         </p>
 
         <p style="color:#64748b;font-size:14px">
-          ניתן לפתוח את הקובץ המצורף בדפדפן ולהדפיסו או לשמור אותו כ־PDF.
+          קובץ ה־PDF מצורף להודעה וניתן לפתיחה, שמירה או הדפסה.
         </p>
 
         <hr style="border:0;border-top:1px solid #e2e8f0;margin:24px 0">
@@ -166,20 +211,16 @@ module.exports = async function handler(req, res) {
     const resendResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
+  Authorization: `Bearer ${resendApiKey}`,
+  "Content-Type": "application/json",
+  "User-Agent": "AzmaiPlus/1.0",
+},
       body: JSON.stringify({
-        from: fromEmail,
+        from: `${fromName} <${fromAddress}>`,
         to: [recipientEmail],
         subject,
         html: emailHtml,
-        attachments: [
-          {
-            filename: attachmentName,
-            content: attachmentContent,
-          },
-        ],
+        attachments,
       }),
     });
 
@@ -209,6 +250,39 @@ module.exports = async function handler(req, res) {
     });
   }
 };
+
+function sanitizeFileName(value) {
+  return String(value || "")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 140);
+}
+
+function parseImageDataUrl(value) {
+  const match = String(value || "").match(
+    /^data:(image\/(?:png|jpe?g|gif|webp));base64,([A-Za-z0-9+/=\s]+)$/i
+  );
+
+  if (!match) return null;
+
+  const mimeType = match[1].toLowerCase();
+  const base64 = match[2].replace(/\s+/g, "");
+
+  if (!base64 || base64.length > 2_500_000) return null;
+
+  const extension =
+    mimeType.includes("png") ? "png" :
+    mimeType.includes("webp") ? "webp" :
+    mimeType.includes("gif") ? "gif" : "jpg";
+
+  return {
+    mimeType,
+    base64,
+    filename: `business-logo.${extension}`,
+  };
+}
 
 function escapeHtml(value) {
   return String(value ?? "")
