@@ -940,15 +940,9 @@ async function waitForFrameImages(frameDocument){
 }
 
 async function documentHtmlToPdfBase64(documentHtml, fileName){
-  if (!window.html2pdf) {
-    throw new Error("רכיב יצירת ה־PDF לא נטען. יש לרענן את העמוד ולנסות שוב.");
-  }
-
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
-  // Keep the source document inside the visible viewport while it is rendered.
-  // Mobile html2canvas may return a blank page for off-screen iframes.
   iframe.style.left = "0";
   iframe.style.top = "0";
   iframe.style.width = "794px";
@@ -964,7 +958,11 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
 
   try {
     await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject(new Error("טעינת המסמך ל־PDF נמשכה זמן רב מדי.")), 15000);
+      const timeout = setTimeout(
+        () => reject(new Error("טעינת המסמך ל־PDF נמשכה זמן רב מדי.")),
+        15000
+      );
+
       iframe.addEventListener("load", () => {
         clearTimeout(timeout);
         resolve();
@@ -972,14 +970,31 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
     });
 
     const frameDocument = iframe.contentDocument;
-    if (!frameDocument?.body) {
+    const frameWindow = iframe.contentWindow;
+
+    if (!frameDocument?.body || !frameWindow) {
       throw new Error("לא ניתן היה להכין את המסמך ל־PDF.");
     }
 
     await waitForFrameImages(frameDocument);
-    await new Promise(resolve => setTimeout(resolve, 250));
 
-    const dataUri = await window.html2pdf()
+    // Load html2pdf inside the iframe itself. Rendering a document from the
+    // parent window can produce a blank PDF on mobile browsers.
+    if (!frameWindow.html2pdf) {
+      await new Promise((resolve, reject) => {
+        const script = frameDocument.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
+        script.onload = resolve;
+        script.onerror = () => reject(
+          new Error("רכיב יצירת ה־PDF לא נטען בתוך המסמך.")
+        );
+        frameDocument.head.appendChild(script);
+      });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    const dataUri = await frameWindow.html2pdf()
       .set({
         margin: [8, 8, 10, 8],
         filename: fileName,
@@ -990,7 +1005,11 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
           allowTaint: true,
           backgroundColor: "#ffffff",
           logging: false,
-          windowWidth: 794
+          windowWidth: 794,
+          windowHeight: Math.max(
+            1123,
+            frameDocument.documentElement.scrollHeight || 1123
+          )
         },
         jsPDF: {
           unit: "mm",
@@ -1006,6 +1025,7 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
       .outputPdf("datauristring");
 
     const base64 = String(dataUri || "").split(",")[1];
+
     if (!base64) {
       throw new Error("יצירת קובץ ה־PDF נכשלה.");
     }
