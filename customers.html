@@ -873,6 +873,51 @@ function closeStoredDocumentModal(){
 }
 
 
+
+function polishHebrewPdfHtml(html){
+  let out = String(html || "");
+
+  const replacements = [
+    ["הצעת מחיר", "הצעת&nbsp;מחיר"],
+    ["חשבונית מס/קבלה", "חשבונית&nbsp;מס/קבלה"],
+    ["חשבונית מס", "חשבונית&nbsp;מס"],
+    ["חשבונית זיכוי", "חשבונית&nbsp;זיכוי"],
+    ["חשבונית עסקה", "חשבונית&nbsp;עסקה"],
+    ["מספר עוסק/ח.פ:", "מספר&nbsp;עוסק/ח.פ:"],
+    ["מספר מזהה:", "מספר&nbsp;מזהה:"],
+    ["איש קשר:", "איש&nbsp;קשר:"],
+    ["מחיר לפני מע״מ", "מחיר&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לפני מע״מ", "סה״כ&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לאחר הנחה לפני מע״מ", "סה״כ&nbsp;לאחר&nbsp;הנחה&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לתשלום", "סה״כ&nbsp;לתשלום"]
+  ];
+
+  replacements.forEach(([from, to]) => {
+    out = out.split(from).join(to);
+  });
+
+  const pdfTextFix = `
+    <style id="azmai-pdf-hebrew-text-fix">
+      h2,h3,th,td,.doc-meta,.customer-box,.totals span{
+        word-spacing:.12em;
+      }
+      h2,h3,.azmai-nowrap{
+        white-space:nowrap;
+      }
+      .doc-meta,.customer-box{
+        unicode-bidi:plaintext;
+      }
+    </style>`;
+
+  if (out.includes("</head>")) {
+    out = out.replace("</head>", `${pdfTextFix}</head>`);
+  } else {
+    out = pdfTextFix + out;
+  }
+
+  return out;
+}
+
 function normalizeStoredDocumentHtml(html, d){
   const title = `${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}`.trim();
   const customerRightFix = `
@@ -900,6 +945,7 @@ function normalizeStoredDocumentHtml(html, d){
   }
   if (out.includes('</head>')) out = out.replace('</head>', `${customerRightFix}</head>`);
   else out = customerRightFix + out;
+  out = polishHebrewPdfHtml(out);
   return out;
 }
 
