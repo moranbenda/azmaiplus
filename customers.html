@@ -951,7 +951,11 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
   iframe.style.top = "0";
   iframe.style.width = "794px";
   iframe.style.height = "1123px";
-  iframe.style.opacity = "0";
+  // The iframe must remain fully rendered for html2canvas.
+  // opacity:0 causes some mobile browsers to generate a blank PDF.
+  iframe.style.opacity = "1";
+  iframe.style.background = "#ffffff";
+  iframe.style.border = "0";
   iframe.style.pointerEvents = "none";
   iframe.srcdoc = documentHtml;
   document.body.appendChild(iframe);
