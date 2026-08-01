@@ -20,12 +20,18 @@ function getEnvironment() {
 function parseCookies(cookieHeader = "") {
   return cookieHeader.split(";").reduce((cookies, item) => {
     const separatorIndex = item.indexOf("=");
-    if (separatorIndex === -1) return cookies;
+
+    if (separatorIndex === -1) {
+      return cookies;
+    }
 
     const key = item.slice(0, separatorIndex).trim();
     const value = item.slice(separatorIndex + 1).trim();
 
-    if (key) cookies[key] = decodeURIComponent(value);
+    if (key) {
+      cookies[key] = decodeURIComponent(value);
+    }
+
     return cookies;
   }, {});
 }
@@ -49,8 +55,12 @@ function clearStateCookie(res) {
 function positiveNumber(...values) {
   for (const value of values) {
     const number = Number(value);
-    if (Number.isFinite(number) && number > 0) return number;
+
+    if (Number.isFinite(number) && number > 0) {
+      return number;
+    }
   }
+
   return 0;
 }
 
@@ -63,7 +73,10 @@ function buildDocumentsUrl(payload) {
     params.set("validUntil", payload.validUntil);
   } else {
     params.set("invoiceIsrael", "error");
-    params.set("message", payload.message || "החיבור לרשות המסים נכשל.");
+    params.set(
+      "message",
+      payload.message || "החיבור לרשות המסים נכשל."
+    );
   }
 
   return `/documents.html?${params.toString()}`;
@@ -82,6 +95,7 @@ function renderResultPage(payload) {
   const safeMessage = escapeHtml(message);
   const documentsUrl = buildDocumentsUrl(payload);
   const safeDocumentsUrl = escapeHtml(documentsUrl);
+
   const serializedPayload = JSON.stringify({
     type: "invoice-israel-oauth-result",
     ...payload
@@ -98,8 +112,13 @@ function renderResultPage(payload) {
     <main style="max-width:680px;margin:40px auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 8px 24px rgba(0,0,0,.08)">
       <h2 style="margin-top:0">${safeTitle}</h2>
       <p style="line-height:1.7">${safeMessage}</p>
-      <p><a href="${safeDocumentsUrl}" style="color:#135fa7">חזרה למסמכים</a></p>
+      <p>
+        <a href="${safeDocumentsUrl}" style="color:#135fa7">
+          חזרה למסמכים
+        </a>
+      </p>
     </main>
+
     <script>
       (() => {
         const payload = ${serializedPayload};
@@ -108,10 +127,15 @@ function renderResultPage(payload) {
         try {
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage(payload, window.location.origin);
+
             setTimeout(() => window.close(), 450);
+
             setTimeout(() => {
-              if (!window.closed) window.location.replace(fallbackUrl);
+              if (!window.closed) {
+                window.location.replace(fallbackUrl);
+              }
             }, 1400);
+
             return;
           }
         } catch (error) {
@@ -143,6 +167,7 @@ export default async function handler(req, res) {
 
     if (error) {
       clearStateCookie(res);
+
       return res.status(400).send(
         renderResultPage({
           ok: false,
@@ -153,6 +178,7 @@ export default async function handler(req, res) {
 
     if (!code) {
       clearStateCookie(res);
+
       return res.status(400).send(
         renderResultPage({
           ok: false,
@@ -166,6 +192,7 @@ export default async function handler(req, res) {
 
     if (!state || !expectedState || state !== expectedState) {
       clearStateCookie(res);
+
       return res.status(400).send(
         renderResultPage({
           ok: false,
@@ -175,42 +202,63 @@ export default async function handler(req, res) {
       );
     }
 
-    const clientId = process.env.ITA_CLIENT_ID;
-    const clientSecret = process.env.ITA_CLIENT_SECRET;
-    const redirectUri = process.env.ITA_REDIRECT_URI;
+    const clientId = String(process.env.ITA_CLIENT_ID || "").trim();
+    const clientSecret = String(
+      process.env.ITA_CLIENT_SECRET || ""
+    ).trim();
+    const redirectUri = String(
+      process.env.ITA_REDIRECT_URI || ""
+    ).trim();
 
     if (!clientId || !clientSecret || !redirectUri) {
       console.error(
         "Missing ITA_CLIENT_ID, ITA_CLIENT_SECRET or ITA_REDIRECT_URI"
       );
+
       clearStateCookie(res);
+
       return res.status(500).send(
         renderResultPage({
           ok: false,
-          message: "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
+          message:
+            "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
         })
       );
     }
 
     const environment = getEnvironment();
     const tokenUrl =
-      process.env.ITA_TOKEN_URL || ENVIRONMENTS[environment].tokenUrl;
+      process.env.ITA_TOKEN_URL ||
+      ENVIRONMENTS[environment].tokenUrl;
+
+    /*
+     * רשות המסים דורשת הזדהות של האפליקציה בבקשת ה-token
+     * באמצעות HTTP Basic:
+     *
+     * Authorization: Basic base64(API_KEY:API_SECRET)
+     *
+     * API Key נשמר ב-ITA_CLIENT_ID
+     * API Secret נשמר ב-ITA_CLIENT_SECRET
+     */
+    const basicCredentials = Buffer.from(
+      `${clientId}:${clientSecret}`,
+      "utf8"
+    ).toString("base64");
 
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: String(code),
-      redirect_uri: redirectUri,
-      client_id: clientId,
-      client_secret: clientSecret
+      redirect_uri: redirectUri
     });
 
     const tokenResponse = await fetch(tokenUrl, {
       method: "POST",
       headers: {
+        Authorization: `Basic ${basicCredentials}`,
         "Content-Type": "application/x-www-form-urlencoded",
         Accept: "application/json"
       },
-      body
+      body: body.toString()
     });
 
     const tokenText = await tokenResponse.text();
@@ -230,6 +278,7 @@ export default async function handler(req, res) {
       });
 
       clearStateCookie(res);
+
       return res.status(502).send(
         renderResultPage({
           ok: false,
@@ -240,21 +289,27 @@ export default async function handler(req, res) {
     }
 
     if (!tokenData?.access_token) {
-      console.error("ITA token response did not include access_token", {
-        environment,
-        response: tokenData || tokenText
-      });
+      console.error(
+        "ITA token response did not include access_token",
+        {
+          environment,
+          response: tokenData || tokenText
+        }
+      );
 
       clearStateCookie(res);
+
       return res.status(502).send(
         renderResultPage({
           ok: false,
-          message: "התקבלה תשובה לא צפויה מרשות המסים."
+          message:
+            "התקבלה תשובה לא צפויה מרשות המסים."
         })
       );
     }
 
     const connectedAtDate = new Date();
+
     const validitySeconds = positiveNumber(
       tokenData.refresh_token_expires_in,
       tokenData.refresh_expires_in,
@@ -268,8 +323,10 @@ export default async function handler(req, res) {
 
     clearStateCookie(res);
 
-    // ה-token לא מוצג ולא מועבר לדפדפן.
-    // שמירה מאובטחת שלו תחובר עם API מספרי ההקצאה.
+    /*
+     * בשלב זה ה-token אינו נשלח לדפדפן ואינו נכתב ללוג.
+     * שמירה מאובטחת של ה-token תחובר בשלב בקשת מספר ההקצאה.
+     */
     return res.status(200).send(
       renderResultPage({
         ok: true,
@@ -284,7 +341,8 @@ export default async function handler(req, res) {
     return res.status(500).send(
       renderResultPage({
         ok: false,
-        message: "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
+        message:
+          "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
       })
     );
   }
