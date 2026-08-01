@@ -20,18 +20,12 @@ function getEnvironment() {
 function parseCookies(cookieHeader = "") {
   return cookieHeader.split(";").reduce((cookies, item) => {
     const separatorIndex = item.indexOf("=");
-
-    if (separatorIndex === -1) {
-      return cookies;
-    }
+    if (separatorIndex === -1) return cookies;
 
     const key = item.slice(0, separatorIndex).trim();
     const value = item.slice(separatorIndex + 1).trim();
 
-    if (key) {
-      cookies[key] = decodeURIComponent(value);
-    }
-
+    if (key) cookies[key] = decodeURIComponent(value);
     return cookies;
   }, {});
 }
@@ -52,9 +46,46 @@ function clearStateCookie(res) {
   );
 }
 
-function renderPage(title, message, isSuccess = false) {
+function positiveNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
+function buildDocumentsUrl(payload) {
+  const params = new URLSearchParams();
+
+  if (payload.ok) {
+    params.set("invoiceIsrael", "connected");
+    params.set("connectedAt", payload.connectedAt);
+    params.set("validUntil", payload.validUntil);
+  } else {
+    params.set("invoiceIsrael", "error");
+    params.set("message", payload.message || "החיבור לרשות המסים נכשל.");
+  }
+
+  return `/documents.html?${params.toString()}`;
+}
+
+function renderResultPage(payload) {
+  const title = payload.ok
+    ? "החיבור לרשות המסים הצליח"
+    : "החיבור לרשות המסים נכשל";
+
+  const message = payload.ok
+    ? "ההרשאה התקבלה בהצלחה. החלון ייסגר ותוחזרו לעצמאי פלוס."
+    : payload.message || "לא ניתן היה להשלים את החיבור.";
+
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
+  const documentsUrl = buildDocumentsUrl(payload);
+  const safeDocumentsUrl = escapeHtml(documentsUrl);
+  const serializedPayload = JSON.stringify({
+    type: "invoice-israel-oauth-result",
+    ...payload
+  }).replaceAll("<", "\\u003c");
 
   return `<!doctype html>
 <html dir="rtl" lang="he">
@@ -63,12 +94,33 @@ function renderPage(title, message, isSuccess = false) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${safeTitle}</title>
   </head>
-  <body style="font-family:Arial,sans-serif;background:#f5f7fa;margin:0;padding:40px;color:#1f2937">
+  <body style="font-family:Arial,sans-serif;background:#f5f7fa;margin:0;padding:24px;color:#1f2937">
     <main style="max-width:680px;margin:40px auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 8px 24px rgba(0,0,0,.08)">
-      <h2 style="margin-top:0">${safeTitle}${isSuccess ? " ✅" : ""}</h2>
+      <h2 style="margin-top:0">${safeTitle}</h2>
       <p style="line-height:1.7">${safeMessage}</p>
-      <p><a href="/" style="color:#135fa7">חזרה לעצמאי פלוס</a></p>
+      <p><a href="${safeDocumentsUrl}" style="color:#135fa7">חזרה למסמכים</a></p>
     </main>
+    <script>
+      (() => {
+        const payload = ${serializedPayload};
+        const fallbackUrl = ${JSON.stringify(documentsUrl)};
+
+        try {
+          if (window.opener && !window.opener.closed) {
+            window.opener.postMessage(payload, window.location.origin);
+            setTimeout(() => window.close(), 450);
+            setTimeout(() => {
+              if (!window.closed) window.location.replace(fallbackUrl);
+            }, 1400);
+            return;
+          }
+        } catch (error) {
+          console.warn("Could not notify opener", error);
+        }
+
+        window.location.replace(fallbackUrl);
+      })();
+    </script>
   </body>
 </html>`;
 }
@@ -82,25 +134,31 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   try {
-    const { code, state, error, error_description: errorDescription } = req.query;
+    const {
+      code,
+      state,
+      error,
+      error_description: errorDescription
+    } = req.query;
 
     if (error) {
       clearStateCookie(res);
-      return res
-        .status(400)
-        .send(
-          renderPage(
-            "החיבור לרשות המסים נכשל",
-            errorDescription || error
-          )
-        );
+      return res.status(400).send(
+        renderResultPage({
+          ok: false,
+          message: String(errorDescription || error)
+        })
+      );
     }
 
     if (!code) {
       clearStateCookie(res);
-      return res
-        .status(400)
-        .send(renderPage("החיבור לרשות המסים נכשל", "לא התקבל קוד הרשאה."));
+      return res.status(400).send(
+        renderResultPage({
+          ok: false,
+          message: "לא התקבל קוד הרשאה מרשות המסים."
+        })
+      );
     }
 
     const cookies = parseCookies(req.headers.cookie);
@@ -108,14 +166,13 @@ export default async function handler(req, res) {
 
     if (!state || !expectedState || state !== expectedState) {
       clearStateCookie(res);
-      return res
-        .status(400)
-        .send(
-          renderPage(
-            "החיבור לרשות המסים נכשל",
+      return res.status(400).send(
+        renderResultPage({
+          ok: false,
+          message:
             "אימות הבקשה נכשל. יש להתחיל את תהליך החיבור מחדש."
-          )
-        );
+        })
+      );
     }
 
     const clientId = process.env.ITA_CLIENT_ID;
@@ -127,14 +184,12 @@ export default async function handler(req, res) {
         "Missing ITA_CLIENT_ID, ITA_CLIENT_SECRET or ITA_REDIRECT_URI"
       );
       clearStateCookie(res);
-      return res
-        .status(500)
-        .send(
-          renderPage(
-            "שגיאת הגדרה",
-            "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
-          )
-        );
+      return res.status(500).send(
+        renderResultPage({
+          ok: false,
+          message: "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
+        })
+      );
     }
 
     const environment = getEnvironment();
@@ -175,14 +230,13 @@ export default async function handler(req, res) {
       });
 
       clearStateCookie(res);
-      return res
-        .status(502)
-        .send(
-          renderPage(
-            "שגיאה בקבלת הרשאה מרשות המסים",
-            "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לנסות שוב או לבדוק את הגדרות החיבור."
-          )
-        );
+      return res.status(502).send(
+        renderResultPage({
+          ok: false,
+          message:
+            "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לבדוק את פרטי החיבור ולנסות שוב."
+        })
+      );
     }
 
     if (!tokenData?.access_token) {
@@ -192,40 +246,46 @@ export default async function handler(req, res) {
       });
 
       clearStateCookie(res);
-      return res
-        .status(502)
-        .send(
-          renderPage(
-            "שגיאה בקבלת הרשאה מרשות המסים",
-            "התקבלה תשובה לא צפויה מרשות המסים."
-          )
-        );
+      return res.status(502).send(
+        renderResultPage({
+          ok: false,
+          message: "התקבלה תשובה לא צפויה מרשות המסים."
+        })
+      );
     }
+
+    const connectedAtDate = new Date();
+    const validitySeconds = positiveNumber(
+      tokenData.refresh_token_expires_in,
+      tokenData.refresh_expires_in,
+      tokenData.long_lived_expires_in,
+      90 * 24 * 60 * 60
+    );
+
+    const validUntilDate = new Date(
+      connectedAtDate.getTime() + validitySeconds * 1000
+    );
 
     clearStateCookie(res);
 
-    // בשלב זה אנו רק מאמתים שהחיבור מצליח.
-    // אין לשמור או להציג את ה-token בדפדפן או בלוגים.
-    return res
-      .status(200)
-      .send(
-        renderPage(
-          "החיבור לרשות המסים הצליח",
-          "התקבלה הרשאה בהצלחה. בשלב הבא נחבר שמירה מאובטחת של ההרשאה לחשבון העסק במערכת.",
-          true
-        )
-      );
+    // ה-token לא מוצג ולא מועבר לדפדפן.
+    // שמירה מאובטחת שלו תחובר עם API מספרי ההקצאה.
+    return res.status(200).send(
+      renderResultPage({
+        ok: true,
+        connectedAt: connectedAtDate.toISOString(),
+        validUntil: validUntilDate.toISOString()
+      })
+    );
   } catch (error) {
     console.error("ITA callback error", error);
     clearStateCookie(res);
 
-    return res
-      .status(500)
-      .send(
-        renderPage(
-          "שגיאה בחיבור לרשות המסים",
-          "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
-        )
-      );
+    return res.status(500).send(
+      renderResultPage({
+        ok: false,
+        message: "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
+      })
+    );
   }
 }
