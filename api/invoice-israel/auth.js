@@ -31,8 +31,8 @@ export default function handler(req, res) {
     return res.status(405).send("Method Not Allowed");
   }
 
-  const clientId = process.env.ITA_CLIENT_ID;
-  const redirectUri = process.env.ITA_REDIRECT_URI;
+  const clientId = String(process.env.ITA_CLIENT_ID || "").trim();
+  const redirectUri = String(process.env.ITA_REDIRECT_URI || "").trim();
 
   if (!clientId || !redirectUri) {
     console.error("Missing ITA_CLIENT_ID or ITA_REDIRECT_URI");
@@ -45,13 +45,12 @@ export default function handler(req, res) {
     ENVIRONMENTS[environment].authorizationUrl;
 
   const state = createState();
+
   const params = new URLSearchParams({
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: "scope",
-    prompt: "login",
-    ui_locales: "he",
     state
   });
 
@@ -74,5 +73,8 @@ export default function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("Set-Cookie", cookieParts.join("; "));
 
-  return res.redirect(302, `${authorizationBaseUrl}?${params.toString()}`);
+  return res.redirect(
+    302,
+    `${authorizationBaseUrl}?${params.toString()}`
+  );
 }
