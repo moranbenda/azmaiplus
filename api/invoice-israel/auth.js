@@ -50,6 +50,8 @@ export default function handler(req, res) {
     client_id: clientId,
     redirect_uri: redirectUri,
     scope: "scope",
+    prompt: "login",
+    ui_locales: "he",
     state
   });
 
