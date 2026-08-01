@@ -48,6 +48,8 @@
 
     .invoice-israel-strip{margin-top:16px;border:1px solid var(--line);border-radius:18px;background:#fbfcff;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
     .invoice-israel-strip b{font-size:16px}.invoice-israel-strip .hint{margin-top:4px}
+    .btn.invoice-israel-connected{background:var(--green);box-shadow:0 8px 20px rgba(22,163,74,.18)}
+    .btn.invoice-israel-connected:disabled{opacity:1;cursor:default}
     .is-hidden{display:none!important}.draft-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     @media(max-width:900px){.line-row{grid-template-columns:1fr}.line-row .remove-line{width:100%}}
 
@@ -150,13 +152,8 @@ const firebaseConfig = { apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE", authD
 const app = initializeApp(firebaseConfig); const auth = getAuth(app); const db = getFirestore(app);
 const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, credit_note:1, quote:1, deal_invoice:1 };
 const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר", deal_invoice:"חשבונית עסקה" };
-const INVOICE_ISRAEL_AUTH_BASE = "https://openapi.taxes.gov.il/shaam/production/longtimetoken/oauth2/authorize";
-// יוגדר רק אחרי רישום עצמאי פלוס כמערכת מול רשות המסים וקבלת client_id רשמי משלנו.
-// לא משתמשים ב-client_id או redirect_uri של מערכת אחרת.
-const INVOICE_ISRAEL_CLIENT_ID = "";
-const INVOICE_ISRAEL_SCOPE = "scope";
-const INVOICE_ISRAEL_REDIRECT_URI = `${location.origin}/api/invoice-israel/callback`;
-const INVOICE_ISRAEL_INFO_URL = "https://www.gov.il/he/departments/topics/israel-invoice/govil-landing-page";
+const INVOICE_ISRAEL_AUTH_URL = "/api/invoice-israel/auth";
+const INVOICE_ISRAEL_POPUP_NAME = "azmaiPlusInvoiceIsraelAuth";
 let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[], settingsLocked=false, previewFinal=false, lastIssuedDocument=null;
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
@@ -241,26 +238,158 @@ function renderLinesEditor(){ensureLines(); const box=$('linesEditor'); if(!box)
 function totals(){ensureLines(); const subtotal=round2(docLines.reduce((s,l)=>s+lineTotalNet(l),0)); const discountPct=Math.min(100,Math.max(0,Number($('docDiscountPct')?.value||0))); const discount=round2(subtotal*discountPct/100); const net=round2(Math.max(0,subtotal-discount)); const vat=round2(vatEnabled()?net*Number($('docVatRate').value||0)/100:0); return {subtotal,discountPct,discount,net,vat,gross:round2(net+vat)};}
 function hydrateSettings(){settings={...DEFAULT_SETTINGS,...(ledger.documentSettings||{})}; settingsLocked=Boolean(ledger.documentSettingsLocked || ledger.documentSettings); $('setInvoice').value=settings.tax_invoice; $('setReceipt').value=settings.receipt; $('setTaxReceipt').value=settings.tax_invoice_receipt; $('setCredit').value=settings.credit_note; $('setQuote').value=settings.quote; $('setDealInvoice').value=settings.deal_invoice; renderNumberingSettings(); renderInvoiceIsraelStatus();}
 function renderNumberingSettings(){ const card=$('numberingSettingsCard'); if(!card)return; card.classList.toggle('is-hidden', !!settingsLocked); }
-function buildInvoiceIsraelConnectUrl(){
-  if(!INVOICE_ISRAEL_CLIENT_ID) return '';
-  const u = new URL(INVOICE_ISRAEL_AUTH_BASE);
-  u.searchParams.set('response_type','code');
-  u.searchParams.set('client_id',INVOICE_ISRAEL_CLIENT_ID);
-  u.searchParams.set('scope',INVOICE_ISRAEL_SCOPE);
-  u.searchParams.set('redirect_uri',INVOICE_ISRAEL_REDIRECT_URI);
-  return u.toString();
+function isMobileInvoiceIsraelFlow(){
+  return window.matchMedia("(max-width: 900px)").matches ||
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
 }
+
 function connectInvoiceIsrael(){
-  const url = buildInvoiceIsraelConnectUrl();
-  if(!url){
-    alert('חיבור חשבוניות ישראל מוכן במבנה הנכון, אבל יופעל רק אחרי רישום עצמאי פלוס כמערכת וקבלת client_id רשמי מרשות המסים. לא ניתן להשתמש בקישור של מערכת אחרת.');
-    window.open(INVOICE_ISRAEL_INFO_URL, '_blank', 'noopener');
+  if(isMobileInvoiceIsraelFlow()){
+    window.location.assign(INVOICE_ISRAEL_AUTH_URL);
     return;
   }
-  window.open(url, '_blank', 'noopener');
+
+  const popup = window.open(
+    INVOICE_ISRAEL_AUTH_URL,
+    INVOICE_ISRAEL_POPUP_NAME,
+    "popup=yes,width=560,height=760,resizable=yes,scrollbars=yes"
+  );
+
+  if(!popup){
+    window.location.assign(INVOICE_ISRAEL_AUTH_URL);
+    return;
+  }
+
+  popup.focus();
 }
-function invoiceIsraelConnection(){ return ledger.invoiceIsraelConnection || {}; }
-function renderInvoiceIsraelStatus(){ const el=$('invoiceIsraelStatus'); if(!el)return; const info=invoiceIsraelConnection(); const until=String(info.validUntil||'').slice(0,10); if(info.status==='connected' && until && until>=today()){ el.textContent=`מחובר עד ${until}`; } else { el.textContent='לא מחובר'; } }
+
+function invoiceIsraelConnection(){
+  return ledger.invoiceIsraelConnection || {};
+}
+
+function formatInvoiceIsraelDate(value){
+  const date = new Date(value);
+  if(Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function isInvoiceIsraelConnectionValid(info = invoiceIsraelConnection()){
+  if(info.status !== "connected") return false;
+  const validUntilTime = new Date(info.validUntil || "").getTime();
+  return Number.isFinite(validUntilTime) && validUntilTime > Date.now();
+}
+
+function renderInvoiceIsraelStatus(){
+  const statusEl = $("invoiceIsraelStatus");
+  const button = $("btnConnectInvoiceIsrael");
+  if(!statusEl || !button) return;
+
+  const info = invoiceIsraelConnection();
+  const isValid = isInvoiceIsraelConnectionValid(info);
+
+  if(isValid){
+    button.textContent = "חיבור לחשבונית ישראל בתוקף";
+    button.classList.add("invoice-israel-connected");
+    button.disabled = true;
+
+    const connectedDate = formatInvoiceIsraelDate(info.connectedAt);
+    statusEl.textContent = connectedDate
+      ? `מחובר מתאריך ${connectedDate}`
+      : "החיבור בתוקף";
+    return;
+  }
+
+  button.textContent = "חיבור לחשבוניות ישראל";
+  button.classList.remove("invoice-israel-connected");
+  button.disabled = false;
+
+  if(info.status === "error" && info.message){
+    statusEl.textContent = info.message;
+  }else if(info.status === "connected" && info.validUntil){
+    statusEl.textContent = "תוקף החיבור הסתיים — יש להתחבר מחדש";
+  }else{
+    statusEl.textContent = "לא מחובר";
+  }
+}
+
+async function saveInvoiceIsraelConnection(result){
+  if(!uid || !result?.ok) return;
+
+  const connection = {
+    status: "connected",
+    connectedAt: String(result.connectedAt || new Date().toISOString()),
+    validUntil: String(result.validUntil || ""),
+    updatedAt: new Date().toISOString()
+  };
+
+  await saveLedgerPatch({invoiceIsraelConnection: connection});
+  renderInvoiceIsraelStatus();
+}
+
+function showInvoiceIsraelConnectionError(message){
+  ledger.invoiceIsraelConnection = {
+    ...invoiceIsraelConnection(),
+    status: "error",
+    message: String(message || "החיבור לרשות המסים נכשל."),
+    updatedAt: new Date().toISOString()
+  };
+  renderInvoiceIsraelStatus();
+}
+
+async function consumeInvoiceIsraelCallbackFromUrl(){
+  const params = new URLSearchParams(window.location.search);
+  const result = params.get("invoiceIsrael");
+
+  if(result !== "connected" && result !== "error") return;
+
+  try{
+    if(result === "connected"){
+      await saveInvoiceIsraelConnection({
+        ok: true,
+        connectedAt: params.get("connectedAt") || new Date().toISOString(),
+        validUntil: params.get("validUntil") || ""
+      });
+    }else{
+      showInvoiceIsraelConnectionError(
+        params.get("message") || "החיבור לרשות המסים נכשל."
+      );
+    }
+  }finally{
+    ["invoiceIsrael","connectedAt","validUntil","message"]
+      .forEach(key => params.delete(key));
+
+    const cleanQuery = params.toString();
+    history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${cleanQuery ? `?${cleanQuery}` : ""}${window.location.hash}`
+    );
+  }
+}
+
+window.addEventListener("message", async event => {
+  if(event.origin !== window.location.origin) return;
+
+  const result = event.data;
+  if(!result || result.type !== "invoice-israel-oauth-result") return;
+
+  try{
+    if(result.ok){
+      await saveInvoiceIsraelConnection(result);
+    }else{
+      showInvoiceIsraelConnectionError(result.message);
+    }
+  }catch(error){
+    console.error("Could not save Invoice Israel connection status", error);
+    showInvoiceIsraelConnectionError(
+      "החיבור הצליח, אך שמירת הסטטוס במערכת נכשלה."
+    );
+  }
+});
 function syncStats(){ $('statCustomers').textContent=customers.length; $('statDrafts').textContent=drafts.length; $('statNextInvoice').textContent=settings.tax_invoice||1; $('statNextReceipt').textContent=settings.receipt||1; }
 function renderCustomerOptions(){ const input=$('docCustomerSearch'); if(!input)return; if(!customers.length){ input.value=''; input.placeholder='אין לקוחות — יש להוסיף לקוח במודול לקוחות'; input.disabled=true; $('docCustomer').value=''; } else { input.disabled=false; input.placeholder='חיפוש לפי שם, מייל, טלפון או מספר מזהה...'; if(!$('docCustomer').value && customers.length===1) setSelectedCustomer(customers[0]); else renderSelectedCustomerHint(); } }
 function updateDocNumber(){ $('docNumber').value = nextNumberFor($('docType').value); }
@@ -296,7 +425,48 @@ function renderPreview(){
   ${allocationPreviewHtml(allocation)}
   ${previewFinal ? "" : `<div class="draft-watermark">טיוטה לבדיקה</div>`}`;
 }
-async function loadAll(){ const u=auth.currentUser; uid=u.uid; $('userEmailPill').textContent=u.email||''; const [pSnap,lSnap]=await Promise.all([getDoc(doc(db,'users',uid)), getDoc(doc(db,'ledgers',uid))]); profile=pSnap.exists()?pSnap.data():{email:u.email}; ledger=lSnap.exists()?lSnap.data():{}; customers=normalizeCustomers(ledger.customers); drafts=Array.isArray(ledger.documentDrafts)?ledger.documentDrafts:[]; hydrateSettings(); renderCustomerOptions(); $('docDate').value=today(); $('docVatRate').value=Number(profile.vatRate||18); docLines=[makeLine({desc:'',qty:1,netPrice:0})]; renderLinesEditor(); updateDocNumber(); updatePaymentVisibility(); syncStats(); renderDrafts(); const params=new URLSearchParams(location.search); const preCustomerId=params.get('customerId'); if(preCustomerId){ const c=customers.find(x=>String(x.id)===String(preCustomerId)); if(c) setSelectedCustomer(c); } renderPreview(); }
+async function loadAll(){
+  const u = auth.currentUser;
+  uid = u.uid;
+  $("userEmailPill").textContent = u.email || "";
+
+  const [pSnap, lSnap] = await Promise.all([
+    getDoc(doc(db, "users", uid)),
+    getDoc(doc(db, "ledgers", uid))
+  ]);
+
+  profile = pSnap.exists() ? pSnap.data() : {email: u.email};
+  ledger = lSnap.exists() ? lSnap.data() : {};
+  customers = normalizeCustomers(ledger.customers);
+  drafts = Array.isArray(ledger.documentDrafts)
+    ? ledger.documentDrafts
+    : [];
+
+  await consumeInvoiceIsraelCallbackFromUrl();
+
+  hydrateSettings();
+  renderCustomerOptions();
+  $("docDate").value = today();
+  $("docVatRate").value = Number(profile.vatRate || 18);
+  docLines = [makeLine({desc:"", qty:1, netPrice:0})];
+  renderLinesEditor();
+  updateDocNumber();
+  updatePaymentVisibility();
+  syncStats();
+  renderDrafts();
+
+  const params = new URLSearchParams(location.search);
+  const preCustomerId = params.get("customerId");
+
+  if(preCustomerId){
+    const c = customers.find(
+      item => String(item.id) === String(preCustomerId)
+    );
+    if(c) setSelectedCustomer(c);
+  }
+
+  renderPreview();
+}
 async function saveLedgerPatch(patch){ if(!uid)return; await setDoc(doc(db,'ledgers',uid), patch, {merge:true}); ledger={...ledger,...patch}; }
 async function logAudit(action, details = {}){
   try{
