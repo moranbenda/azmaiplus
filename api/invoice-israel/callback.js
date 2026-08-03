@@ -1,11 +1,11 @@
 const ENVIRONMENTS = {
   sandbox: {
     tokenUrl:
-      "https://ita-api.taxes.gov.il/shaam/tsandbox/longtimetoken/oauth2/token"
+      "https://openapi.taxes.gov.il/shaam/tsandbox/longtimetoken/oauth2/token"
   },
   production: {
     tokenUrl:
-      "https://ita-api.taxes.gov.il/shaam/production/longtimetoken/oauth2/token"
+      "https://openapi.taxes.gov.il/shaam/production/longtimetoken/oauth2/token"
   }
 };
 
@@ -232,13 +232,9 @@ export default async function handler(req, res) {
       ENVIRONMENTS[environment].tokenUrl;
 
     /*
-     * רשות המסים דורשת הזדהות של האפליקציה בבקשת ה-token
-     * באמצעות HTTP Basic:
-     *
-     * Authorization: Basic base64(API_KEY:API_SECRET)
-     *
-     * API Key נשמר ב-ITA_CLIENT_ID
-     * API Secret נשמר ב-ITA_CLIENT_SECRET
+     * נקודת ה-token הרשמית נמצאת ב-openapi.taxes.gov.il.
+     * שירותי חשבוניות עצמם נמצאים ב-ita-api.taxes.gov.il,
+     * אך לא תהליך הנפקת ה-token.
      */
     const basicCredentials = Buffer.from(
       `${clientId}:${clientSecret}`,
@@ -248,7 +244,8 @@ export default async function handler(req, res) {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: String(code),
-      redirect_uri: redirectUri
+      redirect_uri: redirectUri,
+      scope: "scope"
     });
 
     const tokenResponse = await fetch(tokenUrl, {
@@ -274,6 +271,7 @@ export default async function handler(req, res) {
       console.error("ITA token exchange failed", {
         status: tokenResponse.status,
         environment,
+        tokenHost: new URL(tokenUrl).host,
         response: tokenData || tokenText
       });
 
@@ -293,6 +291,7 @@ export default async function handler(req, res) {
         "ITA token response did not include access_token",
         {
           environment,
+          tokenHost: new URL(tokenUrl).host,
           response: tokenData || tokenText
         }
       );
@@ -324,8 +323,8 @@ export default async function handler(req, res) {
     clearStateCookie(res);
 
     /*
-     * בשלב זה ה-token אינו נשלח לדפדפן ואינו נכתב ללוג.
-     * שמירה מאובטחת של ה-token תחובר בשלב בקשת מספר ההקצאה.
+     * ה-token אינו נשלח לדפדפן ואינו נכתב ללוג.
+     * שמירה מאובטחת תחובר בשלב בקשת מספר ההקצאה.
      */
     return res.status(200).send(
       renderResultPage({
