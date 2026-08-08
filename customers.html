@@ -317,6 +317,262 @@
       .docs-actions .btn{width:100%;padding:8px 6px;font-size:12px}
     }
 
+
+    /* Customers list: clear desktop table with zebra rows */
+    .customers-table-wrap{
+      width:100%;
+      overflow:auto;
+      border:1px solid var(--line);
+      border-radius:16px;
+      background:#fff;
+    }
+    .customers-table{
+      width:100%;
+      min-width:760px;
+      border-collapse:collapse;
+    }
+    .customers-table th,
+    .customers-table td{
+      padding:13px 14px;
+      border-bottom:1px solid #e8eef6;
+      text-align:right;
+      vertical-align:middle;
+    }
+    .customers-table th{
+      background:#eef4fb;
+      color:#334155;
+      font-size:12px;
+      font-weight:850;
+      white-space:nowrap;
+    }
+    .customers-table tbody tr:nth-child(even) td{background:#f7f9fc}
+    .customers-table tbody tr:nth-child(odd) td{background:#fff}
+    .customers-table tbody tr{
+      cursor:pointer;
+      outline:none;
+    }
+    .customers-table tbody tr:hover td,
+    .customers-table tbody tr:focus td{
+      background:#eef6ff;
+    }
+    .customers-table tbody tr:last-child td{border-bottom:0}
+    .customers-table td:first-child{font-size:14px;color:#0f2748}
+    .customer-id-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+
+    .back-customers-btn{
+      background:#0f4b63;
+      border-color:#0f4b63;
+      color:#fff;
+      box-shadow:0 8px 20px rgba(15,75,99,.18);
+      font-weight:850;
+    }
+    .back-customers-btn:hover{
+      background:#0c4055;
+      border-color:#0c4055;
+      transform:translateY(-1px);
+    }
+
+    .customer-details-section,
+    .customer-documents-section{
+      border:1px solid var(--line);
+      border-radius:18px;
+      background:#fff;
+      padding:16px;
+    }
+    .customer-documents-section{margin-top:14px}
+    .section-title-row{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      margin-bottom:12px;
+    }
+    .section-title-row h4{
+      margin:0 0 4px;
+      font-size:17px;
+      color:#0f2748;
+    }
+    .customer-detail-name{
+      font-size:21px;
+      font-weight:900;
+      color:#0f2748;
+      margin-top:4px;
+    }
+
+    .customer-details-table-wrap{
+      overflow:hidden;
+      border:1px solid #e2e8f0;
+      border-radius:14px;
+    }
+    .customer-details-table{
+      width:100%;
+      min-width:0;
+      border-collapse:collapse;
+    }
+    .customer-details-table th,
+    .customer-details-table td{
+      padding:11px 12px;
+      border-bottom:1px solid #edf1f7;
+      vertical-align:top;
+    }
+    .customer-details-table th{
+      width:150px;
+      background:#f8fafc;
+      color:#64748b;
+      font-size:12px;
+      font-weight:800;
+      position:static;
+    }
+    .customer-details-table td{
+      background:#fff;
+      color:#0f172a;
+      font-size:13px;
+    }
+    .customer-details-table tr:last-child th,
+    .customer-details-table tr:last-child td{border-bottom:0}
+
+    .customer-doc-summary{
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:10px;
+      padding:10px 12px;
+      margin-bottom:12px;
+      border:1px solid #e2e8f0;
+      border-radius:12px;
+      background:#f8fafc;
+      color:#475569;
+      font-size:13px;
+    }
+    .customer-doc-summary strong{color:#0f2748}
+    .summary-divider{width:1px;height:18px;background:#cbd5e1}
+    .open-payment-summary,
+    .payment-open{color:#b45309;font-weight:800}
+    .payment-paid{color:#15803d;font-weight:800}
+    .payment-na{color:#94a3b8}
+
+    .customer-docs-table tbody tr:nth-child(even) td{background:#f8fafc}
+    .customer-docs-table tbody tr:nth-child(odd) td{background:#fff}
+    .customer-docs-table tbody tr.open-payment-row td{
+      box-shadow:inset 0 1px 0 rgba(245,158,11,.08), inset 0 -1px 0 rgba(245,158,11,.08);
+    }
+    .payment-check-label{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      margin:0;
+      cursor:pointer;
+      white-space:nowrap;
+    }
+    .payment-check-label input{
+      width:17px;
+      height:17px;
+      margin:0;
+      accent-color:#15803d;
+      box-shadow:none;
+    }
+    .customer-docs-empty{
+      border:1px dashed #cbd5e1;
+      border-radius:14px;
+      background:#f8fafc;
+    }
+
+    @media(max-width:760px){
+      .customers-table-wrap{overflow:visible;border:0;background:transparent}
+      .customers-table{min-width:0;border-collapse:separate;border-spacing:0 10px}
+      .customers-table thead{display:none}
+      .customers-table tbody,
+      .customers-table tr,
+      .customers-table td{display:block;width:100%}
+      .customers-table tbody tr{
+        border:1px solid #dbe3ef;
+        border-radius:16px;
+        overflow:hidden;
+        box-shadow:0 8px 20px rgba(15,39,72,.05);
+        background:#fff;
+      }
+      .customers-table tbody tr:nth-child(odd) td{background:#fff}
+      .customers-table tbody tr:nth-child(even) td{background:#f7f9fc}
+      .customers-table td{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        padding:9px 12px;
+        border-bottom:1px solid #eef3f8;
+      }
+      .customers-table td:first-child{
+        padding-top:12px;
+        font-size:15px;
+        background:#f8fafc !important;
+      }
+      .customers-table tbody tr:nth-child(even) td:first-child{
+        background:#eef4fb !important;
+      }
+      .customers-table td:last-child{border-bottom:0;padding-bottom:12px}
+      .customers-table td::before{
+        content:attr(data-label);
+        color:#64748b;
+        font-size:11px;
+        font-weight:800;
+        white-space:nowrap;
+      }
+      .customers-table td:first-child::before{display:none}
+
+      .card-hd:has(#btnBackToCustomers){
+        align-items:flex-start;
+      }
+      .card-hd:has(#btnBackToCustomers) > div{
+        width:100%;
+        justify-content:space-between !important;
+      }
+      .back-customers-btn{
+        width:100%;
+        margin-top:4px;
+      }
+
+      .customer-details-section,
+      .customer-documents-section{padding:12px}
+      .customer-detail-name{font-size:19px}
+      .customer-details-table-wrap{border:0}
+      .customer-details-table,
+      .customer-details-table tbody,
+      .customer-details-table tr,
+      .customer-details-table th,
+      .customer-details-table td{display:block;width:100%}
+      .customer-details-table tr{
+        display:grid;
+        grid-template-columns:110px 1fr;
+        border-bottom:1px solid #e8eef6;
+      }
+      .customer-details-table tr:last-child{border-bottom:0}
+      .customer-details-table th,
+      .customer-details-table td{
+        border:0;
+        padding:8px 10px;
+      }
+      .customer-details-table th{
+        width:auto;
+        background:#f8fafc;
+      }
+      .customer-details-table td{
+        border-bottom:1px solid #f1f5f9;
+      }
+      .customer-details-table tr th:nth-of-type(2){
+        border-top:1px solid #eef2f7;
+      }
+      .customer-doc-summary{
+        display:grid;
+        grid-template-columns:1fr;
+        gap:5px;
+      }
+      .summary-divider{display:none}
+
+      .customer-docs-table tr.open-payment-row{
+        border-color:#f3d29a;
+      }
+      .payment-check-label{justify-content:flex-end}
+    }
 </style>
 </head>
 <body>
@@ -467,7 +723,7 @@
       <h3>כרטיס לקוח</h3>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="status" id="selectedStatus">בחרו לקוח מהרשימה</div>
-        <button class="btn secondary small" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
+        <button class="btn back-customers-btn" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
       </div>
     </div>
     <div class="card-bd" id="selectedBody">
@@ -703,10 +959,16 @@ async function deleteCustomer(id){
   showToast("הלקוח נמחק");
 }
 
+function setCustomerQuickbarVisible(visible){
+  const quickbar = document.querySelector(".customer-quickbar");
+  if (quickbar) quickbar.style.display = visible ? "" : "none";
+}
+
 function selectCustomer(id){
   selectedId = id;
   const listSection = $("customersSection");
   const selectedCard = $("selectedCard");
+  setCustomerQuickbarVisible(false);
   if (listSection) listSection.style.display = "none";
   if (selectedCard) selectedCard.style.display = "";
   renderSelected();
@@ -718,6 +980,7 @@ function showCustomerList(){
   syncCustomerSearch("");
   const listSection = $("customersSection");
   const selectedCard = $("selectedCard");
+  setCustomerQuickbarVisible(true);
   if (selectedCard) selectedCard.style.display = "none";
   if (listSection) listSection.style.display = "";
   render();
@@ -758,6 +1021,7 @@ function render(){
   if (selectedId && customers.some(c => c.id === selectedId)) {
     const listSection = $("customersSection");
     const selectedCard = $("selectedCard");
+    setCustomerQuickbarVisible(false);
     if (listSection) listSection.style.display = "none";
     if (selectedCard) selectedCard.style.display = "";
     renderSelected();
@@ -774,6 +1038,7 @@ function render(){
   const listSection = $("customersSection");
   const selectedCard = $("selectedCard");
 
+  setCustomerQuickbarVisible(true);
   if (listSection) listSection.style.display = "";
   if (selectedCard) selectedCard.style.display = "none";
 
@@ -782,20 +1047,49 @@ function render(){
     return;
   }
 
-  const rows = filtered.map(c => `
-    <button class="customer-list-card customer-name-link"
-            type="button"
-            data-action="select"
-            data-id="${escapeHtml(c.id)}"
-            aria-label="פתיחת כרטיס לקוח ${escapeHtml(c.name)}">
-      ${escapeHtml(c.name)}
-    </button>
-  `).join("");
+  const rows = filtered.map(c => {
+    const docsCount = docsForCustomer(c).length;
+    return `
+      <tr class="customer-row"
+          tabindex="0"
+          role="button"
+          data-action="select"
+          data-id="${escapeHtml(c.id)}"
+          aria-label="פתיחת כרטיס לקוח ${escapeHtml(c.name)}">
+        <td data-label="שם לקוח"><strong>${escapeHtml(c.name || "—")}</strong></td>
+        <td data-label="סוג לקוח">${escapeHtml(customerTypeLabels[c.type] || "אחר")}</td>
+        <td data-label="ח.פ / ע.מ / ת.ז"><span class="customer-id-ltr">${escapeHtml(c.taxId || "—")}</span></td>
+        <td data-label="מייל">${escapeHtml(c.email || "—")}</td>
+        <td data-label="מסמכים"><strong>${docsCount}</strong></td>
+      </tr>
+    `;
+  }).join("");
 
-  list.innerHTML = `<div class="customer-list-grid">${rows}</div>`;
+  list.innerHTML = `
+    <div class="customers-table-wrap">
+      <table class="customers-table">
+        <thead>
+          <tr>
+            <th>שם לקוח</th>
+            <th>סוג לקוח</th>
+            <th>ח.פ / ע.מ / ת.ז</th>
+            <th>מייל</th>
+            <th>מסמכים</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
 
   list.querySelectorAll("[data-action='select']").forEach(el => {
     el.addEventListener("click", () => selectCustomer(el.dataset.id));
+    el.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        selectCustomer(el.dataset.id);
+      }
+    });
   });
 }
 
@@ -821,6 +1115,100 @@ function documentDisplayType(d){
 
 function documentDisplayTotal(d){
   return Number(d.gross ?? d.total ?? d.debit ?? d.balance ?? 0);
+}
+
+function normalizedDocumentType(d){
+  return String(documentDisplayType(d) || "").trim();
+}
+
+function isCreditDocument(d){
+  return normalizedDocumentType(d).includes("זיכוי");
+}
+
+function isReceiptDocument(d){
+  return normalizedDocumentType(d).includes("קבלה");
+}
+
+function isTaxInvoiceDocument(d){
+  const type = normalizedDocumentType(d);
+  return type.includes("חשבונית מס") && !type.includes("זיכוי");
+}
+
+function isTransactionInvoiceDocument(d){
+  const type = normalizedDocumentType(d);
+  return type.includes("חשבונית עסקה") && !type.includes("זיכוי");
+}
+
+function isPayableInvoice(d){
+  const type = normalizedDocumentType(d);
+  const invoiceLike = isTaxInvoiceDocument(d) || isTransactionInvoiceDocument(d);
+  return invoiceLike && !type.includes("קבלה") && !isCreditDocument(d);
+}
+
+function customerRevenueTotal(docs){
+  const taxInvoices = docs.filter(d => isTaxInvoiceDocument(d));
+  const receipts = docs.filter(d => isReceiptDocument(d) && !normalizedDocumentType(d).includes("חשבונית"));
+  const transactionInvoices = docs.filter(d => isTransactionInvoiceDocument(d));
+  const credits = docs.filter(d => isCreditDocument(d));
+
+  let source = taxInvoices;
+  if (!source.length) source = receipts;
+  if (!source.length) source = transactionInvoices;
+
+  const sourceWithCredits = source.length ? [...source, ...credits] : credits;
+
+  return sourceWithCredits.reduce((sum, d) => {
+    const sign = isCreditDocument(d) ? -1 : 1;
+    return sum + (sign * documentDisplayTotal(d));
+  }, 0);
+}
+
+function openInvoiceSummary(docs){
+  const openDocs = docs.filter(d => isPayableInvoice(d) && !d.paid);
+  return {
+    count: openDocs.length,
+    total: openDocs.reduce((sum, d) => sum + documentDisplayTotal(d), 0)
+  };
+}
+
+async function setDocumentPaidStatus(docId, paid){
+  const idx = ledgerDocuments.findIndex(d => String(d.id || "") === String(docId || ""));
+  if (idx < 0) {
+    showToast("לא ניתן לעדכן את סטטוס התשלום במסמך הזה.", true);
+    return;
+  }
+
+  const previous = !!ledgerDocuments[idx].paid;
+  const previousPaidAt = ledgerDocuments[idx].paidAt || null;
+  ledgerDocuments[idx] = {
+    ...ledgerDocuments[idx],
+    paid: !!paid,
+    paidAt: paid ? new Date().toISOString() : null
+  };
+
+  try {
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      documents: ledgerDocuments,
+      documentsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    await writeAuditLog(paid ? "חשבונית סומנה כשולמה" : "חשבונית נפתחה מחדש לתשלום", {
+      entityType: "מסמך",
+      entityId: docId,
+      documentId: docId,
+      documentNumber: ledgerDocuments[idx].number || "",
+      customerId: ledgerDocuments[idx].customerId || selectedId || "",
+      summary: `${paid ? "סומנה כשולמה" : "סומנה כפתוחה לתשלום"}: ${documentDisplayType(ledgerDocuments[idx])} ${ledgerDocuments[idx].number || ""}`
+    });
+
+    renderSelected();
+    showToast(paid ? "החשבונית סומנה כשולמה ✅" : "החשבונית סומנה כפתוחה לתשלום");
+  } catch (error) {
+    console.error("Payment status update failed", error);
+    ledgerDocuments[idx] = {...ledgerDocuments[idx], paid: previous, paidAt: previousPaidAt};
+    showToast("לא הצלחנו לשמור את סטטוס התשלום.", true);
+    renderSelected();
+  }
 }
 
 function documentHtmlForView(d){
@@ -1271,88 +1659,139 @@ function renderSelected(){
   const c = customers.find(x => x.id === selectedId);
   const status = $("selectedStatus");
   const body = $("selectedBody");
+
   if (!c) {
     $("selectedCard").style.display = "none";
     status.textContent = "בחרו לקוח מהרשימה";
     body.innerHTML = `<div class="empty">לא נבחר לקוח. לחיצה על שם לקוח ברשימה תפתח את הכרטיס שלו.</div>`;
     return;
   }
+
   $("selectedCard").style.display = "";
   status.textContent = c.name;
 
   const docs = docsForCustomer(c);
-  const totalDocs = docs.reduce((sum,d) => sum + documentDisplayTotal(d), 0);
-  const lastDoc = docs[0];
+  const revenueTotal = customerRevenueTotal(docs);
+  const openInvoices = openInvoiceSummary(docs);
+  const address = [c.address, c.city, c.zip].filter(Boolean).join(", ") || "—";
+
   const docsHtml = docs.length ? `
-    <div class="document-history-summary">
-      <span class="chip ok">סה״כ מסמכים: ${docs.length}</span>
-      <span class="chip">סה״כ מסמכים כספיים: ${money(totalDocs)}</span>
-      ${lastDoc ? `<span class="chip">מסמך אחרון: ${escapeHtml(documentDisplayType(lastDoc))} ${escapeHtml(lastDoc.number || "")}</span>` : ``}
+    <div class="customer-doc-summary">
+      <span><strong>${docs.length}</strong> מסמכים</span>
+      <span class="summary-divider"></span>
+      <span>סה״כ הכנסות מהלקוח: <strong>${money(revenueTotal)}</strong></span>
+      <span class="summary-divider"></span>
+      <span class="${openInvoices.count ? "open-payment-summary" : ""}">
+        חשבוניות פתוחות: <strong>${openInvoices.count}</strong>${openInvoices.count ? ` · ${money(openInvoices.total)}` : ""}
+      </span>
     </div>
+
     <div class="docs-history-table-wrap">
-      <table class="docs-history-table">
+      <table class="docs-history-table customer-docs-table">
         <thead>
           <tr>
             <th>תאריך</th>
-            <th>מספר מסמך</th>
+            <th>מספר</th>
             <th>סוג מסמך</th>
             <th>סכום</th>
-            <th>סכום כולל מע״מ</th>
-            <th>מספר הקצאה</th>
+            <th>סטטוס תשלום</th>
             <th>פעולות</th>
           </tr>
         </thead>
         <tbody>
-          ${docs.map(d => `
-            <tr>
-              <td data-label="תאריך"><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
-              <td data-label="מספר מסמך"><b>${escapeHtml(d.number || "—")}</b></td>
-              <td data-label="סוג מסמך">${escapeHtml(documentDisplayType(d))}</td>
-              <td data-label="סכום">${money(Number(d.net ?? d.subtotal ?? documentDisplayTotal(d)))}</td>
-              <td data-label="סכום כולל מע״מ"><b>${money(documentDisplayTotal(d))}</b></td>
-              <td data-label="מספר הקצאה">${escapeHtml(d.allocationNumber || "—")}</td>
-              <td data-label="פעולות">
-                <div class="docs-actions">
-                  <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
-                  <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
-                  <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שלח ללקוח</button>
-                </div>
-              </td>
-            </tr>`).join("")}
+          ${docs.map(d => {
+            const payable = isPayableInvoice(d);
+            const paid = !!d.paid;
+            const canPersistPaid = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
+
+            return `
+              <tr class="${payable && !paid ? "open-payment-row" : ""}">
+                <td data-label="תאריך"><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
+                <td data-label="מספר"><strong>${escapeHtml(d.number || "—")}</strong></td>
+                <td data-label="סוג מסמך">${escapeHtml(documentDisplayType(d))}</td>
+                <td data-label="סכום"><strong>${money(documentDisplayTotal(d))}</strong></td>
+                <td data-label="סטטוס תשלום">
+                  ${payable ? `
+                    <label class="payment-check-label">
+                      <input type="checkbox"
+                             data-paid-doc="${escapeHtml(d.id || "")}"
+                             ${paid ? "checked" : ""}
+                             ${canPersistPaid ? "" : "disabled"} />
+                      <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
+                    </label>
+                  ` : `<span class="payment-na">—</span>`}
+                </td>
+                <td data-label="פעולות">
+                  <div class="docs-actions">
+                    <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
+                    <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
+                    <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
+                  </div>
+                </td>
+              </tr>`;
+          }).join("")}
         </tbody>
       </table>
     </div>
-  ` : `<div class="empty">עדיין אין מסמכים ללקוח.</div>`;
+  ` : `<div class="empty customer-docs-empty">עדיין אין מסמכים ללקוח.</div>`;
 
   body.innerHTML = `
-    <div class="customer-card">
-      <div class="name">${escapeHtml(c.name)}</div>
-      <div class="hint">${escapeHtml(customerTypeLabels[c.type] || "אחר")}${c.taxId ? " · " + escapeHtml(c.taxId) : ""}</div>
-      <div class="chips">
-        ${c.email ? `<span class="chip ok">מייל: ${escapeHtml(c.email)}</span>` : `<span class="chip">אין מייל</span>`}
-        ${c.phone ? `<span class="chip">טלפון: ${escapeHtml(c.phone)}</span>` : `<span class="chip">אין טלפון</span>`}
-        ${c.autoSendDocuments ? `<span class="chip ok">שליחה אוטומטית פעילה</span>` : ``}
+    <section class="customer-details-section">
+      <div class="section-title-row">
+        <div>
+          <h4>פרטי לקוח</h4>
+          <div class="customer-detail-name">${escapeHtml(c.name)}</div>
+        </div>
       </div>
-    </div>
-    <div class="split">
-      <div class="info-box">
-        <h4>פרטי לקוח</h4>
-        <div class="kv"><div class="k">איש קשר</div><div>${escapeHtml(c.contact || "—")}</div></div>
-        <div class="kv"><div class="k">טלפון</div><div>${escapeHtml(c.phone || "—")}</div></div>
-        <div class="kv"><div class="k">מייל</div><div>${escapeHtml(c.email || "—")}</div></div>
-        <div class="kv"><div class="k">כתובת</div><div>${escapeHtml([c.address,c.city,c.zip].filter(Boolean).join(", ") || "—")}</div></div>
+
+      <div class="customer-details-table-wrap">
+        <table class="customer-details-table">
+          <tbody>
+            <tr>
+              <th>סוג לקוח</th>
+              <td>${escapeHtml(customerTypeLabels[c.type] || "אחר")}</td>
+              <th>ח.פ / ע.מ / ת.ז</th>
+              <td><span class="customer-id-ltr">${escapeHtml(c.taxId || "—")}</span></td>
+            </tr>
+            <tr>
+              <th>איש קשר</th>
+              <td>${escapeHtml(c.contact || "—")}</td>
+              <th>טלפון</th>
+              <td>${escapeHtml(c.phone || "—")}</td>
+            </tr>
+            <tr>
+              <th>מייל</th>
+              <td>${escapeHtml(c.email || "—")}</td>
+              <th>כתובת</th>
+              <td>${escapeHtml(address)}</td>
+            </tr>
+            <tr>
+              <th>תנאי תשלום</th>
+              <td>${escapeHtml(termsLabels[c.paymentTerms] || "—")}</td>
+              <th>תשלום מועדף</th>
+              <td>${escapeHtml(paymentLabels[c.paymentMethod] || "—")}</td>
+            </tr>
+            <tr>
+              <th>שליחת מסמכים אוטומטית</th>
+              <td>${c.autoSendDocuments ? "פעילה" : "לא פעילה"}</td>
+              <th>הערות</th>
+              <td>${escapeHtml(c.notes || "—")}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-      <div class="info-box">
-        <h4>חשבונאות</h4>
-        <div class="kv"><div class="k">תנאי תשלום</div><div>${escapeHtml(termsLabels[c.paymentTerms] || "—")}</div></div>
-        <div class="kv"><div class="k">תשלום מועדף</div><div>${escapeHtml(paymentLabels[c.paymentMethod] || "—")}</div></div>
-        <div class="kv"><div class="k">הערות</div><div>${escapeHtml(c.notes || "—")}</div></div>
+    </section>
+
+    <section class="customer-documents-section">
+      <div class="section-title-row">
+        <div>
+          <h4>מסמכים</h4>
+          <div class="hint">כל המסמכים שהופקו ללקוח, כולל צפייה, PDF ושליחה חוזרת במייל.</div>
+        </div>
       </div>
-    </div>
-    <div class="info-box" style="margin-top:12px">
-      <h4>כרטסת לקוח</h4>
       ${docsHtml}
-    </div>
+    </section>
+
     <div class="selected-actions">
       <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
       <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
@@ -1364,14 +1803,30 @@ function renderSelected(){
   $("btnCreateDocSelected").addEventListener("click", () => {
     location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}`;
   });
+
   $("btnPrintLedgerSelected").addEventListener("click", () => printCustomerLedger(c.id));
   $("btnEditSelected").addEventListener("click", () => openForm(c));
   $("btnDeleteSelected").addEventListener("click", () => deleteCustomer(c.id));
-  body.querySelectorAll("[data-view-doc]").forEach(btn => btn.addEventListener("click", () => openStoredDocument(btn.dataset.viewDoc, false)));
-  body.querySelectorAll("[data-print-doc]").forEach(btn => btn.addEventListener("click", () => openStoredDocument(btn.dataset.printDoc, true)));
-  body.querySelectorAll("[data-send-doc]").forEach(btn => btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc)));
-}
 
+  body.querySelectorAll("[data-view-doc]").forEach(btn =>
+    btn.addEventListener("click", () => openStoredDocument(btn.dataset.viewDoc, false))
+  );
+
+  body.querySelectorAll("[data-print-doc]").forEach(btn =>
+    btn.addEventListener("click", () => openStoredDocument(btn.dataset.printDoc, true))
+  );
+
+  body.querySelectorAll("[data-send-doc]").forEach(btn =>
+    btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc))
+  );
+
+  body.querySelectorAll("[data-paid-doc]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      await setDocumentPaidStatus(input.dataset.paidDoc, input.checked);
+    });
+  });
+}
 
 function printCustomerLedger(id){
   const c = customers.find(x => x.id === id);
