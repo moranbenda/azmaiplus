@@ -1,13 +1,5 @@
-const ENVIRONMENTS = {
-  sandbox: {
-    tokenUrl:
-      "https://ita-api.taxes.gov.il/shaam/tsandbox/longtimetoken/oauth2/token"
-  },
-  production: {
-    tokenUrl:
-      "https://ita-api.taxes.gov.il/shaam/production/longtimetoken/oauth2/token"
-  }
-};
+const DEFAULT_TOKEN_GATEWAY_URL =
+  "https://api.azmaiplus.co.il/api/invoice-israel/token-exchange";
 
 function getEnvironment() {
   const requestedEnvironment = String(process.env.ITA_ENV || "sandbox")
@@ -20,10 +12,12 @@ function getEnvironment() {
 function parseCookies(cookieHeader = "") {
   return cookieHeader.split(";").reduce((cookies, item) => {
     const separatorIndex = item.indexOf("=");
+
     if (separatorIndex === -1) return cookies;
 
     const key = item.slice(0, separatorIndex).trim();
     const value = item.slice(separatorIndex + 1).trim();
+
     if (key) cookies[key] = decodeURIComponent(value);
     return cookies;
   }, {});
@@ -51,23 +45,6 @@ function positiveNumber(...values) {
     if (Number.isFinite(number) && number > 0) return number;
   }
   return 0;
-}
-
-function maskValue(value, visibleStart = 5, visibleEnd = 4) {
-  const text = String(value || "");
-  if (!text) return "";
-  if (text.length <= visibleStart + visibleEnd) return `${text.slice(0, 2)}***`;
-  return `${text.slice(0, visibleStart)}***${text.slice(-visibleEnd)}`;
-}
-
-function headersToObject(headers) {
-  const result = {};
-  try {
-    headers.forEach((value, key) => {
-      result[key] = value;
-    });
-  } catch {}
-  return result;
 }
 
 function buildDocumentsUrl(payload) {
@@ -98,10 +75,11 @@ function renderResultPage(payload) {
   const safeMessage = escapeHtml(message);
   const documentsUrl = buildDocumentsUrl(payload);
   const safeDocumentsUrl = escapeHtml(documentsUrl);
+
   const serializedPayload = JSON.stringify({
     type: "invoice-israel-oauth-result",
     ...payload
-  }).replaceAll("<", "\\u003c");
+  }).replaceAll("<", "\u003c");
 
   return `<!doctype html>
 <html dir="rtl" lang="he">
@@ -120,6 +98,7 @@ function renderResultPage(payload) {
       (() => {
         const payload = ${serializedPayload};
         const fallbackUrl = ${JSON.stringify(documentsUrl)};
+
         try {
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage(payload, window.location.origin);
@@ -132,6 +111,7 @@ function renderResultPage(payload) {
         } catch (error) {
           console.warn("Could not notify opener", error);
         }
+
         window.location.replace(fallbackUrl);
       })();
     </script>
@@ -148,19 +128,30 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   try {
-    const { code, state, error, error_description: errorDescription } = req.query;
+    const {
+      code,
+      state,
+      error,
+      error_description: errorDescription
+    } = req.query;
 
     if (error) {
       clearStateCookie(res);
       return res.status(400).send(
-        renderResultPage({ ok: false, message: String(errorDescription || error) })
+        renderResultPage({
+          ok: false,
+          message: String(errorDescription || error)
+        })
       );
     }
 
     if (!code) {
       clearStateCookie(res);
       return res.status(400).send(
-        renderResultPage({ ok: false, message: "לא התקבל קוד הרשאה מרשות המסים." })
+        renderResultPage({
+          ok: false,
+          message: "לא התקבל קוד הרשאה מרשות המסים."
+        })
       );
     }
 
@@ -172,7 +163,8 @@ export default async function handler(req, res) {
       return res.status(400).send(
         renderResultPage({
           ok: false,
-          message: "אימות הבקשה נכשל. יש להתחיל את תהליך החיבור מחדש."
+          message:
+            "אימות הבקשה נכשל. יש להתחיל את תהליך החיבור מחדש."
         })
       );
     }
@@ -180,94 +172,61 @@ export default async function handler(req, res) {
     const clientId = String(process.env.ITA_CLIENT_ID || "").trim();
     const clientSecret = String(process.env.ITA_CLIENT_SECRET || "").trim();
     const redirectUri = String(process.env.ITA_REDIRECT_URI || "").trim();
+    const gatewaySecret = String(process.env.ITA_GATEWAY_SECRET || "").trim();
 
-    if (!clientId || !clientSecret || !redirectUri) {
-      console.error("Missing ITA_CLIENT_ID, ITA_CLIENT_SECRET or ITA_REDIRECT_URI");
+    if (!clientId || !clientSecret || !redirectUri || !gatewaySecret) {
+      console.error(
+        "Missing ITA_CLIENT_ID, ITA_CLIENT_SECRET, ITA_REDIRECT_URI or ITA_GATEWAY_SECRET"
+      );
       clearStateCookie(res);
       return res.status(500).send(
         renderResultPage({
           ok: false,
-          message: "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
+          message:
+            "חסרים משתני סביבה הנדרשים לחיבור לרשות המסים."
         })
       );
     }
 
     const environment = getEnvironment();
-    const tokenUrl = process.env.ITA_TOKEN_URL || ENVIRONMENTS[environment].tokenUrl;
+
+    if (environment !== "production") {
+      clearStateCookie(res);
+      return res.status(500).send(
+        renderResultPage({
+          ok: false,
+          message:
+            "סביבת החיבור לרשות המסים אינה מוגדרת ל־Production."
+        })
+      );
+    }
+
+    const tokenGatewayUrl =
+      process.env.ITA_TOKEN_GATEWAY_URL ||
+      DEFAULT_TOKEN_GATEWAY_URL;
 
     const basicCredentials = Buffer.from(
       `${clientId}:${clientSecret}`,
       "utf8"
     ).toString("base64");
 
-    const requestBody = {
+    const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: String(code),
       redirect_uri: redirectUri,
       scope: "scope"
-    };
+    });
 
-    const body = new URLSearchParams(requestBody);
-
-    console.log(
-      "ITA TOKEN REQUEST (SANITIZED)",
-      JSON.stringify(
-        {
-          url: tokenUrl,
-          method: "POST",
-          environment,
-          headers: {
-            Authorization: "Basic [REDACTED]",
-            "Content-Type": "application/x-www-form-urlencoded",
-            Accept: "application/json"
-          },
-          body: {
-            grant_type: requestBody.grant_type,
-            code: `[REDACTED, length=${requestBody.code.length}]`,
-            redirect_uri: requestBody.redirect_uri,
-            scope: requestBody.scope
-          },
-          client_id: maskValue(clientId)
-        },
-        null,
-        2
-      )
-    );
-
-    let tokenResponse;
-
-    try {
-      tokenResponse = await fetch(tokenUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicCredentials}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json"
-        },
-        body: body.toString()
-      });
-    } catch (fetchError) {
-      console.error(
-        "ITA TOKEN NETWORK ERROR",
-        JSON.stringify(
-          {
-            name: fetchError?.name || "Error",
-            message: fetchError?.message || String(fetchError),
-            cause: fetchError?.cause
-              ? {
-                  name: fetchError.cause.name,
-                  message: fetchError.cause.message,
-                  code: fetchError.cause.code
-                }
-              : null,
-            url: tokenUrl
-          },
-          null,
-          2
-        )
-      );
-      throw fetchError;
-    }
+    const tokenResponse = await fetch(tokenGatewayUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${basicCredentials}`,
+        "X-Azmai-Gateway-Key": gatewaySecret,
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json"
+      },
+      body: body.toString()
+    });
 
     const tokenText = await tokenResponse.text();
     let tokenData = null;
@@ -278,66 +237,45 @@ export default async function handler(req, res) {
       tokenData = null;
     }
 
-    const safeResponseBody =
-      tokenData && typeof tokenData === "object"
-        ? {
-            ...tokenData,
-            access_token: tokenData.access_token ? "[REDACTED]" : tokenData.access_token,
-            refresh_token: tokenData.refresh_token ? "[REDACTED]" : tokenData.refresh_token
-          }
-        : tokenText;
-
-    console.log(
-      "ITA TOKEN RESPONSE",
-      JSON.stringify(
-        {
-          status: tokenResponse.status,
-          statusText: tokenResponse.statusText,
-          headers: headersToObject(tokenResponse.headers),
-          body: safeResponseBody
-        },
-        null,
-        2
-      )
-    );
-
     if (!tokenResponse.ok) {
-      console.error("ITA token exchange failed", {
+      console.error("ITA token exchange through Kamatera failed", {
         status: tokenResponse.status,
         environment,
-        tokenHost: new URL(tokenUrl).host,
-        response: safeResponseBody
+        gatewayHost: new URL(tokenGatewayUrl).host,
+        response: tokenData || tokenText
       });
 
       clearStateCookie(res);
+
       return res.status(502).send(
         renderResultPage({
           ok: false,
-          message: "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לבדוק את פרטי החיבור ולנסות שוב."
+          message:
+            "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לבדוק את פרטי החיבור ולנסות שוב."
         })
       );
     }
 
     if (!tokenData?.access_token) {
-      console.error("ITA token response did not include access_token", {
-        environment,
-        tokenHost: new URL(tokenUrl).host,
-        response: safeResponseBody
-      });
-
       clearStateCookie(res);
       return res.status(502).send(
-        renderResultPage({ ok: false, message: "התקבלה תשובה לא צפויה מרשות המסים." })
+        renderResultPage({
+          ok: false,
+          message:
+            "התקבלה תשובה לא צפויה מרשות המסים."
+        })
       );
     }
 
     const connectedAtDate = new Date();
+
     const validitySeconds = positiveNumber(
       tokenData.refresh_token_expires_in,
       tokenData.refresh_expires_in,
       tokenData.long_lived_expires_in,
       90 * 24 * 60 * 60
     );
+
     const validUntilDate = new Date(
       connectedAtDate.getTime() + validitySeconds * 1000
     );
@@ -354,10 +292,12 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error("ITA callback error", error);
     clearStateCookie(res);
+
     return res.status(500).send(
       renderResultPage({
         ok: false,
-        message: "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
+        message:
+          "אירעה תקלה בלתי צפויה. יש לנסות שוב מאוחר יותר."
       })
     );
   }
