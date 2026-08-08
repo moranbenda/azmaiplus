@@ -739,7 +739,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -1187,10 +1187,21 @@ async function setDocumentPaidStatus(docId, paid){
   };
 
   try {
-    await setDoc(doc(db, "ledgers", currentUser.uid), {
-      documents: ledgerDocuments,
-      documentsUpdatedAt: new Date().toISOString()
-    }, { merge: true });
+    if (ledgerDocuments[idx]._storage === "subcollection") {
+      await setDoc(
+        doc(db, "ledgers", currentUser.uid, "documents", String(docId)),
+        { paid: !!paid, paidAt: ledgerDocuments[idx].paidAt },
+        { merge: true }
+      );
+    } else {
+      const legacyDocuments = ledgerDocuments
+        .filter(item => item._storage !== "subcollection")
+        .map(({_storage, ...item}) => item);
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        documents: legacyDocuments,
+        documentsUpdatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
 
     await writeAuditLog(paid ? "חשבונית סומנה כשולמה" : "חשבונית נפתחה מחדש לתשלום", {
       entityType: "מסמך",
@@ -1999,10 +2010,24 @@ async function loadData(){
     const userSnap = await getDoc(doc(db, "users", currentUser.uid));
     userProfile = userSnap.exists() ? userSnap.data() : {};
 
-    const ledgerSnap = await getDoc(doc(db, "ledgers", currentUser.uid));
+    const [ledgerSnap, documentsSnap] = await Promise.all([
+      getDoc(doc(db, "ledgers", currentUser.uid)),
+      getDocs(collection(db, "ledgers", currentUser.uid, "documents"))
+    ]);
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
-    ledgerDocuments = Array.isArray(data.documents) ? data.documents : [];
+
+    const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
+    const subcollectionDocuments = documentsSnap.docs.map(snapshot => ({
+      ...snapshot.data(),
+      id: snapshot.data()?.id || snapshot.id,
+      _storage:"subcollection"
+    }));
+    const byId = new Map();
+    legacyDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
+    subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
+    ledgerDocuments = Array.from(byId.values());
+
     saveStatus.textContent = `נטענו ${customers.length} לקוחות`;
     render();
   } catch (err) {
