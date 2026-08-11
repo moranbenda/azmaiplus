@@ -50,6 +50,9 @@
     .invoice-israel-strip b{font-size:16px}.invoice-israel-strip .hint{margin-top:4px}
     .btn.invoice-israel-connected{background:var(--green);box-shadow:0 8px 20px rgba(22,163,74,.18)}
     .btn.invoice-israel-connected:disabled{opacity:1;cursor:default}
+    .invoice-israel-actions{display:flex;flex-direction:column;align-items:center;gap:6px}
+    .invoice-israel-reconnect{border:0;background:none;padding:0;color:var(--blue);font:inherit;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+    .invoice-israel-reconnect:hover{opacity:.78}
     .is-hidden{display:none!important}.draft-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     @media(max-width:900px){.line-row{grid-template-columns:1fr}.line-row .remove-line{width:100%}}
 
@@ -79,7 +82,10 @@
     </div>
     <div class="invoice-israel-strip no-print" id="invoiceIsraelStrip">
       <div><b>חשבוניות ישראל</b><div class="hint" id="invoiceIsraelStatus">לא מחובר</div></div>
-      <button type="button" class="btn" id="btnConnectInvoiceIsrael">חיבור לחשבוניות ישראל</button>
+      <div class="invoice-israel-actions">
+        <button type="button" class="btn" id="btnConnectInvoiceIsrael">חיבור לחשבוניות ישראל</button>
+        <button type="button" class="invoice-israel-reconnect is-hidden" id="btnReconnectInvoiceIsrael">חיבור מחדש לרשות המסים</button>
+      </div>
     </div>
   </section>
 
@@ -393,6 +399,7 @@ function isInvoiceIsraelConnectionValid(info = invoiceIsraelConnection()){
 function renderInvoiceIsraelStatus(){
   const statusEl = $("invoiceIsraelStatus");
   const button = $("btnConnectInvoiceIsrael");
+  const reconnectButton = $("btnReconnectInvoiceIsrael");
   if(!statusEl || !button) return;
 
   const info = invoiceIsraelConnection();
@@ -402,6 +409,7 @@ function renderInvoiceIsraelStatus(){
     button.textContent = "חיבור לחשבונית ישראל בתוקף";
     button.classList.add("invoice-israel-connected");
     button.disabled = true;
+    reconnectButton?.classList.remove("is-hidden");
 
     const connectedDate = formatInvoiceIsraelDate(info.connectedAt);
     statusEl.textContent = connectedDate
@@ -413,6 +421,7 @@ function renderInvoiceIsraelStatus(){
   button.textContent = "חיבור לחשבוניות ישראל";
   button.classList.remove("invoice-israel-connected");
   button.disabled = false;
+  reconnectButton?.classList.add("is-hidden");
 
   if(info.status === "error" && info.message){
     statusEl.textContent = info.message;
@@ -1238,6 +1247,7 @@ $('btnIssueDocument').onclick=issueDocument;
 $('btnSaveSettings').onclick=async()=>{ if(settingsLocked)return; settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings, documentSettingsLocked:true, documentSettingsLockedAt:new Date().toISOString()}); settingsLocked=true; renderNumberingSettings(); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
 $('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); await logAudit("טיוטת מסמך נשמרה", {entityType:"מסמך", entityId:d.id, documentId:d.id, documentType:d.type, documentTypeLabel:TYPE_LABELS[d.type]||d.type, customerId:d.customerId||'', amount:totals().gross||0, summary:`נשמרה טיוטת ${TYPE_LABELS[d.type]||'מסמך'}`}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
 $('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
+$('btnReconnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
 </script>
 </body>
