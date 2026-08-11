@@ -249,10 +249,23 @@ function buildAllocationPayload(finalDoc, customer){
     throw new Error('סוג המסמך אינו תומך במספר הקצאה.');
   }
 
+  const allocationUserName=String(
+    profile.businessName ||
+    profile.business ||
+    profile.companyName ||
+    profile.fullName ||
+    auth.currentUser?.displayName ||
+    ''
+  ).trim();
+  if(!allocationUserName){
+    throw new Error('כדי לקבל מספר הקצאה יש להגדיר שם עסק או שם משתמש בפרטי העסק.');
+  }
+
   const payload={
     Invoice_ID:String(finalDoc.id || '').slice(0,50),
     Invoice_Type:invoiceType,
     Vat_Number:Number(sellerVat),
+    User_Name:allocationUserName.slice(0,50),
     Invoice_Reference_Number:String(finalDoc.number || '').slice(0,20),
     Customer_Name:String(finalDoc.customerName || '').slice(0,25),
     Invoice_Date:String(finalDoc.date || today()).slice(0,10),
