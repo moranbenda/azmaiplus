@@ -13,7 +13,7 @@ const TAX_TOKEN_URL =
 
 const TAX_ALLOCATION_URL =
   process.env.ITA_ALLOCATION_URL ||
-  "https://ita-api.taxes.gov.il/shaam/production/Invoices/v1/Approval";
+  "https://t-ita-api.taxes.gov.il/shaam/production/Invoices/v2/Approval";
 
 const TOKEN_STORE_FILE =
   process.env.ITA_TOKEN_STORE_FILE ||
@@ -176,6 +176,8 @@ function allocationNumberFromResponse(data) {
     data?.Confirmation_number ??
     data?.confirmation_number ??
     data?.confirmationNumber ??
+    data?.allocation_number ??
+    data?.Allocation_Number ??
     0;
 
   const stringValue = String(value ?? "").trim();
@@ -300,7 +302,7 @@ app.post(
 
 /*
  * Supplier-side allocation request.
- * The request structure follows the Tax Authority "Invoices/v1/Approval"
+ * The request structure follows the Tax Authority "Invoices/v2/Approval"
  * service. Accounting_Software_Number defaults to 99999999 when no
  * software registration number is configured, as specified by the API
  * documentation.
@@ -384,18 +386,90 @@ app.post(
       ).replace(/\D/g, "")
     );
 
-    const invoice = {
-      ...incomingInvoice,
-      Accounting_Software_Number:
-        accountingSoftwareNumber || 99999999
+    /*
+     * Invoices v2 in the Tax Authority portal documents the request body
+     * with lower-case snake_case property names. documents.html still uses
+     * the older Pascal_Case names internally, so normalize here at the
+     * gateway boundary without changing the document-generation logic.
+     */
+    const pick = (lowerName, legacyName, fallback = undefined) => {
+      const value = incomingInvoice?.[lowerName] ?? incomingInvoice?.[legacyName];
+      return value === undefined || value === null ? fallback : value;
     };
 
+    const invoice = {
+      invoice_id: pick("invoice_id", "Invoice_ID", ""),
+      invoice_type: Number(pick("invoice_type", "Invoice_Type", 0)),
+      vat_number: Number(pick("vat_number", "Vat_Number", 0)),
+      invoice_reference_number: String(
+        pick("invoice_reference_number", "Invoice_Reference_Number", "")
+      ),
+      customer_name: String(
+        pick("customer_name", "Customer_Name", "")
+      ),
+      invoice_date: String(
+        pick("invoice_date", "Invoice_Date", "")
+      ),
+      invoice_issuance_date: String(
+        pick("invoice_issuance_date", "Invoice_Issuance_Date", "")
+      ),
+      accounting_software_number:
+        accountingSoftwareNumber || 99999999,
+      amount_before_discount: Number(
+        pick("amount_before_discount", "Amount_Before_Discount", 0)
+      ),
+      discount: Number(pick("discount", "Discount", 0)),
+      payment_amount: Number(
+        pick("payment_amount", "Payment_Amount", 0)
+      ),
+      vat_amount: Number(pick("vat_amount", "VAT_Amount", 0)),
+      payment_amount_including_vat: Number(
+        pick(
+          "payment_amount_including_vat",
+          "Payment_Amount_Including_VAT",
+          0
+        )
+      ),
+      action: Number(pick("action", "Action", 0))
+    };
+
+    const optionalFields = [
+      ["union_vat_number", "Union_Vat_Number"],
+      ["authorized_company", "Authorized_Company"],
+      ["user_id", "User_ID"],
+      ["user_name", "User_Name"],
+      ["customer_vat_number", "Customer_VAT_Number"],
+      ["customer_country_code", "Customer_Country_Code"],
+      ["branch_id", "Branch_ID"],
+      ["client_software_key", "Client_Software_Key"],
+      ["invoice_note", "Invoice_Note"],
+      ["vehicle_license_number", "Vehicle_License_Number"],
+      ["phone_of_driver", "Phone_Of_Driver"],
+      ["arrival_date", "Arrival_Date"],
+      ["estimated_arrival_time", "Estimated_Arrival_Time"],
+      ["transition_location", "Transition_Location"],
+      ["delivery_address", "Delivery_Address"],
+      ["additional_information", "Additional_Information"],
+      ["additional_information_1", "Additional_Information_1"],
+      ["additional_information_2", "Additional_Information_2"],
+      ["additional_information_3", "Additional_Information_3"],
+      ["items", "Items"]
+    ];
+
+    for (const [lowerName, legacyName] of optionalFields) {
+      const value = pick(lowerName, legacyName);
+      if (value !== undefined && value !== null && value !== "") {
+        invoice[lowerName] = value;
+      }
+    }
+
     console.log("ITA allocation request", {
-      invoiceId: invoice.Invoice_ID,
-      invoiceType: invoice.Invoice_Type,
-      invoiceReference: invoice.Invoice_Reference_Number,
-      amount: invoice.Payment_Amount,
-      vatNumber: invoice.Vat_Number
+      endpoint: TAX_ALLOCATION_URL,
+      invoiceId: invoice.invoice_id,
+      invoiceType: invoice.invoice_type,
+      invoiceReference: invoice.invoice_reference_number,
+      amount: invoice.payment_amount,
+      vatNumber: invoice.vat_number
     });
 
     try {
@@ -432,6 +506,12 @@ app.post(
       });
 
       if (!upstreamResponse.ok || !allocationNumber) {
+        console.error("ITA allocation rejected", {
+          invoiceId: invoice.invoice_id,
+          status: upstreamResponse.status,
+          response: responseData || responseText || null
+        });
+
         return res.status(
           upstreamResponse.ok ? 422 : upstreamResponse.status
         ).json({
