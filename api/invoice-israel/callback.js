@@ -1,12 +1,30 @@
-const DEFAULT_TOKEN_GATEWAY_URL =
-  "https://api.azmaiplus.co.il/api/invoice-israel/token-exchange";
+import { randomUUID } from "node:crypto";
+
+const ENVIRONMENTS = {
+  sandbox: {
+    tokenGatewayUrl:
+      "https://api.azmaiplus.co.il/api/invoice-israel/token-exchange"
+  },
+  production: {
+    tokenGatewayUrl:
+      "https://api.azmaiplus.co.il/api/invoice-israel/token-exchange"
+  }
+};
+
+const TOKEN_STORE_URL =
+  process.env.ITA_TOKEN_STORE_URL ||
+  "https://api.azmaiplus.co.il/api/invoice-israel/token-store";
 
 function getEnvironment() {
-  const requestedEnvironment = String(process.env.ITA_ENV || "sandbox")
+  const requestedEnvironment = String(
+    process.env.ITA_ENV || "sandbox"
+  )
     .trim()
     .toLowerCase();
 
-  return requestedEnvironment === "production" ? "production" : "sandbox";
+  return requestedEnvironment === "production"
+    ? "production"
+    : "sandbox";
 }
 
 function parseCookies(cookieHeader = "") {
@@ -32,19 +50,33 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function clearStateCookie(res) {
-  res.setHeader(
-    "Set-Cookie",
-    "ita_oauth_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"
-  );
-}
-
 function positiveNumber(...values) {
   for (const value of values) {
     const number = Number(value);
-    if (Number.isFinite(number) && number > 0) return number;
+    if (Number.isFinite(number) && number > 0) {
+      return number;
+    }
   }
   return 0;
+}
+
+function stateCookieClear() {
+  return "ita_oauth_state=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
+}
+
+function connectionCookie(connectionId, maxAgeSeconds) {
+  return [
+    `ita_connection_id=${encodeURIComponent(connectionId)}`,
+    "Path=/",
+    "HttpOnly",
+    "Secure",
+    "SameSite=Lax",
+    `Max-Age=${Math.max(60, Math.floor(maxAgeSeconds))}`
+  ].join("; ");
+}
+
+function setCookies(res, cookies) {
+  res.setHeader("Set-Cookie", cookies);
 }
 
 function buildDocumentsUrl(payload) {
@@ -56,7 +88,10 @@ function buildDocumentsUrl(payload) {
     params.set("validUntil", payload.validUntil);
   } else {
     params.set("invoiceIsrael", "error");
-    params.set("message", payload.message || "החיבור לרשות המסים נכשל.");
+    params.set(
+      "message",
+      payload.message || "החיבור לרשות המסים נכשל."
+    );
   }
 
   return `/documents.html?${params.toString()}`;
@@ -68,18 +103,26 @@ function renderResultPage(payload) {
     : "החיבור לרשות המסים נכשל";
 
   const message = payload.ok
-    ? "ההרשאה התקבלה בהצלחה. החלון ייסגר ותוחזרו לעצמאי פלוס."
-    : payload.message || "לא ניתן היה להשלים את החיבור.";
+    ? "ההרשאה התקבלה ונשמרה בהצלחה. החלון ייסגר ותוחזרו לעצמאי פלוס."
+    : payload.message ||
+      "לא ניתן היה להשלים את החיבור.";
 
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
   const documentsUrl = buildDocumentsUrl(payload);
   const safeDocumentsUrl = escapeHtml(documentsUrl);
 
+  const browserPayload = {
+    ok: Boolean(payload.ok),
+    connectedAt: payload.connectedAt || "",
+    validUntil: payload.validUntil || "",
+    message: payload.message || ""
+  };
+
   const serializedPayload = JSON.stringify({
     type: "invoice-israel-oauth-result",
-    ...payload
-  }).replaceAll("<", "\u003c");
+    ...browserPayload
+  }).replaceAll("<", "\\u003c");
 
   return `<!doctype html>
 <html dir="rtl" lang="he">
@@ -92,7 +135,11 @@ function renderResultPage(payload) {
     <main style="max-width:680px;margin:40px auto;background:#fff;border-radius:14px;padding:32px;box-shadow:0 8px 24px rgba(0,0,0,.08)">
       <h2 style="margin-top:0">${safeTitle}</h2>
       <p style="line-height:1.7">${safeMessage}</p>
-      <p><a href="${safeDocumentsUrl}" style="color:#135fa7">חזרה למסמכים</a></p>
+      <p>
+        <a href="${safeDocumentsUrl}" style="color:#135fa7">
+          חזרה למסמכים
+        </a>
+      </p>
     </main>
     <script>
       (() => {
@@ -101,10 +148,16 @@ function renderResultPage(payload) {
 
         try {
           if (window.opener && !window.opener.closed) {
-            window.opener.postMessage(payload, window.location.origin);
+            window.opener.postMessage(
+              payload,
+              window.location.origin
+            );
+
             setTimeout(() => window.close(), 450);
             setTimeout(() => {
-              if (!window.closed) window.location.replace(fallbackUrl);
+              if (!window.closed) {
+                window.location.replace(fallbackUrl);
+              }
             }, 1400);
             return;
           }
@@ -136,7 +189,7 @@ export default async function handler(req, res) {
     } = req.query;
 
     if (error) {
-      clearStateCookie(res);
+      setCookies(res, [stateCookieClear()]);
       return res.status(400).send(
         renderResultPage({
           ok: false,
@@ -146,11 +199,12 @@ export default async function handler(req, res) {
     }
 
     if (!code) {
-      clearStateCookie(res);
+      setCookies(res, [stateCookieClear()]);
       return res.status(400).send(
         renderResultPage({
           ok: false,
-          message: "לא התקבל קוד הרשאה מרשות המסים."
+          message:
+            "לא התקבל קוד הרשאה מרשות המסים."
         })
       );
     }
@@ -159,7 +213,7 @@ export default async function handler(req, res) {
     const expectedState = cookies.ita_oauth_state;
 
     if (!state || !expectedState || state !== expectedState) {
-      clearStateCookie(res);
+      setCookies(res, [stateCookieClear()]);
       return res.status(400).send(
         renderResultPage({
           ok: false,
@@ -169,16 +223,29 @@ export default async function handler(req, res) {
       );
     }
 
-    const clientId = String(process.env.ITA_CLIENT_ID || "").trim();
-    const clientSecret = String(process.env.ITA_CLIENT_SECRET || "").trim();
-    const redirectUri = String(process.env.ITA_REDIRECT_URI || "").trim();
-    const gatewaySecret = String(process.env.ITA_GATEWAY_SECRET || "").trim();
+    const clientId = String(
+      process.env.ITA_CLIENT_ID || ""
+    ).trim();
+    const clientSecret = String(
+      process.env.ITA_CLIENT_SECRET || ""
+    ).trim();
+    const redirectUri = String(
+      process.env.ITA_REDIRECT_URI || ""
+    ).trim();
+    const gatewaySecret = String(
+      process.env.ITA_GATEWAY_SECRET || ""
+    ).trim();
 
-    if (!clientId || !clientSecret || !redirectUri || !gatewaySecret) {
+    if (
+      !clientId ||
+      !clientSecret ||
+      !redirectUri ||
+      !gatewaySecret
+    ) {
       console.error(
-        "Missing ITA_CLIENT_ID, ITA_CLIENT_SECRET, ITA_REDIRECT_URI or ITA_GATEWAY_SECRET"
+        "Missing Invoice Israel environment variables"
       );
-      clearStateCookie(res);
+      setCookies(res, [stateCookieClear()]);
       return res.status(500).send(
         renderResultPage({
           ok: false,
@@ -189,21 +256,9 @@ export default async function handler(req, res) {
     }
 
     const environment = getEnvironment();
-
-    if (environment !== "production") {
-      clearStateCookie(res);
-      return res.status(500).send(
-        renderResultPage({
-          ok: false,
-          message:
-            "סביבת החיבור לרשות המסים אינה מוגדרת ל־Production."
-        })
-      );
-    }
-
     const tokenGatewayUrl =
       process.env.ITA_TOKEN_GATEWAY_URL ||
-      DEFAULT_TOKEN_GATEWAY_URL;
+      ENVIRONMENTS[environment].tokenGatewayUrl;
 
     const basicCredentials = Buffer.from(
       `${clientId}:${clientSecret}`,
@@ -213,16 +268,16 @@ export default async function handler(req, res) {
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code: String(code),
-      redirect_uri: redirectUri,
-      scope: "scope"
+      redirect_uri: redirectUri
     });
 
     const tokenResponse = await fetch(tokenGatewayUrl, {
       method: "POST",
       headers: {
         Authorization: `Basic ${basicCredentials}`,
-        "X-Azmai-Gateway-Key": gatewaySecret,
-        "Content-Type": "application/x-www-form-urlencoded",
+        "x-azmai-gateway-key": gatewaySecret,
+        "Content-Type":
+          "application/x-www-form-urlencoded",
         Accept: "application/json"
       },
       body: body.toString()
@@ -232,37 +287,64 @@ export default async function handler(req, res) {
     let tokenData = null;
 
     try {
-      tokenData = tokenText ? JSON.parse(tokenText) : null;
+      tokenData = tokenText
+        ? JSON.parse(tokenText)
+        : null;
     } catch {
       tokenData = null;
     }
 
-    if (!tokenResponse.ok) {
-      console.error("ITA token exchange through Kamatera failed", {
+    if (!tokenResponse.ok || !tokenData?.access_token) {
+      console.error("ITA token exchange failed", {
         status: tokenResponse.status,
         environment,
-        gatewayHost: new URL(tokenGatewayUrl).host,
         response: tokenData || tokenText
       });
 
-      clearStateCookie(res);
-
+      setCookies(res, [stateCookieClear()]);
       return res.status(502).send(
         renderResultPage({
           ok: false,
           message:
-            "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לבדוק את פרטי החיבור ולנסות שוב."
+            "רשות המסים לא אישרה את החלפת קוד ההרשאה. יש לנסות להתחבר מחדש."
         })
       );
     }
 
-    if (!tokenData?.access_token) {
-      clearStateCookie(res);
+    /*
+     * Tokens are stored only on Kamatera. The browser receives a random
+     * opaque connection id in an HttpOnly cookie, never an OAuth token.
+     */
+    const connectionId = randomUUID();
+    const storeResponse = await fetch(TOKEN_STORE_URL, {
+      method: "POST",
+      headers: {
+        "x-azmai-gateway-key": gatewaySecret,
+        "Content-Type": "application/json",
+        Accept: "application/json"
+      },
+      body: JSON.stringify({
+        connectionId,
+        tokenData
+      })
+    });
+
+    const storeData = await storeResponse
+      .json()
+      .catch(() => ({}));
+
+    if (!storeResponse.ok || !storeData?.ok) {
+      console.error("Could not store ITA tokens", {
+        status: storeResponse.status,
+        response: storeData
+      });
+
+      setCookies(res, [stateCookieClear()]);
       return res.status(502).send(
         renderResultPage({
           ok: false,
           message:
-            "התקבלה תשובה לא צפויה מרשות המסים."
+            "ההרשאה התקבלה, אך לא ניתן היה לשמור אותה בצורה מאובטחת. יש לנסות שוב."
         })
       );
     }
@@ -277,21 +359,30 @@ export default async function handler(req, res) {
     );
 
     const validUntilDate = new Date(
-      connectedAtDate.getTime() + validitySeconds * 1000
+      connectedAtDate.getTime() +
+        validitySeconds * 1000
     );
 
-    clearStateCookie(res);
+    setCookies(res, [
+      stateCookieClear(),
+      connectionCookie(
+        connectionId,
+        validitySeconds
+      )
+    ]);
 
     return res.status(200).send(
       renderResultPage({
         ok: true,
-        connectedAt: connectedAtDate.toISOString(),
-        validUntil: validUntilDate.toISOString()
+        connectedAt:
+          connectedAtDate.toISOString(),
+        validUntil:
+          validUntilDate.toISOString()
       })
     );
   } catch (error) {
     console.error("ITA callback error", error);
-    clearStateCookie(res);
+    setCookies(res, [stateCookieClear()]);
 
     return res.status(500).send(
       renderResultPage({

@@ -203,14 +203,121 @@ function renderAllocationPanel(){
   el.className='allocation-panel wide '+(a.status==='required'?'warn':'ok');
   const amountLine=`סכום לפני מע״מ לאחר הנחה: ${money(a.net)} · תקרה לבדיקה: ${money(a.threshold)}`;
   if(a.status==='required'){
-    el.innerHTML=`<div class="allocation-title">חשבוניות ישראל: נדרש מספר הקצאה</div><div class="allocation-meta">${amountLine}<br>סטטוס: ימתין לחיבור API מאובטח. לא תהיה הזנה ידנית ולא תתאפשר הפקה סופית בלי מספר שהתקבל מהמערכת.</div>`;
+    el.innerHTML=`<div class="allocation-title">חשבוניות ישראל: נדרש מספר הקצאה</div><div class="allocation-meta">${amountLine}<br>בעת הפקת המסמך המערכת תבקש את מספר ההקצאה אוטומטית מרשות המסים. לא תהיה הזנה ידנית ולא תתאפשר הפקה סופית בלי מספר שהתקבל מהמערכת.</div>`;
     return;
   }
   el.innerHTML=`<div class="allocation-title">חשבוניות ישראל: לא נדרש</div><div class="allocation-meta">${amountLine}</div>`;
 }
 function allocationPreviewHtml(a){
+  if(lastIssuedDocument?.allocationNumber){
+    return `<div class="box" style="margin-top:20px"><h3>חשבוניות ישראל</h3>מספר הקצאה התקבל בהצלחה: <b>${escapeHtml(lastIssuedDocument.allocationNumber)}</b></div>`;
+  }
   if(a.status==='required') return `<div class="box" style="margin-top:20px"><h3>חשבוניות ישראל</h3>נדרש מספר הקצאה לפני הפקה סופית.<br>סכום לפני מע״מ: ${money(a.net)} · תקרה: ${money(a.threshold)}</div>`;
   return '';
+}
+
+function digitsOnly(value){
+  return String(value ?? '').replace(/\D/g,'');
+}
+function invoiceTypeForAllocation(type){
+  if(type === 'tax_invoice') return 305;
+  if(type === 'tax_invoice_receipt') return 320;
+  return null;
+}
+function customerVatNumberForAllocation(customer){
+  if(!customer) return '';
+  const type=String(customer.type || '').toLowerCase();
+  if(!['murshe','company'].includes(type)) return '';
+  const value=digitsOnly(customer.taxId || customer.vatId || customer.businessId || '');
+  return value.length===9 ? value : '';
+}
+function buildAllocationPayload(finalDoc, customer){
+  const t=totals();
+  const sellerVat=digitsOnly(profile.businessId || profile.taxId || profile.vatId || '');
+  if(sellerVat.length!==9){
+    throw new Error('כדי לקבל מספר הקצאה יש להגדיר בפרטי העסק מספר עוסק מורשה תקין בן 9 ספרות.');
+  }
+
+  const invoiceType=invoiceTypeForAllocation(finalDoc.type);
+  if(!invoiceType){
+    throw new Error('סוג המסמך אינו תומך במספר הקצאה.');
+  }
+
+  const payload={
+    Invoice_ID:String(finalDoc.id || '').slice(0,50),
+    Invoice_Type:invoiceType,
+    Vat_Number:Number(sellerVat),
+    Invoice_Reference_Number:String(finalDoc.number || '').slice(0,20),
+    Customer_Name:String(finalDoc.customerName || '').slice(0,25),
+    Invoice_Date:String(finalDoc.date || today()).slice(0,10),
+    Invoice_Issuance_Date:today(),
+    Amount_Before_Discount:round2(t.subtotal),
+    Discount:Math.abs(round2(t.discount)),
+    Payment_Amount:round2(t.net),
+    VAT_Amount:round2(t.vat),
+    Payment_Amount_Including_VAT:round2(t.gross)
+  };
+
+  const customerVat=customerVatNumberForAllocation(customer);
+  if(customerVat) payload.Customer_VAT_Number=Number(customerVat);
+
+  const note=String(finalDoc.notes || $('docNotes')?.value || '').trim();
+  if(note) payload.Invoice_Note=note.slice(0,100);
+
+  return payload;
+}
+function extractAllocationError(result){
+  if(!result) return 'לא התקבלה תשובה מרשות המסים.';
+  if(typeof result.error === 'string' && result.error.trim()) return result.error.trim();
+  if(typeof result.message === 'string' && result.message.trim()) return result.message.trim();
+
+  const source=result.taxAuthorityResponse || result.upstream || result;
+  const message=source?.Message ?? source?.message;
+
+  if(typeof message === 'string' && message.trim()) return message.trim();
+
+  const errorMessages=[];
+  const walk=value=>{
+    if(!value) return;
+    if(Array.isArray(value)){ value.forEach(walk); return; }
+    if(typeof value === 'object'){
+      if(typeof value.message === 'string') errorMessages.push(value.message);
+      if(typeof value.Message === 'string') errorMessages.push(value.Message);
+      Object.values(value).forEach(v=>{
+        if(v && (Array.isArray(v) || typeof v === 'object')) walk(v);
+      });
+    }
+  };
+  walk(message);
+  if(errorMessages.length) return [...new Set(errorMessages)].join(' · ');
+
+  return 'רשות המסים לא החזירה מספר הקצאה.';
+}
+async function requestInvoiceIsraelAllocation(finalDoc, customer){
+  if(!isInvoiceIsraelConnectionValid()){
+    throw new Error('החיבור לחשבונית ישראל אינו בתוקף. יש להתחבר מחדש לרשות המסים.');
+  }
+
+  const invoice=buildAllocationPayload(finalDoc, customer);
+  const response=await fetch('/api/invoice-israel/allocation',{
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({invoice})
+  });
+
+  const result=await response.json().catch(()=>({}));
+
+  if(!response.ok || !result?.ok || !result?.allocationNumber){
+    const error=new Error(extractAllocationError(result));
+    error.reconnect=Boolean(result?.reconnect);
+    throw error;
+  }
+
+  return {
+    allocationNumber:String(result.allocationNumber),
+    taxAuthorityResponse:result.taxAuthorityResponse || null
+  };
 }
 function makeLine(data={}){return {id:data.id || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())), desc:data.desc ?? data.itemDesc ?? '', qty:Number(data.qty ?? 1), netPrice:Number(data.netPrice ?? data.price ?? 0), grossPrice:Number(data.grossPrice ?? round2(Number(data.netPrice ?? data.price ?? 0)*rateFactor()))};}
 function ensureLines(){if(!Array.isArray(docLines) || !docLines.length) docLines=[makeLine({desc:'',qty:1,netPrice:0})];}
@@ -952,11 +1059,37 @@ async function issueDocument(){
     return;
   }
   const allocation=allocationCheck();
-  if(allocation.required){
-    setStatus($('draftStatus'),'נדרש מספר הקצאה לפני הפקה סופית','err');
-    return;
-  }
   const finalDoc=buildFinalDocument();
+
+  if(allocation.required){
+    try{
+      setStatus($('draftStatus'),'מבקש מספר הקצאה מרשות המסים…','ok');
+      const allocationResult=await requestInvoiceIsraelAllocation(finalDoc,c);
+      finalDoc.allocationNumber=allocationResult.allocationNumber;
+      finalDoc.allocationStatus='approved';
+      finalDoc.allocationRequestedAt=new Date().toISOString();
+      finalDoc.allocationReceivedAt=new Date().toISOString();
+      setStatus($('draftStatus'),`מספר הקצאה ${allocationResult.allocationNumber} התקבל. מפיק את המסמך…`,'ok');
+    }catch(allocationError){
+      console.error('Invoice Israel allocation failed',allocationError);
+      if(allocationError?.reconnect){
+        ledger.invoiceIsraelConnection={
+          ...invoiceIsraelConnection(),
+          status:'error',
+          message:'יש להתחבר מחדש לחשבונית ישראל כדי לקבל מספר הקצאה.',
+          updatedAt:new Date().toISOString()
+        };
+        renderInvoiceIsraelStatus();
+      }
+      setStatus(
+        $('draftStatus'),
+        `לא ניתן לקבל מספר הקצאה: ${allocationError?.message || 'שגיאה לא ידועה'}`,
+        'err'
+      );
+      return;
+    }
+  }
+
   lastIssuedDocument=finalDoc;
   previewFinal=true;
   renderPreview();
