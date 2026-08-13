@@ -89,6 +89,17 @@
       .report-top{grid-template-columns:1fr 1fr}
       .report-table{min-width:1280px}
     }
+    @media(max-width:600px){
+      .wrap{padding:10px}
+      .grid{grid-template-columns:1fr}
+      .report-top{grid-template-columns:1fr}
+      .row,.mini-actions{align-items:stretch}
+      .row .btn,.mini-actions .btn{width:100%;justify-content:center}
+      .card-hd{align-items:flex-start;gap:10px}
+      .card-bd{padding:12px}
+      .report-paper{padding:10px}
+      .table-scroll,.report-table-wrap{-webkit-overflow-scrolling:touch}
+    }
     @media print{
       body{background:#fff}
       header,.controls,.nonprint{display:none !important}
@@ -141,7 +152,7 @@
           <input id="prevDepFile" type="file" accept="application/pdf,.pdf" hidden />
           <button class="btn secondary" id="btnSave" type="button">שמירה</button>
           <button class="btn secondary" id="btnCsv" type="button">ייצוא CSV</button>
-          <button class="btn secondary" id="btnPdf" type="button">הורדת PDF</button>
+          <button class="btn secondary" id="btnPdf" type="button">שמירה כ־PDF</button>
           <button class="btn secondary" id="btnPrint" type="button">הדפסה</button>
         </div>
       </div>
@@ -293,7 +304,7 @@
         <h3>דוח פחת</h3>
         <div class="report-toolbar">
           <span class="pdf-note">הדוח מעוצב להפקה כ־A4 לרוחב</span>
-          <button class="btn secondary" id="btnPdfReport" type="button">הורדת PDF</button>
+          <button class="btn secondary" id="btnPdfReport" type="button">שמירה כ־PDF</button>
           <button class="btn secondary" id="btnPrintReport" type="button">הדפסה</button>
         </div>
       </div>
@@ -707,7 +718,11 @@ function renderReport(){
       gOriginal += original; gAdditions += calc.additionThisYear; gBase += calc.base; gYearDep += calc.yearDep; gAccumBefore += calc.accumulatedBefore; gTotalDep += calc.totalDep; gWritten += calc.writtenDown;
       const noteParts = [];
       if (asset.sold) noteParts.push(`נמכר/נגרע${asset.saleDate ? ' ב-' + formatDate(asset.saleDate) : ''}`);
-      if (asset.notes) noteParts.push(asset.notes);
+      const visibleNotes = String(asset.notes || '')
+        .split('|')
+        .map(v => v.trim())
+        .filter(v => v && !v.startsWith('יובא מדוח פחת'));
+      noteParts.push(...visibleNotes);
       rowsHtml.push(`<tr>
         <td>${escapeHtml(asset.name || '')}</td>
         <td>${escapeHtml(formatDate(asset.purchaseDate))}</td>
@@ -744,7 +759,7 @@ function renderReport(){
     <div class="report-table-wrap">
       <table class="report-table">
         <colgroup>
-          <col style="width:15%"><col style="width:7%"><col style="width:7%"><col style="width:7.5%"><col style="width:7%"><col style="width:7.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:10%">
+          <col style="width:18%"><col style="width:7%"><col style="width:7%"><col style="width:8%"><col style="width:7%"><col style="width:8%"><col style="width:6%"><col style="width:6%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:5%">
         </colgroup>
         <thead><tr>
           <th>רשימת הנכסים ותיאורם</th><th>תאריך רכישה/שינוי</th><th>תאריך הפעלה</th><th>המחיר המקורי</th><th>שינויי השנה</th><th>נכסים בני פחת</th><th>% פחת בחוק</th><th>% פחת נתבע</th><th>פחת השנה</th><th>פחת שנצבר</th><th>סה״כ פחת</th><th>עלות מופחתת</th><th>הערות</th>
@@ -857,7 +872,7 @@ async function parsePreviousDepreciationPdf(file){
         sold:/נמכר|נגרע|גריעה/.test(note),
         saleDate:/נמכר|נגרע|גריעה/.test(note) ? parseSaleDateFromNote(note, null) : '',
         salePrice:0,
-        notes:[note, `יובא מדוח פחת ${file.name}`].filter(Boolean).join(' | '),
+        notes:note,
         sourceRowId:'', sourceRowDesc:'',
         importedFromPreviousReport:true,
         importedPreviousYear:null,
@@ -1091,9 +1106,9 @@ taxYear.addEventListener('change', renderAll);
 $('btnSave').addEventListener('click', saveAssets);
 $('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
 $('btnCsv').addEventListener('click', exportCsv);
-$('btnPdf').addEventListener('click', exportPdf);
+$('btnPdf').addEventListener('click', () => window.print());
 $('btnPrint').addEventListener('click', () => window.print());
-$('btnPdfReport').addEventListener('click', exportPdf);
+$('btnPdfReport').addEventListener('click', () => window.print());
 $('btnPrintReport').addEventListener('click', () => window.print());
 
 onAuthStateChanged(auth, async user => {
