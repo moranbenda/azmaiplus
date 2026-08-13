@@ -3439,6 +3439,8 @@ btnSaveProfile.onclick = async () => {
 ---------------------------------------------------------- */
 
 let rows = [];
+// Source of truth for depreciation: only assets explicitly added in fixed-assets.html.
+let fixedAssets = [];
 let localLedgerMeta = { updatedAt: null };
 let cloudLoadedForUid = null;
 let isHydratingLedger = false;
@@ -3657,6 +3659,7 @@ async function loadFromCloudFirst() {
     if (currentUid !== uid) return;
 
     cloudObj = snap.exists() ? (snap.data() || {}) : {};
+    fixedAssets = Array.isArray(cloudObj.fixedAssets) ? cloudObj.fixedAssets : [];
     const cloudRows = Array.isArray(cloudObj.rows) ? cloudObj.rows : [];
 
     rows = mergeLedgerRows(cloudRows, recoveredLocalRows);
@@ -3678,6 +3681,7 @@ async function loadFromCloudFirst() {
     if (currentUid !== uid) return;
 
     rows = recoveredLocalRows;
+    fixedAssets = [];
     localLedgerMeta.updatedAt = new Date().toISOString();
     cloudLoadedForUid = uid;
     saveToLocal();
@@ -5737,6 +5741,20 @@ async function buildCustomerLedgerReport(customerId, from, to) {
   return { customer, rows:outRows, totals };
 }
 
+function isApprovedFixedAssetExpense(row) {
+  if (!row?.id) return false;
+  return fixedAssets.some(asset => asset?.sourceRowId && asset.sourceRowId === row.id);
+}
+
+function report1320SectionForExpense(meta, row) {
+  // A category may be a depreciation candidate, but until the user explicitly
+  // adds that expense to fixed assets it remains a regular current expense.
+  if ((meta?.depreciable || meta?.report1320 === "17-פחת") && !isApprovedFixedAssetExpense(row)) {
+    return "9-הוצאות משרדיות";
+  }
+  return meta?.report1320 || "16-הוצאות אחרות";
+}
+
 function build1320Summary(from, to) {
   const expenseRows = filterByDateAndType("expense", from, to);
   const groups = new Map();
@@ -5746,11 +5764,11 @@ function build1320Summary(from, to) {
     const meta = getExpenseMeta(r);
     if (!meta || meta.personalTaxItem) return;
     const split = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
-    if (meta.depreciable || meta.report1320 === "17-פחת") {
+    if (isApprovedFixedAssetExpense(r)) {
       depreciablePurchases += Number(split.net || 0);
       return;
     }
-    const key = meta.report1320 || "16-הוצאות אחרות";
+    const key = report1320SectionForExpense(meta, r);
     const deductible = getTaxDeductibleExpenseAmount(r, { net:split.net, gross:split.gross });
     groups.set(key, (groups.get(key) || 0) + Number(deductible || 0));
   });
@@ -5799,7 +5817,7 @@ function buildPnlReportData(from, to) {
       personalPayments += Number(r.gross || 0);
       return;
     }
-    if (meta?.depreciable || meta?.report1320 === "17-פחת") {
+    if (isApprovedFixedAssetExpense(r)) {
       depreciablePurchases += Number(r.net || 0);
       return;
     }
