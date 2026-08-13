@@ -21,7 +21,7 @@
     html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Heebo",Arial,sans-serif}
     body{direction:rtl}
     a{color:inherit}
-    .wrap{max-width:1240px;margin:0 auto;padding:22px}
+    .wrap{max-width:1500px;margin:0 auto;padding:22px}
     header{background:#fff;border-bottom:1px solid var(--line)}
     .top{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap}
     h1{margin:0;font-size:28px;line-height:1.25}
@@ -55,9 +55,19 @@
     .table-scroll{overflow:auto}
     .actions{display:flex;gap:6px;flex-wrap:wrap}
     .empty{padding:30px;text-align:center;color:var(--muted)}
-    .report-paper{background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px;margin:0 auto}
-    .report-top{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:18px;font-size:14px}
-    .report-title{font-size:22px;text-align:center;margin:12px 0 20px;font-weight:800}
+    .report-paper{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;margin:0 auto;direction:rtl}
+    .report-top{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 18px;margin-bottom:14px;font-size:13px}
+    .report-title{font-size:20px;text-align:center;margin:10px 0 16px;font-weight:800}
+    .report-table-wrap{width:100%;overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+    .report-table{width:100%;min-width:1360px;table-layout:fixed;font-size:10.5px;line-height:1.3;border-collapse:collapse}
+    .report-table th,.report-table td{padding:6px 5px;text-align:center;vertical-align:middle;overflow-wrap:break-word;word-break:normal}
+    .report-table th{font-size:10.5px;line-height:1.2}
+    .report-table td:first-child,.report-table th:first-child{text-align:right}
+    .report-table td:last-child,.report-table th:last-child{text-align:right}
+    .report-table .group-row td{text-align:right;padding:7px 8px}
+    .report-table .total-row td{font-weight:800}
+    .report-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pdf-note{font-size:12px;color:var(--muted)}
 
     .guide-panel{background:#eff6ff;border:1px solid #bfdbfe;border-radius:18px;padding:14px 16px;margin-bottom:14px;display:none}
     .guide-on .guide-panel{display:block}
@@ -76,7 +86,8 @@
       .grid{grid-template-columns:1fr 1fr}
       .form-grid{grid-template-columns:1fr}
       table{min-width:1120px}
-      .report-top{grid-template-columns:1fr}
+      .report-top{grid-template-columns:1fr 1fr}
+      .report-table{min-width:1280px}
     }
     @media print{
       body{background:#fff}
@@ -85,9 +96,15 @@
       .card{box-shadow:none;border:none;margin:0}
       .card-hd{display:none}
       .card-bd{padding:0}
-      .report-paper{border:none;border-radius:0;padding:10px;max-width:none}
-      table{min-width:0;font-size:11px}
-      th,td{padding:5px}
+      @page{size:A4 landscape;margin:7mm}
+      .report-paper{border:none;border-radius:0;padding:0;max-width:none;width:100%}
+      .report-top{grid-template-columns:repeat(4,1fr);font-size:9px;gap:4px 10px;margin-bottom:7px}
+      .report-title{font-size:14px;margin:6px 0 9px}
+      .report-table-wrap{overflow:visible;border:none;border-radius:0}
+      .report-table{width:100%;min-width:0 !important;table-layout:fixed;font-size:7.5px;line-height:1.15}
+      .report-table th,.report-table td{padding:3px 2px}
+      .report-table th{font-size:7.5px}
+      .report-toolbar,.pdf-note{display:none !important}
     }
   </style>
 </head>
@@ -124,7 +141,8 @@
           <input id="prevDepFile" type="file" accept="application/pdf,.pdf" hidden />
           <button class="btn secondary" id="btnSave" type="button">שמירה</button>
           <button class="btn secondary" id="btnCsv" type="button">ייצוא CSV</button>
-          <button class="btn secondary" id="btnPrint" type="button">הדפסה / PDF</button>
+          <button class="btn secondary" id="btnPdf" type="button">הורדת PDF</button>
+          <button class="btn secondary" id="btnPrint" type="button">הדפסה</button>
         </div>
       </div>
     </section>
@@ -271,12 +289,21 @@
     </section>
 
     <section class="card" id="depReportCard">
-      <div class="card-hd nonprint"><h3>דוח פחת</h3></div>
+      <div class="card-hd nonprint">
+        <h3>דוח פחת</h3>
+        <div class="report-toolbar">
+          <span class="pdf-note">הדוח מעוצב להפקה כ־A4 לרוחב</span>
+          <button class="btn secondary" id="btnPdfReport" type="button">הורדת PDF</button>
+          <button class="btn secondary" id="btnPrintReport" type="button">הדפסה</button>
+        </div>
+      </div>
       <div class="card-bd table-scroll">
         <div class="report-paper" id="depReport"></div>
       </div>
     </section>
   </main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -714,12 +741,17 @@ function renderReport(){
       <div><strong>שנת המס:</strong> ${escapeHtml(year)}</div>
     </div>
     <div class="report-title">תקנות מס הכנסה (פחת) לשנה שנסתיימה ב־31/12/${escapeHtml(year)}</div>
-    <table>
-      <thead><tr>
-        <th>רשימת הנכסים ותיאורם</th><th>תאריך רכישה/שינוי</th><th>תאריך הפעלה</th><th>המחיר המקורי</th><th>שינויי השנה</th><th>נכסים בני פחת</th><th>% פחת בחוק</th><th>% פחת נתבע</th><th>פחת השנה</th><th>פחת שנצבר</th><th>סה״כ פחת</th><th>עלות מופחתת</th><th>הערות</th>
-      </tr></thead>
-      <tbody>${rowsHtml.join('')}</tbody>
-    </table>
+    <div class="report-table-wrap">
+      <table class="report-table">
+        <colgroup>
+          <col style="width:15%"><col style="width:7%"><col style="width:7%"><col style="width:7.5%"><col style="width:7%"><col style="width:7.5%"><col style="width:5.5%"><col style="width:5.5%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:7%"><col style="width:10%">
+        </colgroup>
+        <thead><tr>
+          <th>רשימת הנכסים ותיאורם</th><th>תאריך רכישה/שינוי</th><th>תאריך הפעלה</th><th>המחיר המקורי</th><th>שינויי השנה</th><th>נכסים בני פחת</th><th>% פחת בחוק</th><th>% פחת נתבע</th><th>פחת השנה</th><th>פחת שנצבר</th><th>סה״כ פחת</th><th>עלות מופחתת</th><th>הערות</th>
+        </tr></thead>
+        <tbody>${rowsHtml.join('')}</tbody>
+      </table>
+    </div>
   `;
 }
 function parsePdfNumber(value){
@@ -904,6 +936,63 @@ function exportCsv(){
   }
   downloadFile(`דוח-פחת-${year}.csv`, lines.join('\n'));
 }
+async function exportPdf(){
+  const year = taxYear.value || new Date().getFullYear();
+  if (!depReport || !depReport.innerHTML.trim()) return alert('אין דוח להפקה.');
+  if (typeof window.html2pdf !== 'function') {
+    alert('רכיב הפקת ה־PDF לא נטען. אפשר להשתמש ב״הדפסה״ ולבחור שמירה כ־PDF.');
+    return;
+  }
+  const source = depReport.cloneNode(true);
+  source.style.width = '277mm';
+  source.style.maxWidth = '277mm';
+  source.style.padding = '0';
+  source.style.border = '0';
+  source.style.borderRadius = '0';
+  const table = source.querySelector('.report-table');
+  const wrap = source.querySelector('.report-table-wrap');
+  if (wrap) { wrap.style.overflow = 'visible'; wrap.style.border = '0'; }
+  if (table) {
+    table.style.minWidth = '0';
+    table.style.width = '100%';
+    table.style.fontSize = '7.5px';
+    table.style.lineHeight = '1.15';
+  }
+  const top = source.querySelector('.report-top');
+  if (top) { top.style.fontSize = '9px'; top.style.marginBottom = '7px'; }
+  const title = source.querySelector('.report-title');
+  if (title) { title.style.fontSize = '14px'; title.style.margin = '6px 0 9px'; }
+  const host = document.createElement('div');
+  host.dir = 'rtl';
+  host.style.position = 'fixed';
+  host.style.left = '-100000px';
+  host.style.top = '0';
+  host.style.background = '#fff';
+  host.appendChild(source);
+  document.body.appendChild(host);
+  const oldText = $('btnPdf')?.textContent;
+  const oldReportText = $('btnPdfReport')?.textContent;
+  if ($('btnPdf')) { $('btnPdf').disabled = true; $('btnPdf').textContent = 'מפיק PDF…'; }
+  if ($('btnPdfReport')) { $('btnPdfReport').disabled = true; $('btnPdfReport').textContent = 'מפיק PDF…'; }
+  try {
+    await window.html2pdf().set({
+      margin:[7,7,7,7],
+      filename:`דוח-פחת-${year}.pdf`,
+      image:{type:'jpeg',quality:0.98},
+      html2canvas:{scale:2,useCORS:true,backgroundColor:'#ffffff',letterRendering:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'landscape'},
+      pagebreak:{mode:['avoid-all','css','legacy']}
+    }).from(source).save();
+  } catch (err) {
+    console.error(err);
+    alert('לא הצלחנו להפיק PDF ישירות. אפשר להשתמש בכפתור ״הדפסה״ ולבחור שמירה כ־PDF.');
+  } finally {
+    host.remove();
+    if ($('btnPdf')) { $('btnPdf').disabled = false; $('btnPdf').textContent = oldText || 'הורדת PDF'; }
+    if ($('btnPdfReport')) { $('btnPdfReport').disabled = false; $('btnPdfReport').textContent = oldReportText || 'הורדת PDF'; }
+  }
+}
+
 async function loadData(user){
   currentUser = user;
   statusText.textContent = 'טוען נתונים…';
@@ -1002,7 +1091,10 @@ taxYear.addEventListener('change', renderAll);
 $('btnSave').addEventListener('click', saveAssets);
 $('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
 $('btnCsv').addEventListener('click', exportCsv);
+$('btnPdf').addEventListener('click', exportPdf);
 $('btnPrint').addEventListener('click', () => window.print());
+$('btnPdfReport').addEventListener('click', exportPdf);
+$('btnPrintReport').addEventListener('click', () => window.print());
 
 onAuthStateChanged(auth, async user => {
   try {
