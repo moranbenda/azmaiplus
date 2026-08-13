@@ -160,7 +160,7 @@ const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, cred
 const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר", deal_invoice:"חשבונית עסקה" };
 const INVOICE_ISRAEL_AUTH_URL = "/api/invoice-israel/auth";
 const INVOICE_ISRAEL_POPUP_NAME = "azmaiPlusInvoiceIsraelAuth";
-let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[], settingsLocked=false, previewFinal=false, lastIssuedDocument=null;
+let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], docLines=[], settingsLocked=false, previewFinal=false, lastIssuedDocument=null, activeDraftId=null;
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function money(n){return '₪ ' + (Number(n)||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -685,8 +685,48 @@ async function logAudit(action, details = {}){
 }
 function draftFromForm(){ const t=totals(); const allocation=allocationCheck(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentMethod:$('paymentMethod')?.value||'', paymentRef:$('paymentRef')?.value||'', vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, notes:$('docNotes').value, allocationStatus:allocation.status, allocationRequired:allocation.required, allocationThreshold:allocation.threshold, allocationNumber:'', allocationRequestedAt:'', allocationReceivedAt:'', source:'draft', createdAt:new Date().toISOString() }; }
 function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(d.date||'')} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><div class="draft-actions"><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button><button class="btn danger small" data-delete-draft="${escapeHtml(d.id)}">מחיקה</button></div></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); box.querySelectorAll('[data-delete-draft]').forEach(btn=>btn.onclick=()=>deleteDraft(btn.dataset.deleteDraft)); }
-async function deleteDraft(id){ const d=drafts.find(x=>String(x.id)===String(id)); if(!d)return; if(!confirm('למחוק את הטיוטה?'))return; const prev=drafts; drafts=drafts.filter(x=>String(x.id)!==String(id)); try{ await saveLedgerPatch({documentDrafts:drafts}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נמחקה','ok'); }catch(e){ console.error(e); drafts=prev; renderDrafts(); setStatus($('draftStatus'),'שגיאה במחיקת טיוטה','err'); } }
-function loadDraft(id){ const d=drafts.find(x=>x.id===id); if(!d)return; $('docType').value=d.type; $('docNumber').value=d.number; $('docDate').value=d.date; $('docCustomer').value=d.customerId||''; const c=getSelectedCustomer(); $('docCustomerSearch').value=c?customerName(c):(d.customerName||''); renderSelectedCustomerHint(); docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:d.itemDesc||'',qty:d.qty||1,netPrice:d.price||0})]; $('docDiscountPct').value=d.discountPct||0; $('paymentMethod').value=d.paymentMethod||''; $('paymentRef').value=d.paymentRef||''; $('docVatRate').value=d.vatRate||profile.vatRate||18; $('docNotes').value=d.notes||''; updatePaymentVisibility(); renderLinesEditor(); renderPreview(); window.scrollTo({top:0,behavior:'smooth'}); }
+async function deleteDraft(id){
+  const d=drafts.find(x=>String(x.id)===String(id));
+  if(!d)return;
+  if(!confirm('למחוק את הטיוטה?'))return;
+  const prev=drafts;
+  const wasActive = String(activeDraftId||'') === String(id);
+  drafts=drafts.filter(x=>String(x.id)!==String(id));
+  try{
+    await saveLedgerPatch({documentDrafts:drafts});
+    if(wasActive) activeDraftId=null;
+    syncStats();
+    renderDrafts();
+    setStatus($('draftStatus'),'הטיוטה נמחקה','ok');
+  }catch(e){
+    console.error(e);
+    drafts=prev;
+    renderDrafts();
+    setStatus($('draftStatus'),'שגיאה במחיקת טיוטה','err');
+  }
+}
+function loadDraft(id){
+  const d=drafts.find(x=>String(x.id)===String(id));
+  if(!d)return;
+  activeDraftId=d.id;
+  $('docType').value=d.type;
+  $('docNumber').value=d.number;
+  $('docDate').value=d.date;
+  $('docCustomer').value=d.customerId||'';
+  const c=getSelectedCustomer();
+  $('docCustomerSearch').value=c?customerName(c):(d.customerName||'');
+  renderSelectedCustomerHint();
+  docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:d.itemDesc||'',qty:d.qty||1,netPrice:d.price||0})];
+  $('docDiscountPct').value=d.discountPct||0;
+  $('paymentMethod').value=d.paymentMethod||'';
+  $('paymentRef').value=d.paymentRef||'';
+  $('docVatRate').value=d.vatRate||profile.vatRate||18;
+  $('docNotes').value=d.notes||'';
+  updatePaymentVisibility();
+  renderLinesEditor();
+  renderPreview();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 
 function documentIncomeEffect(type){
   const businessType = String(profile.businessType || '').toLowerCase();
@@ -1125,11 +1165,16 @@ async function issueDocument(){
     if(String(customer.id)!==String(finalDoc.customerId)) return customer;
     return {...customer, updatedAt:new Date().toISOString()};
   }));
+  const issuedDraftId = activeDraftId;
+  const remainingDrafts = issuedDraftId
+    ? drafts.filter(d=>String(d.id)!==String(issuedDraftId))
+    : drafts;
   const patch={
     customers:updatedCustomers,
     documentSettings:nextSettings,
     documentSettingsLocked:true,
-    documentsUpdatedAt:new Date().toISOString()
+    documentsUpdatedAt:new Date().toISOString(),
+    ...(issuedDraftId ? {documentDrafts:remainingDrafts} : {})
   };
   if(shouldCreateIncomeForDoc(finalDoc.type)){
     finalDoc.incomeRowId = crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random());
@@ -1157,6 +1202,11 @@ async function issueDocument(){
     customers=updatedCustomers;
     settings=nextSettings;
     settingsLocked=true;
+    if(issuedDraftId){
+      drafts=remainingDrafts;
+      activeDraftId=null;
+      renderDrafts();
+    }
     lastIssuedDocument=finalDoc;
     previewFinal=true;
     renderNumberingSettings();
@@ -1258,7 +1308,45 @@ $('btnDownload').onclick=downloadCurrentDocument;
 $('btnGoCustomer').onclick=()=>{ const c=getSelectedCustomer(); if(!c?.id) return setStatus($('draftStatus'),'יש לבחור לקוח כדי לעבור לכרטיס הלקוח','err'); location.href='/customers.html?customerId='+encodeURIComponent(c.id); };
 $('btnIssueDocument').onclick=issueDocument;
 $('btnSaveSettings').onclick=async()=>{ if(settingsLocked)return; settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings, documentSettingsLocked:true, documentSettingsLockedAt:new Date().toISOString()}); settingsLocked=true; renderNumberingSettings(); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
-$('btnSaveDraft').onclick=async()=>{ if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err'); const d=draftFromForm(); drafts=[...drafts,d]; try{ await saveLedgerPatch({documentDrafts:drafts}); await logAudit("טיוטת מסמך נשמרה", {entityType:"מסמך", entityId:d.id, documentId:d.id, documentType:d.type, documentTypeLabel:TYPE_LABELS[d.type]||d.type, customerId:d.customerId||'', amount:totals().gross||0, summary:`נשמרה טיוטת ${TYPE_LABELS[d.type]||'מסמך'}`}); syncStats(); renderDrafts(); setStatus($('draftStatus'),'הטיוטה נשמרה ✅','ok'); }catch(e){console.error(e); drafts=drafts.filter(x=>x.id!==d.id); setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');} };
+$('btnSaveDraft').onclick=async()=>{
+  if(!customers.length) return setStatus($('draftStatus'),'צריך להוסיף לקוח לפני שמירת טיוטה','err');
+  const previousDrafts=[...drafts];
+  const existing=activeDraftId ? drafts.find(x=>String(x.id)===String(activeDraftId)) : null;
+  const fresh=draftFromForm();
+  const d={
+    ...fresh,
+    id: existing?.id || fresh.id,
+    createdAt: existing?.createdAt || fresh.createdAt,
+    updatedAt:new Date().toISOString()
+  };
+  drafts = existing
+    ? drafts.map(x=>String(x.id)===String(existing.id) ? d : x)
+    : [...drafts,d];
+  activeDraftId=d.id;
+  try{
+    await saveLedgerPatch({documentDrafts:drafts});
+    await logAudit(existing ? "טיוטת מסמך עודכנה" : "טיוטת מסמך נשמרה", {
+      entityType:"מסמך",
+      entityId:d.id,
+      documentId:d.id,
+      documentType:d.type,
+      documentTypeLabel:TYPE_LABELS[d.type]||d.type,
+      customerId:d.customerId||'',
+      amount:totals().gross||0,
+      summary:`${existing ? 'עודכנה' : 'נשמרה'} טיוטת ${TYPE_LABELS[d.type]||'מסמך'}`
+    });
+    syncStats();
+    renderDrafts();
+    setStatus($('draftStatus'), existing ? 'הטיוטה עודכנה ✅' : 'הטיוטה נשמרה ✅','ok');
+  }catch(e){
+    console.error(e);
+    drafts=previousDrafts;
+    activeDraftId=existing?.id || null;
+    renderDrafts();
+    syncStats();
+    setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');
+  }
+};
 $('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 $('btnReconnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
