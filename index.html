@@ -2952,9 +2952,77 @@ function normalizeExpenseText(value = "") {
     .replace(/\s+/g, " ");
 }
 
+/*
+  מיגרציה חד-כיוונית ובטוחה של שמות קטגוריה ישנים לשמות החדשים.
+  נשמרת תאימות לנתונים שכבר נקלטו בעבר, בלי לשנות סכומים/מע"מ/תאריכים.
+*/
+function resolveLegacyExpenseItem(row = {}) {
+  if (!row || row.type !== "expense") return "";
+
+  const rawCategory = String(row.category || "").trim();
+  const categoryKey = normalizeExpenseText(rawCategory);
+  const descKey = normalizeExpenseText(row.desc || "");
+
+  // אם זו כבר קטגוריה עדכנית — לא משנים.
+  const currentExact = EXPENSE_ITEMS.find(item =>
+    normalizeExpenseText(item.item) === categoryKey
+  );
+  if (currentExact) return currentExact.item;
+
+  const directMap = new Map([
+    [normalizeExpenseText("חנייה"), "חנייה / כבישי אגרה"],
+    [normalizeExpenseText("ביגוד"), "ביגוד מקצועי / ממותג"],
+    [normalizeExpenseText("מים"), "מים - משרד ביתי"],
+    [normalizeExpenseText("ביטוח"), "ביטוח רכב"],
+    [normalizeExpenseText("ייעוץ עסקי/פיתוח עסקי"), "ייעוץ עסקי / פיתוח עסקי"],
+    [normalizeExpenseText("אחסון אתר/דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר /דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר/ דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("ציוד )כללי("), "ציוד (כללי)"]
+  ]);
+
+  if (directMap.has(categoryKey)) return directMap.get(categoryKey);
+
+  // קטגוריות כלליות ישנות — מסווגים רק כשיש אינדיקציה ברורה בתיאור.
+  if (categoryKey === normalizeExpenseText("כללי")) {
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  if (categoryKey === normalizeExpenseText("רכב")) {
+    if (/ביטוח|חובה|מקיף/.test(descKey)) return "ביטוח רכב";
+    if (/מוסך|טיפול|טסט|תיקון|צמיג|מצבר/.test(descKey)) return "טיפולים במוסך";
+    if (/שטיפ|מגב/.test(descKey)) return "שטיפת רכב ותחזוקה שוטפת";
+    if (/חני|כביש 6|אגרה/.test(descKey)) return "חנייה / כבישי אגרה";
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  return "";
+}
+
+function migrateLegacyExpenseRows1320() {
+  let changed = 0;
+  rows = rows.map(row => {
+    if (!row || row.type !== "expense") return row;
+
+    const targetItem = resolveLegacyExpenseItem(row);
+    if (!targetItem || String(row.category || "").trim() === targetItem) return row;
+
+    changed++;
+    return {
+      ...row,
+      category: targetItem,
+      categoryMigratedFrom: row.category || "",
+      categoryMigrationVersion: "1320-v1",
+      categoryMigratedAt: new Date().toISOString()
+    };
+  });
+  return changed;
+}
+
 function getExpenseMeta(row) {
   if (!row) return null;
-  const categoryKey = normalizeExpenseText(row.category || "");
+  const legacyResolved = resolveLegacyExpenseItem(row);
+  const categoryKey = normalizeExpenseText(legacyResolved || row.category || "");
   const descKey = normalizeExpenseText(row.desc || "");
 
   let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
@@ -6419,6 +6487,16 @@ renderItemsDatalist();
   // לבסוף, לטעון נתונים ולרנדר
   (async () => {
     await loadFromCloudFirst();
+
+    // התאמת קטגוריות היסטוריות לשמות החדשים של מודל 1320.
+    // המיגרציה אינה משנה סכומים או חישובי מע"מ — רק את שם הקטגוריה.
+    const migratedExpenseCategories = migrateLegacyExpenseRows1320();
+    if (migratedExpenseCategories > 0) {
+      saveToLocal();
+      scheduleCloudSave();
+      console.info(`1320 category migration: ${migratedExpenseCategories} historical expense rows updated`);
+    }
+
     if (!fDate.value) fDate.value = todayStr();
     if (fType) fType.value = "expense";
     buildYearOptions();
