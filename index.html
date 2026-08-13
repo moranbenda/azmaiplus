@@ -1413,7 +1413,7 @@ body.account-frozen .readonly-disabled{
         <input type="date" id="rFrom" />
       </div>
       <div>
-        <label>עד תאריך</label>
+        <label>עד תאריך <button type="button" class="link-btn" id="btnReportToday" style="margin-inline-start:6px">עד היום</button></label>
         <input type="date" id="rTo" />
       </div>
       <div>
@@ -1422,8 +1422,18 @@ body.account-frozen .readonly-disabled{
           <option value="income">דוח הכנסות</option>
           <option value="expense">דוח רשימת הוצאות</option>
           <option value="both">דוח תנועות</option>
+          <option value="pnl">דו״ח רווח והפסד</option>
           <option value="vat">דוח מע״מ</option>
           <option value="customers">דוח רשימת לקוחות</option>
+          <option value="customerLedger">כרטסת לקוח</option>
+          <option value="report1320">סיכום הוצאות לפי 1320</option>
+          <option value="personalTax">תשלומי מס וניכויים אישיים</option>
+        </select>
+      </div>
+      <div id="reportCustomerWrap" hidden>
+        <label>לקוח לכרטסת</label>
+        <select id="rCustomer">
+          <option value="">בחירת לקוח...</option>
         </select>
       </div>
       <div id="expenseReportColumnsWrap" style="grid-column:1 / -1" hidden>
@@ -1446,7 +1456,7 @@ body.account-frozen .readonly-disabled{
         <button class="btn small" id="btnReportCsv">ייצוא לאקסל (CSV)</button>
         <button class="btn secondary small" id="btnReportPdf">ייצוא ל-PDF</button>
       </div>
-      <span class="hint">מאפשר להוציא דוח מפורט לפי סוג ותאריכים: הכנסות, הוצאות, תנועות, מע״מ ורשימת לקוחות.</span>
+      <span class="hint">דוחות לפי טווח תאריכים: הכנסות, הוצאות, תנועות, רווח והפסד, מע״מ, לקוחות, כרטסת לקוח, 1320 ותשלומי מס וניכויים אישיים.</span>
     </div>
   </div>
 </dialog>
@@ -1658,6 +1668,7 @@ import {
   getDoc,
   collection,
   addDoc,
+  getDocs as getDocsFromFirestore,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
@@ -2646,6 +2657,9 @@ const btnDelete  = document.getElementById("btnDelete");
 const rFrom        = document.getElementById("rFrom");
 const rTo          = document.getElementById("rTo");
 const rType        = document.getElementById("rType");
+const rCustomer    = document.getElementById("rCustomer");
+const reportCustomerWrap = document.getElementById("reportCustomerWrap");
+const btnReportToday = document.getElementById("btnReportToday");
 const btnReportCsv = document.getElementById("btnReportCsv");
 const btnReportPdf = document.getElementById("btnReportPdf");
 const expenseReportColumnsWrap = document.getElementById("expenseReportColumnsWrap");
@@ -2703,15 +2717,37 @@ btnProfileOpen.onclick    = () => {
 btnCategoriesOpen.onclick = () => {
   categoriesDialog.showModal();
 };
+async function populateReportCustomerSelect() {
+  if (!rCustomer) return;
+  const selected = rCustomer.value || "";
+  const list = await getCustomersForReports();
+  rCustomer.innerHTML = '<option value="">בחירת לקוח...</option>' +
+    list
+      .slice()
+      .sort((a,b)=>String(a?.name||a?.businessName||"").localeCompare(String(b?.name||b?.businessName||""), "he"))
+      .map(c => `<option value="${escapeHtml(c.id || "")}">${escapeHtml(c.name || c.businessName || c.customerName || "לקוח ללא שם")}</option>`)
+      .join("");
+  if (selected && Array.from(rCustomer.options).some(o => o.value === selected)) rCustomer.value = selected;
+}
+
 function updateReportDialogUI() {
   const showExpenseCols = rType.value === "expense";
+  const showCustomer = rType.value === "customerLedger";
   if (expenseReportColumnsWrap) expenseReportColumnsWrap.hidden = !showExpenseCols;
+  if (reportCustomerWrap) reportCustomerWrap.hidden = !showCustomer;
+  if (showCustomer) populateReportCustomerSelect().catch(err => console.warn("report customer list failed", err));
 }
+
+btnReportToday && (btnReportToday.onclick = () => {
+  rTo.value = todayStr();
+  rTo.dispatchEvent(new Event("change", { bubbles:true }));
+});
 
 btnReportsOpen.onclick    = () => {
   rFrom.value = "";
   rTo.value   = "";
   rType.value = "income";
+  if (rCustomer) rCustomer.value = "";
   expenseReportCols().forEach(cb => cb.checked = true);
   updateReportDialogUI();
   reportsDialog.showModal();
@@ -5626,6 +5662,168 @@ function paymentMethodLabel(v = "") {
   return { cash: "מזומן", bank: "העברה בנקאית", credit: "אשראי", check: "צ׳ק", app: "אפליקציית תשלום", other: "אחר" }[v] || v || "";
 }
 
+
+function reportDocumentTypeLabel(type = "", fallback = "") {
+  return {
+    tax_invoice: "חשבונית מס",
+    receipt: "קבלה",
+    tax_invoice_receipt: "חשבונית מס/קבלה",
+    credit_note: "חשבונית זיכוי",
+    quote: "הצעת מחיר",
+    deal_invoice: "חשבונית עסקה",
+    invoice: "חשבונית מס",
+    invrec: "חשבונית מס/קבלה",
+    credit: "חשבונית זיכוי",
+    deal: "חשבונית עסקה"
+  }[type] || fallback || type || "מסמך";
+}
+
+async function getIssuedDocumentsForReports() {
+  const uid = currentUid || auth.currentUser?.uid;
+  if (!uid) return [];
+  try {
+    const snap = await getDocsFromFirestore(collection(db, "ledgers", uid, "documents"));
+    return snap.docs
+      .map(s => ({ id: s.id, ...s.data() }))
+      .filter(d => d && (d.status === "issued" || d.source === "issued" || d.number));
+  } catch (err) {
+    console.warn("documents report read failed", err);
+    return [];
+  }
+}
+
+function customerLedgerEffect(docRow = {}) {
+  const t = String(docRow.type || "");
+  const gross = Math.abs(Number(docRow.gross ?? docRow.amount ?? 0) || 0);
+  if (t === "tax_invoice" || t === "invoice") return { debit:gross, credit:0 };
+  if (t === "receipt") return { debit:0, credit:gross };
+  if (t === "credit_note" || t === "credit") return { debit:0, credit:gross };
+  if (t === "tax_invoice_receipt" || t === "invrec") return { debit:gross, credit:gross };
+  return { debit:0, credit:0 };
+}
+
+async function buildCustomerLedgerReport(customerId, from, to) {
+  if (!customerId) return { customer:null, rows:[], totals:{debit:0,credit:0,balance:0} };
+  const customers = await getCustomersForReports();
+  const customer = customers.find(c => String(c.id) === String(customerId)) || null;
+  const docs = (await getIssuedDocumentsForReports())
+    .filter(d => String(d.customerId || "") === String(customerId))
+    .filter(d => !from || String(d.date || "") >= from)
+    .filter(d => !to || String(d.date || "") <= to)
+    .sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+
+  let balance = 0;
+  const outRows = docs.map(d => {
+    const { debit, credit } = customerLedgerEffect(d);
+    balance += debit - credit;
+    return {
+      date: d.date || "",
+      typeLabel: d.typeLabel || reportDocumentTypeLabel(d.type),
+      number: d.number || "",
+      desc: d.notes || d.desc || (Array.isArray(d.lines) ? d.lines.map(x=>x.desc).filter(Boolean).join("; ") : ""),
+      debit,
+      credit,
+      balance,
+      allocationNumber: d.allocationNumber || "",
+      status: d.status || "issued"
+    };
+  });
+  const totals = outRows.reduce((a,r) => {
+    a.debit += r.debit || 0;
+    a.credit += r.credit || 0;
+    return a;
+  }, { debit:0, credit:0, balance:0 });
+  totals.balance = totals.debit - totals.credit;
+  return { customer, rows:outRows, totals };
+}
+
+function build1320Summary(from, to) {
+  const expenseRows = filterByDateAndType("expense", from, to);
+  const groups = new Map();
+  let depreciablePurchases = 0;
+
+  expenseRows.forEach(r => {
+    const meta = getExpenseMeta(r);
+    if (!meta || meta.personalTaxItem) return;
+    const split = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
+    if (meta.depreciable || meta.report1320 === "17-פחת") {
+      depreciablePurchases += Number(split.net || 0);
+      return;
+    }
+    const key = meta.report1320 || "16-הוצאות אחרות";
+    const deductible = getTaxDeductibleExpenseAmount(r, { net:split.net, gross:split.gross });
+    groups.set(key, (groups.get(key) || 0) + Number(deductible || 0));
+  });
+
+  const rows1320 = Array.from(groups.entries())
+    .map(([section, amount]) => ({ section, amount }))
+    .sort((a,b) => {
+      const na = parseInt(String(a.section).match(/^\d+/)?.[0] || "999", 10);
+      const nb = parseInt(String(b.section).match(/^\d+/)?.[0] || "999", 10);
+      return na - nb || String(a.section).localeCompare(String(b.section), "he");
+    });
+  const total = rows1320.reduce((s,r)=>s+r.amount,0);
+  return { rows:rows1320, total, depreciablePurchases };
+}
+
+function buildPersonalTaxPayments(from, to) {
+  const data = [];
+  filterByDateAndType("expense", from, to).forEach(r => {
+    const meta = getExpenseMeta(r);
+    if (!meta?.personalTaxItem) return;
+    const { net, vat, gross } = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
+    data.push({
+      date:r.date || "",
+      category:meta.item || r.category || "",
+      desc:r.desc || "",
+      gross:Number(gross || r.amount || 0),
+      docNumber:r.docNumber || ""
+    });
+  });
+  data.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  return { rows:data, total:data.reduce((s,r)=>s+r.gross,0) };
+}
+
+function buildPnlReportData(from, to) {
+  const incomeRows = addVatInfo(filterByDateAndType("income", from, to));
+  const expenseBase = filterByDateAndType("expense", from, to);
+  const expenseRows = addVatInfo(expenseBase);
+
+  let taxDeductibleExpenses = 0;
+  let personalPayments = 0;
+  let depreciablePurchases = 0;
+
+  expenseRows.rows.forEach(r => {
+    const meta = getExpenseMeta(r);
+    if (meta?.personalTaxItem) {
+      personalPayments += Number(r.gross || 0);
+      return;
+    }
+    if (meta?.depreciable || meta?.report1320 === "17-פחת") {
+      depreciablePurchases += Number(r.net || 0);
+      return;
+    }
+    taxDeductibleExpenses += Number(r.deductibleExpense || 0);
+  });
+
+  const accountingProfit = Number(incomeRows.totals.net || 0) - Number(expenseRows.totals.net || 0);
+  const estimatedTaxProfitBeforeDepreciation = Number(incomeRows.totals.net || 0) - taxDeductibleExpenses;
+
+  return {
+    incomeNet:incomeRows.totals.net,
+    incomeVat:incomeRows.totals.vat,
+    incomeGross:incomeRows.totals.gross,
+    expenseNet:expenseRows.totals.net,
+    expenseVat:expenseRows.totals.vat,
+    expenseGross:expenseRows.totals.gross,
+    taxDeductibleExpenses,
+    personalPayments,
+    depreciablePurchases,
+    accountingProfit,
+    estimatedTaxProfitBeforeDepreciation
+  };
+}
+
 /* ------------ CSV לדוחות ------------ */
 btnReportCsv.onclick = async () => {
   const type = rType.value;
@@ -5633,15 +5831,58 @@ btnReportCsv.onclick = async () => {
   const to   = rTo.value   || null;
 
   if (type === "pnl") {
-    const inc = addVatInfo(filterByDateAndType("income", from, to)).totals;
-    const exp = addVatInfo(filterByDateAndType("expense", from, to)).totals;
+    const p = buildPnlReportData(from, to);
     const lines = [
-      "section,net,vat,gross",
-      `income,${inc.net},${inc.vat},${inc.gross}`,
-      `expense,${exp.net},${exp.vat},${exp.gross}`,
-      `profit,${inc.net - exp.net},,${inc.gross - exp.gross}`
+      "section,amount",
+      `income_before_vat,${p.incomeNet}`,
+      `expenses_before_vat,${p.expenseNet}`,
+      `accounting_profit_before_vat,${p.accountingProfit}`,
+      `tax_deductible_expenses_before_depreciation,${p.taxDeductibleExpenses}`,
+      `estimated_tax_profit_before_depreciation,${p.estimatedTaxProfitBeforeDepreciation}`,
+      `depreciable_asset_purchases_not_expensed,${p.depreciablePurchases}`,
+      `personal_tax_payments_not_in_pnl,${p.personalPayments}`
     ];
     downloadFile("pnl-report.csv", lines.join("\n"));
+    return;
+  }
+
+  if (type === "customerLedger") {
+    if (!rCustomer?.value) return alert("יש לבחור לקוח לכרטסת");
+    const report = await buildCustomerLedgerReport(rCustomer.value, from, to);
+    if (!report.rows.length) return alert("אין מסמכים ללקוח בטווח שנבחר");
+    const csv = [
+      "date,type,number,description,debit,credit,balance,allocation_number",
+      ...report.rows.map(r => [
+        r.date,r.typeLabel,r.number,r.desc,r.debit,r.credit,r.balance,r.allocationNumber
+      ].map(v=>`"${String(v ?? "").replace(/"/g,'""')}"`).join(","))
+    ];
+    csv.push(`"TOTAL","","","",${report.totals.debit},${report.totals.credit},${report.totals.balance},""`);
+    downloadFile("customer-ledger.csv", csv.join("\n"));
+    return;
+  }
+
+  if (type === "report1320") {
+    const report = build1320Summary(from, to);
+    if (!report.rows.length && !report.depreciablePurchases) return alert("אין הוצאות מתאימות לטווח שנבחר");
+    const csv = [
+      "1320_section,recognized_expense",
+      ...report.rows.map(r => `"${String(r.section).replace(/"/g,'""')}",${r.amount}`),
+      `"TOTAL",${report.total}`,
+      `"DEPRECIABLE_ASSET_PURCHASES_NOT_INCLUDED_AS_EXPENSE",${report.depreciablePurchases}`
+    ];
+    downloadFile("report-1320-summary.csv", csv.join("\n"));
+    return;
+  }
+
+  if (type === "personalTax") {
+    const report = buildPersonalTaxPayments(from, to);
+    if (!report.rows.length) return alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
+    const csv = [
+      "date,category,description,document_number,amount",
+      ...report.rows.map(r => [r.date,r.category,r.desc,r.docNumber,r.gross].map(v=>`"${String(v ?? "").replace(/"/g,'""')}"`).join(",")),
+      `"TOTAL","","","",${report.total}`
+    ];
+    downloadFile("personal-tax-payments.csv", csv.join("\n"));
     return;
   }
 
@@ -5789,22 +6030,97 @@ btnReportPdf.onclick = async () => {
   }
 
   if (type === "pnl") {
-    const incomeList  = filterByDateAndType("income",  from, to);
-    const expenseList = filterByDateAndType("expense", from, to);
-    const { totals: incTotals } = addVatInfo(incomeList);
-    const { totals: expTotals } = addVatInfo(expenseList);
-    const profitNet   = incTotals.net - expTotals.net;
-    const profitGross = incTotals.gross - expTotals.gross;
+    const p = buildPnlReportData(from, to);
     openReportWindow('דו"ח רווח והפסד', `
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">
+        הדוח מציג גם תמונת פעילות עסקית וגם התאמה ראשונית לצורכי מס. רכישות נכסים בני־פחת ותשלומי מס/ניכויים אישיים מוצגים בנפרד ואינם נכללים אוטומטית כהוצאה מוכרת.
+      </p>
       <table>
-        <thead>
-          <tr><th>סעיף</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
-        </thead>
+        <thead><tr><th>סעיף</th><th>סכום</th></tr></thead>
         <tbody>
-          <tr><td>סה"כ הכנסות</td><td>${toMoney(incTotals.net)}</td><td>${toMoney(incTotals.vat)}</td><td>${toMoney(incTotals.gross)}</td></tr>
-          <tr><td>סה"כ הוצאות</td><td>${toMoney(expTotals.net)}</td><td>${toMoney(expTotals.vat)}</td><td>${toMoney(expTotals.gross)}</td></tr>
-          <tr><td><b>רווח לפני מס</b></td><td><b>${toMoney(profitNet)}</b></td><td></td><td></td></tr>
-          <tr><td><b>יתרה כולל מע"מ</b></td><td><b>${toMoney(profitGross)}</b></td><td></td><td></td></tr>
+          <tr><td>הכנסות לפני מע״מ</td><td>${toMoney(p.incomeNet)}</td></tr>
+          <tr><td>הוצאות לפני מע״מ</td><td>${toMoney(p.expenseNet)}</td></tr>
+          <tr><td><b>רווח חשבונאי לפני מע״מ</b></td><td><b>${toMoney(p.accountingProfit)}</b></td></tr>
+          <tr><td>הוצאות מוכרות למס לפני פחת</td><td>${toMoney(p.taxDeductibleExpenses)}</td></tr>
+          <tr><td><b>רווח משוער לצורכי מס לפני פחת</b></td><td><b>${toMoney(p.estimatedTaxProfitBeforeDepreciation)}</b></td></tr>
+          <tr><td>רכישות נכסים בני־פחת שלא נרשמו כהוצאה שוטפת</td><td>${toMoney(p.depreciablePurchases)}</td></tr>
+          <tr><td>תשלומי מס וניכויים אישיים מחוץ לרווח והפסד</td><td>${toMoney(p.personalPayments)}</td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
+
+  if (type === "customerLedger") {
+    if (!rCustomer?.value) {
+      alert("יש לבחור לקוח לכרטסת");
+      return;
+    }
+    const report = await buildCustomerLedgerReport(rCustomer.value, from, to);
+    if (!report.rows.length) {
+      alert("אין מסמכים ללקוח בטווח שנבחר");
+      return;
+    }
+    const customerName = report.customer?.name || report.customer?.businessName || report.customer?.customerName || "לקוח";
+    const rowsHtml = report.rows.map(r => `
+      <tr>
+        <td>${escapeHtml(r.date)}</td>
+        <td>${escapeHtml(r.typeLabel)}</td>
+        <td>${escapeHtml(r.number)}</td>
+        <td>${escapeHtml(r.desc || "")}</td>
+        <td>${toMoney(r.debit)}</td>
+        <td>${toMoney(r.credit)}</td>
+        <td>${toMoney(r.balance)}</td>
+        <td>${escapeHtml(r.allocationNumber || "")}</td>
+      </tr>`).join("");
+    openReportWindow(`כרטסת לקוח - ${escapeHtml(customerName)}`, `
+      <table>
+        <thead><tr><th>תאריך</th><th>מסמך</th><th>מס׳</th><th>תיאור</th><th>חיוב</th><th>זיכוי/תשלום</th><th>יתרה</th><th>מס׳ הקצאה</th></tr></thead>
+        <tbody>
+          ${rowsHtml}
+          <tr><td colspan="4"><b>סה״כ</b></td><td><b>${toMoney(report.totals.debit)}</b></td><td><b>${toMoney(report.totals.credit)}</b></td><td><b>${toMoney(report.totals.balance)}</b></td><td></td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
+
+  if (type === "report1320") {
+    const report = build1320Summary(from, to);
+    if (!report.rows.length && !report.depreciablePurchases) {
+      alert("אין הוצאות מתאימות לטווח שנבחר");
+      return;
+    }
+    const rowsHtml = report.rows.map(r => `<tr><td>${escapeHtml(r.section)}</td><td>${toMoney(r.amount)}</td></tr>`).join("");
+    openReportWindow('סיכום הוצאות לפי נספח 1320', `
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">
+        זהו סיכום על בסיס סיווגי ההוצאות במערכת. רכישות נכסים שסווגו לפחת אינן נרשמות כאן כהוצאה שוטפת; סכום הפחת עצמו יילקח מדוח הפחת.
+      </p>
+      <table>
+        <thead><tr><th>סעיף 1320</th><th>הוצאה מוכרת</th></tr></thead>
+        <tbody>
+          ${rowsHtml}
+          <tr><td><b>סה״כ הוצאות מסווגות</b></td><td><b>${toMoney(report.total)}</b></td></tr>
+          <tr><td>רכישות נכסים בני־פחת — להמשך לדוח הפחת</td><td>${toMoney(report.depreciablePurchases)}</td></tr>
+        </tbody>
+      </table>`);
+    return;
+  }
+
+  if (type === "personalTax") {
+    const report = buildPersonalTaxPayments(from, to);
+    if (!report.rows.length) {
+      alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
+      return;
+    }
+    const rowsHtml = report.rows.map(r => `
+      <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${toMoney(r.gross)}</td></tr>
+    `).join("");
+    openReportWindow('תשלומי מס וניכויים אישיים', `
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מרכז תשלומים שנרשמו במערכת אך אינם הוצאה עסקית שוטפת בנספח 1320.</p>
+      <table>
+        <thead><tr><th>תאריך</th><th>סוג תשלום</th><th>תיאור</th><th>אסמכתא</th><th>סכום</th></tr></thead>
+        <tbody>
+          ${rowsHtml}
+          <tr><td colspan="4"><b>סה״כ</b></td><td><b>${toMoney(report.total)}</b></td></tr>
         </tbody>
       </table>`);
     return;
