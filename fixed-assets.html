@@ -120,9 +120,32 @@
             <select id="taxYear"></select>
           </div>
           <button class="btn" id="btnNew" type="button">הוספת נכס</button>
+          <button class="btn secondary" id="btnImportPrev" type="button">ייבוא דוח פחת משנה קודמת</button>
+          <input id="prevDepFile" type="file" accept="application/pdf,.pdf" hidden />
           <button class="btn secondary" id="btnSave" type="button">שמירה</button>
           <button class="btn secondary" id="btnCsv" type="button">ייצוא CSV</button>
           <button class="btn secondary" id="btnPrint" type="button">הדפסה / PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card controls" id="prevImportCard" style="display:none">
+      <div class="card-hd"><h3>ייבוא דוח פחת משנה קודמת</h3><span class="hint" id="prevImportStatus"></span></div>
+      <div class="card-bd">
+        <div class="guide-panel" style="display:block">
+          <div class="soft-title">איך זה עובד?</div>
+          <div class="hint">מעלים PDF של דוח הפחת מהשנה הקודמת. המערכת קוראת את הנכסים, הקבוצות, העלות, שיעורי הפחת והפחת שנצבר, ומעבירה אותם אוטומטית לשנת המס שנבחרה. לפני השמירה מוצגת תצוגה מקדימה — שום נתון לא נשמר עד לאישור.</div>
+        </div>
+        <div id="prevImportWarnings" class="field-help" style="display:none;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:14px;padding:10px;margin:10px 0"></div>
+        <div class="table-scroll" style="margin-top:12px">
+          <table>
+            <thead><tr><th>קבוצה</th><th>נכס</th><th>תאריך רכישה</th><th>עלות מקורית</th><th>בסיס לפחת</th><th>% פחת</th><th>פחת שנצבר עד סוף השנה הקודמת</th><th>עלות מופחתת</th><th>סטטוס</th></tr></thead>
+            <tbody id="prevImportBody"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:14px">
+          <button class="btn" id="btnConfirmPrevImport" type="button">קליטת הנכסים לשנת המס</button>
+          <button class="btn secondary" id="btnCancelPrevImport" type="button">ביטול</button>
         </div>
       </div>
     </section>
@@ -259,6 +282,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -286,7 +311,13 @@ const mOriginal = $('mOriginal');
 const mBase = $('mBase');
 const mYearDep = $('mYearDep');
 const mWritten = $('mWritten');
+const prevImportCard = $('prevImportCard');
+const prevImportBody = $('prevImportBody');
+const prevImportStatus = $('prevImportStatus');
+const prevImportWarnings = $('prevImportWarnings');
 
+let pendingPreviousAssets = [];
+let pendingPreviousYear = null;
 let currentUser = null;
 let userProfile = null;
 let ledgerSettings = { vatEnabled:true, vatRate:DEFAULT_VAT };
@@ -624,6 +655,10 @@ function groupedAssetsForReport(){
   const year = taxYear.value;
   const map = new Map();
   for (const asset of assets) {
+    const selectedYearStart = new Date(Number(year), 0, 1);
+    const sold = asset.sold === true || asset.sold === 'true';
+    const saleDate = sold ? parseLocalDate(asset.saleDate) : null;
+    if (sold && saleDate && saleDate < selectedYearStart) continue;
     const group = asset.group || 'אחר';
     if (!map.has(group)) map.set(group, []);
     map.get(group).push({ asset, calc: calcAsset(asset, year) });
@@ -687,6 +722,172 @@ function renderReport(){
     </table>
   `;
 }
+function parsePdfNumber(value){
+  const raw = String(value ?? '').replace(/[₪,\s]/g, '').trim();
+  if (!raw) return NaN;
+  const n = Number(raw.replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : NaN;
+}
+function textFromItems(items){
+  return items.filter(Boolean).map(i => String(i.str || '').trim()).filter(Boolean).join(' ').replace(/\s+/g,' ').trim();
+}
+function groupPdfItemsByLine(items){
+  const lines = [];
+  for (const item of items) {
+    const str = String(item.str || '').trim();
+    if (!str) continue;
+    const x = Number(item.transform?.[4] || 0);
+    const y = Number(item.transform?.[5] || 0);
+    let line = lines.find(l => Math.abs(l.y - y) <= 2.2);
+    if (!line) { line = { y, items:[] }; lines.push(line); }
+    line.items.push({ str, x, y });
+  }
+  return lines.sort((a,b)=>b.y-a.y).map(l => ({...l, items:l.items.sort((a,b)=>b.x-a.x)}));
+}
+function pdfColumnValue(line, minX, maxX){
+  const found = line.items.filter(i => i.x >= minX && i.x < maxX);
+  return textFromItems(found);
+}
+function extractPreviousTaxYear(allText){
+  const m = String(allText || '').match(/(?:שנת\s*המס|31\/12\/)(?:\s*:?\s*)?(20\d{2})/);
+  if (m) return Number(m[1]);
+  const years = [...String(allText || '').matchAll(/20\d{2}/g)].map(m=>Number(m[0])).filter(y=>y>=2000&&y<=2200);
+  return years.length ? Math.max(...years) : null;
+}
+function parseSaleDateFromNote(note, fallbackYear){
+  const full = String(note || '').match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](20\d{2})/);
+  if (full) return toIsoDateParts(full[3], full[2], full[1]);
+  const monthYear = String(note || '').match(/(\d{1,2})[\/.\-](20\d{2})/);
+  if (monthYear) {
+    const month = Number(monthYear[1]), year = Number(monthYear[2]);
+    const last = new Date(year, month, 0).getDate();
+    return toIsoDateParts(year, month, last);
+  }
+  return fallbackYear ? `${fallbackYear}-12-31` : '';
+}
+function normalizeImportedName(s){
+  return String(s || '').replace(/\s+/g,' ').trim();
+}
+function priorAssetDuplicate(asset){
+  const name = normalizeImportedName(asset.name).toLowerCase();
+  const cost = Number(asset.originalCost || 0);
+  return assets.some(a => normalizeImportedName(a.name).toLowerCase() === name && normalizeDateValue(a.purchaseDate) === normalizeDateValue(asset.purchaseDate) && Math.abs(Number(a.originalCost||0)-cost) < 0.01);
+}
+async function parsePreviousDepreciationPdf(file){
+  const buffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data:buffer }).promise;
+  const parsed = [];
+  let currentGroup = 'אחר';
+  let allText = '';
+  for (let p=1; p<=pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const lines = groupPdfItemsByLine(content.items);
+    allText += ' ' + content.items.map(i=>i.str || '').join(' ');
+    for (const line of lines) {
+      const lineText = textFromItems(line.items);
+      if (!lineText) continue;
+      if (/קבוצה/.test(lineText) && !/סה["״]?כ/.test(lineText)) {
+        const groupItems = line.items.filter(i => i.x >= 650 && i.x < 750 && !/^\d+$/.test(i.str) && !/קבוצה/.test(i.str));
+        const g = normalizeImportedName(textFromItems(groupItems));
+        if (g) currentGroup = g;
+        continue;
+      }
+      if (/סה["״]?כ/.test(lineText) || /כללי/.test(lineText)) continue;
+      const purchaseItem = line.items.find(i => i.x >= 590 && i.x < 680 && /^\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}$/.test(i.str));
+      if (!purchaseItem) continue;
+      const purchaseDate = normalizeDateValue(purchaseItem.str);
+      const name = normalizeImportedName(textFromItems(line.items.filter(i => i.x >= 675)));
+      if (!name || !purchaseDate) continue;
+      const originalCost = parsePdfNumber(pdfColumnValue(line, 500, 555));
+      const base = parsePdfNumber(pdfColumnValue(line, 420, 470));
+      const legalRate = parsePdfNumber(pdfColumnValue(line, 380, 420));
+      const claimedRateRaw = parsePdfNumber(pdfColumnValue(line, 340, 380));
+      const yearDep = parsePdfNumber(pdfColumnValue(line, 300, 340));
+      const accumulatedBefore = parsePdfNumber(pdfColumnValue(line, 255, 300));
+      const totalDep = parsePdfNumber(pdfColumnValue(line, 210, 255));
+      const writtenDown = parsePdfNumber(pdfColumnValue(line, 160, 210));
+      const note = normalizeImportedName(textFromItems(line.items.filter(i => i.x < 160)));
+      if (!(originalCost > 0) || !(base > 0) || !(legalRate > 0) || !Number.isFinite(totalDep)) continue;
+      parsed.push({
+        id: crypto.randomUUID(),
+        name,
+        group: currentGroup || 'אחר',
+        purchaseDate,
+        activationDate: purchaseDate,
+        originalCost,
+        incVat:false,
+        vatClaimed:false,
+        baseOverride:base,
+        legalRate,
+        claimedRate:Number.isFinite(claimedRateRaw) && claimedRateRaw > 0 ? claimedRateRaw : legalRate,
+        priorAccumulated:Math.min(base, Math.max(0,totalDep)),
+        sold:/נמכר|נגרע|גריעה/.test(note),
+        saleDate:/נמכר|נגרע|גריעה/.test(note) ? parseSaleDateFromNote(note, null) : '',
+        salePrice:0,
+        notes:[note, `יובא מדוח פחת ${file.name}`].filter(Boolean).join(' | '),
+        sourceRowId:'', sourceRowDesc:'',
+        importedFromPreviousReport:true,
+        importedPreviousYear:null,
+        importedPreviousYearDep:Number.isFinite(yearDep) ? yearDep : 0,
+        importedPreviousAccumulatedBefore:Number.isFinite(accumulatedBefore) ? accumulatedBefore : 0,
+        importedPreviousWrittenDown:Number.isFinite(writtenDown) ? writtenDown : Math.max(0,base-totalDep)
+      });
+    }
+  }
+  const previousYear = extractPreviousTaxYear(allText);
+  parsed.forEach(a => a.importedPreviousYear = previousYear);
+  return { assets:parsed, previousYear };
+}
+function renderPreviousImportPreview(){
+  if (!pendingPreviousAssets.length) {
+    prevImportBody.innerHTML = '<tr><td colspan="9" class="empty">לא נמצאו נכסים לקליטה</td></tr>';
+    return;
+  }
+  prevImportBody.innerHTML = pendingPreviousAssets.map(a => {
+    const duplicate = priorAssetDuplicate(a);
+    const soldBefore = a.sold && a.saleDate && parseLocalDate(a.saleDate) < new Date(Number(taxYear.value),0,1);
+    const status = duplicate ? 'כבר קיים — לא ייובא' : soldBefore ? 'נמכר/נגרע בשנה קודמת — יישמר להיסטוריה ולא יוצג בדוח השנה' : 'מוכן לקליטה';
+    return `<tr><td>${escapeHtml(a.group)}</td><td>${escapeHtml(a.name)}</td><td>${escapeHtml(formatDate(a.purchaseDate))}</td><td class="money">${toMoney(a.originalCost)}</td><td class="money">${toMoney(a.baseOverride)}</td><td>${escapeHtml(a.claimedRate)}%</td><td class="money">${toMoney(a.priorAccumulated)}</td><td class="money">${toMoney(a.importedPreviousWrittenDown)}</td><td>${escapeHtml(status)}</td></tr>`;
+  }).join('');
+}
+async function handlePreviousReportFile(file){
+  if (!file) return;
+  prevImportCard.style.display = '';
+  prevImportStatus.textContent = 'קורא את הדוח…';
+  prevImportWarnings.style.display = 'none';
+  prevImportWarnings.innerHTML = '';
+  prevImportBody.innerHTML = '<tr><td colspan="9" class="empty">קורא PDF…</td></tr>';
+  try {
+    const result = await parsePreviousDepreciationPdf(file);
+    pendingPreviousAssets = result.assets;
+    pendingPreviousYear = result.previousYear;
+    const targetYear = Number(taxYear.value);
+    const warnings = [];
+    if (!result.assets.length) warnings.push('לא הצלחנו לזהות שורות נכסים בדוח. ייתכן שמבנה ה-PDF אינו נתמך עדיין.');
+    if (result.previousYear && targetYear && result.previousYear !== targetYear - 1) warnings.push(`הדוח שזוהה הוא לשנת ${result.previousYear}, בעוד ששנת המס שנבחרה היא ${targetYear}. מומלץ לייבא דוח של ${targetYear-1}.`);
+    const dupCount = result.assets.filter(priorAssetDuplicate).length;
+    if (dupCount) warnings.push(`${dupCount} נכסים כבר קיימים במערכת ולכן לא ייובאו שוב.`);
+    if (warnings.length) { prevImportWarnings.innerHTML = warnings.map(w=>`• ${escapeHtml(w)}`).join('<br>'); prevImportWarnings.style.display=''; }
+    prevImportStatus.textContent = result.assets.length ? `זוהו ${result.assets.length} נכסים${result.previousYear ? ` מדוח ${result.previousYear}` : ''}` : 'לא נמצאו נכסים';
+    renderPreviousImportPreview();
+  } catch (err) {
+    console.error(err);
+    pendingPreviousAssets = [];
+    prevImportStatus.textContent = 'הייבוא נכשל';
+    prevImportWarnings.innerHTML = `לא הצלחנו לקרוא את הקובץ: ${escapeHtml(err?.message || err)}`;
+    prevImportWarnings.style.display = '';
+    renderPreviousImportPreview();
+  }
+}
+function closePreviousImport(){
+  pendingPreviousAssets = [];
+  pendingPreviousYear = null;
+  $('prevDepFile').value = '';
+  prevImportCard.style.display = 'none';
+  prevImportWarnings.style.display = 'none';
+}
+
 function renderAll(){
   renderAssetsList();
   renderAssetSuggestions();
@@ -721,6 +922,29 @@ async function loadData(user){
   taxYear.value = years.includes(current) ? current : years[0];
   renderAll();
 }
+
+$('btnImportPrev').addEventListener('click', () => $('prevDepFile').click());
+$('prevDepFile').addEventListener('change', e => handlePreviousReportFile(e.target.files?.[0]));
+$('btnCancelPrevImport').addEventListener('click', closePreviousImport);
+$('btnConfirmPrevImport').addEventListener('click', async () => {
+  if (!pendingPreviousAssets.length) return alert('אין נכסים לקליטה.');
+  const targetYear = Number(taxYear.value);
+  if (pendingPreviousYear && targetYear && pendingPreviousYear !== targetYear - 1) {
+    if (!confirm(`הדוח הוא לשנת ${pendingPreviousYear} ושנת המס שנבחרה היא ${targetYear}. להמשיך בכל זאת?`)) return;
+  }
+  const fresh = pendingPreviousAssets.filter(a => !priorAssetDuplicate(a));
+  if (!fresh.length) return alert('כל הנכסים בדוח כבר קיימים במערכת.');
+  assets.push(...fresh);
+  renderAll();
+  try {
+    await saveAssets();
+    alert(`נקלטו ${fresh.length} נכסים מדוח הפחת${pendingPreviousYear ? ` של ${pendingPreviousYear}` : ''}. הפחת שנצבר הועבר כיתרת פתיחה ל-${targetYear}.`);
+    closePreviousImport();
+  } catch (err) {
+    console.error(err);
+    statusText.textContent = 'הנכסים נקלטו במסך, אך לא הצלחנו לשמור לענן';
+  }
+});
 
 $('btnNew').addEventListener('click', () => openForm());
 $('btnCancelAsset').addEventListener('click', closeForm);
