@@ -50,7 +50,7 @@ export default function handler(req, res) {
     response_type: "code",
     client_id: clientId,
     redirect_uri: redirectUri,
-    scope: "scope",
+    scope: "scope vat_report_scope",
     state
   });
 
