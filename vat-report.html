@@ -52,13 +52,15 @@
   </div></section>
 
   <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">איך תרצו לדווח?</h2></div><div class="bd choice-grid">
-    <div class="choice"><h3>דיווח ישירות מעצמאי פלוס</h3><p><b>שלב בדיקה בטוח:</b> כרגע הכפתור בודק את תקינות הנתונים ואת החיבור ל־VATReportV3Api בלבד. הוא אינו שולח דוח ואינו משנה נתונים ברשות המסים.</p><button id="apiSend" class="btn" disabled>בדיקת מוכנות ל־API — ללא שליחה</button></div>
+    <div class="choice"><h3>דיווח ישירות מעצמאי פלוס</h3><p><b>שלב 1:</b> בדיקת מוכנות בטוחה שאינה שולחת דבר. לאחר שהבדיקה עוברת בהצלחה ניתן לעבור לשלב 2 ולשלוח את הדוח בפועל.</p><button id="apiSend" class="btn" disabled>בדיקת מוכנות ל־API — ללא שליחה</button><button id="apiSubmit" class="btn" style="display:none;margin-inline-start:8px;background:#b42318;border-color:#b42318" disabled>שליחת דוח לרשות המסים</button></div>
     <div class="choice"><h3>דיווח באתר רשות המסים</h3><p>אפשר להמשיך לדווח בדרך הרגילה. הנתונים בטבלה למעלה הם הנתונים שצריך להעתיק לשדות המקבילים באתר.</p><a class="btn secondary" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a></div>
   </div></section>
 
   <section id="apiValidationCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת בדיקת המוכנות</h2><span class="status">בדיקה בלבד · ללא שליחה</span></div><div class="bd"><div id="apiValidationResult" class="validation-box warn">טרם בוצעה בדיקה.</div></div></section>
 
-  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תצוגה מקדימה ל־API</h2><span class="status">לא נשלח דבר בשלב זה</span></div><div class="bd"><pre id="payloadPreview">{}</pre></div></section>
+  <section id="apiSubmitCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת השליחה לרשות המסים</h2><span class="status">שליחה אמיתית</span></div><div class="bd"><div id="apiSubmitResult" class="validation-box warn">טרם נשלח דוח.</div></div></section>
+
+  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תצוגה מקדימה ל־API</h2><span class="status">הנתונים שיועברו לאחר אישור מפורש</span></div><div class="bd"><pre id="payloadPreview">{}</pre></div></section>
 </main>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -66,7 +68,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",authDomain:"freelance-accounting-6c3bb.firebaseapp.com",projectId:"freelance-accounting-6c3bb",storageBucket:"freelance-accounting-6c3bb.firebasestorage.app",messagingSenderId:"196974556694",appId:"1:196974556694:web:60ba710567f2a7c67c6737"};
 const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
-const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={},lastPayload=null;
+const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={},lastPayload=null,apiReady=false;
 const EXPENSE_ITEMS = [
   // רכב — שורת 7 בנספח 1320. האחוז כאן הוא ברירת מחדל תפעולית בלבד וניתן לשינוי בתנועה.
   { item: "דלק", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
@@ -176,11 +178,14 @@ function monthRange(){const raw=document.getElementById('endMonth').value;if(!ra
 function calculate(){const rg=monthRange();if(!rg)return;const rate=settings.vatEnabled!==false?(Number(settings.vatRate||profile.vatRate)||DEFAULT_VAT):0;let income=0,incomeVat=0,assetVat=0,expenseVat=0;for(const r of rows){if(!r?.date||r.date<rg.from||r.date>rg.to)continue;const a=split(r.amount,r.incVat,rate);if(r.type==='income'){income+=a.net;incomeVat+=a.vat}else if(r.type==='expense'){const v=a.vat*vatFactor(r);if(isAsset(r))assetVat+=v;else expenseVat+=v}}const exempt=Math.max(0,Number(document.getElementById('exemptIncome').value)||0);const balance=incomeVat-assetVat-expenseVat;const reportType=Math.abs(balance)<0.5?3:(balance>0?1:2);const total=Math.round(Math.abs(balance));
  document.getElementById('taxableIncome').textContent=money(income);document.getElementById('outputVat').textContent=money(incomeVat);document.getElementById('inputVat').textContent=money(assetVat+expenseVat);document.getElementById('vatBalance').textContent=(balance>=0?'לתשלום ':'להחזר ')+money(Math.abs(balance));document.getElementById('periodLabel').textContent=rg.label;
  const vals={rIncome:income,rIncomeVat:incomeVat,rExempt:exempt,rAssetVat:assetVat,rExpenseVat:expenseVat,rTotal:Math.abs(balance)};for(const [id,v] of Object.entries(vals))document.getElementById(id).textContent=money(v);document.getElementById('rType').textContent=reportType===1?'דוח לתשלום':reportType===2?'דוח להחזר':'דוח אפס';
+ apiReady=false;const submitBtn=document.getElementById('apiSubmit');if(submitBtn){submitBtn.style.display='none';submitBtn.disabled=true}
  const payload={BookkeepingCorporateNumber:Number(String(profile.bookkeepingCorporateNumber||profile.representativeNumber||'').replace(/\D/g,''))||0,CorporateNumber:Number(String(profile.businessId||profile.taxId||'').replace(/\D/g,''))||0,ReportPeriod:rg.reportPeriod,ReportType:reportType,TotalVAT:total,ExemptIncome:Math.round(exempt),IncomeItems:[{Income:Math.round(income),VATRate:rate,IncomeVAT:Math.round(incomeVat)}],AssetVAT:Math.round(assetVat),ExpenseVAT:Math.round(expenseVat),PaymentMethod:reportType===1?1:0,NumberOfPayments:reportType===1?1:0};lastPayload=payload;document.getElementById('payloadPreview').textContent=JSON.stringify(payload,null,2);
 }
 async function load(user){const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);profile=us.exists()?us.data():{email:user.email};const ledger=ls.exists()?ls.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';const type=String(profile.businessType||'').toLowerCase();const isPtor=type==='ptor';document.getElementById('ptorNotice').style.display=isPtor?'block':'none';document.getElementById('apiSend').disabled=isPtor;const d=new Date();d.setMonth(d.getMonth()-1);document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;calculate()}
 function renderValidationResult(data,httpOk){
- const card=document.getElementById('apiValidationCard'),box=document.getElementById('apiValidationResult');card.style.display='block';box.innerHTML='';
+ const card=document.getElementById('apiValidationCard'),box=document.getElementById('apiValidationResult'),submitBtn=document.getElementById('apiSubmit');card.style.display='block';box.innerHTML='';
+ apiReady=data?.ready===true;
+ if(submitBtn){submitBtn.style.display=apiReady?'inline-flex':'none';submitBtn.disabled=!apiReady}
  const title=document.createElement('b');
  if(data?.ready===true){box.className='validation-box good';title.textContent='✓ הנתונים והחיבור עברו את בדיקת המוכנות.'}
  else if(httpOk&&data?.ok){box.className='validation-box warn';title.textContent='בדיקת המוכנות הסתיימה — יש נקודות שצריך להשלים.'}
@@ -205,7 +210,85 @@ async function validateApiReadiness(){
  }catch(e){console.error(e);renderValidationResult({ok:false,error:'לא ניתן להגיע כרגע לשירות בדיקת המע״מ.'},false)}
  finally{const type=String(profile.businessType||'').toLowerCase();btn.disabled=type==='ptor';btn.textContent=old}
 }
+
+function renderSubmitResult(data,httpOk){
+ const card=document.getElementById('apiSubmitCard'),box=document.getElementById('apiSubmitResult');card.style.display='block';box.innerHTML='';
+ const title=document.createElement('b');
+ if(data?.submitted===true&&Number(data?.code)===1){box.className='validation-box good';title.textContent='✓ דוח המע״מ נקלט בהצלחה ברשות המסים.'}
+ else if(data?.paymentCapturedReportFailed===true||Number(data?.code)===2){box.className='validation-box badbox';title.textContent='⚠ התשלום נקלט אך הדוח לא נקלט.'}
+ else if(data?.alreadySubmitted===true){box.className='validation-box warn';title.textContent='השליחה החוזרת נחסמה.'}
+ else{box.className='validation-box badbox';title.textContent='דוח המע״מ לא נקלט.'}
+ box.appendChild(title);
+
+ const message=document.createElement('div');message.style.marginTop='8px';message.textContent=data?.message||data?.error||'לא התקבלה תשובת הצלחה מרשות המסים.';box.appendChild(message);
+
+ if(Number(data?.reference||0)>0){
+  const ref=document.createElement('div');ref.style.marginTop='10px';ref.innerHTML='<b>מספר אסמכתה:</b> '+String(data.reference);box.appendChild(ref);
+ }
+ if(data?.totalPayment!==undefined&&data?.totalPayment!==null){
+  const pay=document.createElement('div');pay.style.marginTop='6px';pay.innerHTML='<b>סכום תשלום כולל לפי רשות המסים:</b> '+money(Number(data.totalPayment)||0);box.appendChild(pay);
+ }
+ if(Number(data?.code)===2){
+  const critical=document.createElement('div');critical.style.marginTop='10px';critical.innerHTML='<b>חשוב:</b> אין ללחוץ שוב על שליחה. יש לבדוק את מצב הדוח והתשלום מול רשות המסים.';box.appendChild(critical);
+ }
+ if(data?.alreadySubmitted===true&&data?.previousSubmission?.reference){
+  const previous=document.createElement('div');previous.style.marginTop='10px';previous.textContent='אסמכתה קודמת: '+String(data.previousSubmission.reference);box.appendChild(previous);
+ }
+ card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function submitVatReport(){
+ const btn=document.getElementById('apiSubmit');
+ if(!apiReady||!lastPayload){alert('יש לבצע תחילה בדיקת מוכנות תקינה.');return}
+
+ const period=String(lastPayload.ReportPeriod||'');
+ const periodLabel=period.length===6?`${period.slice(4,6)}/${period.slice(0,4)}`:period;
+ const reportTypeLabel=Number(lastPayload.ReportType)===1?'דוח לתשלום':Number(lastPayload.ReportType)===2?'דוח להחזר':'דוח אפס';
+ const amountLabel=money(Number(lastPayload.TotalVAT)||0);
+
+ const approved=confirm(
+`שליחה אמיתית לרשות המסים
+
+תקופת דיווח: ${periodLabel}
+סוג הדוח: ${reportTypeLabel}
+סכום: ${amountLabel}
+
+לחיצה על אישור תשלח את הדוח בפועל לרשות המסים.
+לאחר קליטת הדוח לא ניתן לבטל את הפעולה מתוך עצמאי פלוס.
+
+האם לשלוח את הדוח?`
+ );
+ if(!approved)return;
+
+ btn.disabled=true;const old=btn.textContent;btn.textContent='שולח לרשות המסים…';
+ try{
+  const response=await fetch('/api/vat-report/submit',{
+   method:'POST',
+   headers:{'Content-Type':'application/json','Accept':'application/json'},
+   credentials:'same-origin',
+   body:JSON.stringify({payload:lastPayload,confirmSubmit:true})
+  });
+  const data=await response.json().catch(()=>({ok:false,submitted:false,error:'התקבלה תשובה לא תקינה משירות שליחת דוח המע״מ.'}));
+  renderSubmitResult(data,response.ok);
+
+  if(data?.submitted===true&&Number(data?.code)===1){
+   apiReady=false;
+   btn.style.display='none';
+  }else if(data?.paymentCapturedReportFailed===true||Number(data?.code)===2||data?.alreadySubmitted===true){
+   apiReady=false;
+   btn.style.display='none';
+  }
+ }catch(e){
+  console.error(e);
+  renderSubmitResult({ok:false,submitted:false,error:'לא ניתן להגיע כרגע לשירות שליחת דוח המע״מ.'},false);
+ }finally{
+  btn.textContent=old;
+  if(apiReady)btn.disabled=false;
+ }
+}
+
 document.getElementById('apiSend').addEventListener('click',validateApiReadiness);
+document.getElementById('apiSubmit').addEventListener('click',submitVatReport);
 
 ['endMonth','cycle','exemptIncome'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 onAuthStateChanged(auth,u=>{if(!u){location.href='/';return}load(u).catch(e=>{console.error(e);document.getElementById('status').innerHTML='<span class="bad">שגיאה בטעינה</span>'})});
