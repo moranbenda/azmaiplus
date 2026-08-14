@@ -18,7 +18,7 @@
     table{width:100%;border-collapse:collapse} th,td{border:1px solid var(--line);padding:10px;text-align:right;vertical-align:top} th{background:#f3f6fb} .money{white-space:nowrap;font-variant-numeric:tabular-nums} .muted{color:var(--muted)}
     .choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px} .choice{border:1px solid var(--line);border-radius:18px;padding:18px;background:#fff} .choice h3{margin:0 0 8px} .choice p{color:var(--muted);line-height:1.6;margin:0 0 14px}
     .notice{border:1px solid #bfdbfe;background:#eff6ff;border-radius:16px;padding:13px 15px;line-height:1.6} .warnbox{border-color:#fed7aa;background:#fff7ed} pre{direction:ltr;text-align:left;background:#101827;color:#e5eefc;border-radius:14px;padding:14px;overflow:auto;font-size:12px}
-    .status{font-size:13px;color:var(--muted)} .ok{color:var(--green);font-weight:800} .bad{color:var(--red);font-weight:800}
+    .status{font-size:13px;color:var(--muted)} .ok{color:var(--green);font-weight:800} .bad{color:var(--red);font-weight:800} .validation-box{border-radius:16px;padding:14px 16px;line-height:1.7}.validation-box.good{background:#f0fdf4;border:1px solid #bbf7d0}.validation-box.warn{background:#fff7ed;border:1px solid #fed7aa}.validation-box.badbox{background:#fef2f2;border:1px solid #fecaca}.validation-box ul{margin:8px 0 0;padding-right:20px}.validation-box b{font-weight:800}
     @media(max-width:850px){.wrap{padding:14px}.controls,.metrics,.choice-grid{grid-template-columns:1fr}.brand h1{font-size:23px}.table-scroll{overflow:auto}table{min-width:720px}}
   </style>
 </head>
@@ -52,9 +52,11 @@
   </div></section>
 
   <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">איך תרצו לדווח?</h2></div><div class="bd choice-grid">
-    <div class="choice"><h3>דיווח ישירות מעצמאי פלוס</h3><p>המערכת תשלח את הנתונים דרך VATReportV3Api ותשמור את האסמכתה. לפני השליחה תוצג תמיד תצוגה מקדימה ואישור.</p><button id="apiSend" class="btn" disabled>שליחה דרך API — חיבור Kamatera הבא</button></div>
+    <div class="choice"><h3>דיווח ישירות מעצמאי פלוס</h3><p><b>שלב בדיקה בטוח:</b> כרגע הכפתור בודק את תקינות הנתונים ואת החיבור ל־VATReportV3Api בלבד. הוא אינו שולח דוח ואינו משנה נתונים ברשות המסים.</p><button id="apiSend" class="btn" disabled>בדיקת מוכנות ל־API — ללא שליחה</button></div>
     <div class="choice"><h3>דיווח באתר רשות המסים</h3><p>אפשר להמשיך לדווח בדרך הרגילה. הנתונים בטבלה למעלה הם הנתונים שצריך להעתיק לשדות המקבילים באתר.</p><a class="btn secondary" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a></div>
   </div></section>
+
+  <section id="apiValidationCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת בדיקת המוכנות</h2><span class="status">בדיקה בלבד · ללא שליחה</span></div><div class="bd"><div id="apiValidationResult" class="validation-box warn">טרם בוצעה בדיקה.</div></div></section>
 
   <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תצוגה מקדימה ל־API</h2><span class="status">לא נשלח דבר בשלב זה</span></div><div class="bd"><pre id="payloadPreview">{}</pre></div></section>
 </main>
@@ -64,7 +66,7 @@ import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",authDomain:"freelance-accounting-6c3bb.firebaseapp.com",projectId:"freelance-accounting-6c3bb",storageBucket:"freelance-accounting-6c3bb.firebasestorage.app",messagingSenderId:"196974556694",appId:"1:196974556694:web:60ba710567f2a7c67c6737"};
 const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
-const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={};
+const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={},lastPayload=null;
 const EXPENSE_ITEMS = [
   // רכב — שורת 7 בנספח 1320. האחוז כאן הוא ברירת מחדל תפעולית בלבד וניתן לשינוי בתנועה.
   { item: "דלק", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
@@ -174,9 +176,37 @@ function monthRange(){const raw=document.getElementById('endMonth').value;if(!ra
 function calculate(){const rg=monthRange();if(!rg)return;const rate=settings.vatEnabled!==false?(Number(settings.vatRate||profile.vatRate)||DEFAULT_VAT):0;let income=0,incomeVat=0,assetVat=0,expenseVat=0;for(const r of rows){if(!r?.date||r.date<rg.from||r.date>rg.to)continue;const a=split(r.amount,r.incVat,rate);if(r.type==='income'){income+=a.net;incomeVat+=a.vat}else if(r.type==='expense'){const v=a.vat*vatFactor(r);if(isAsset(r))assetVat+=v;else expenseVat+=v}}const exempt=Math.max(0,Number(document.getElementById('exemptIncome').value)||0);const balance=incomeVat-assetVat-expenseVat;const reportType=Math.abs(balance)<0.5?3:(balance>0?1:2);const total=Math.round(Math.abs(balance));
  document.getElementById('taxableIncome').textContent=money(income);document.getElementById('outputVat').textContent=money(incomeVat);document.getElementById('inputVat').textContent=money(assetVat+expenseVat);document.getElementById('vatBalance').textContent=(balance>=0?'לתשלום ':'להחזר ')+money(Math.abs(balance));document.getElementById('periodLabel').textContent=rg.label;
  const vals={rIncome:income,rIncomeVat:incomeVat,rExempt:exempt,rAssetVat:assetVat,rExpenseVat:expenseVat,rTotal:Math.abs(balance)};for(const [id,v] of Object.entries(vals))document.getElementById(id).textContent=money(v);document.getElementById('rType').textContent=reportType===1?'דוח לתשלום':reportType===2?'דוח להחזר':'דוח אפס';
- const payload={BookkeepingCorporateNumber:0,CorporateNumber:Number(String(profile.businessId||profile.taxId||'').replace(/\D/g,''))||0,ReportPeriod:rg.reportPeriod,ReportType:reportType,TotalVAT:total,ExemptIncome:Math.round(exempt),IncomeItems:[{Income:Math.round(income),VATRate:rate,IncomeVAT:Math.round(incomeVat)}],AssetVAT:Math.round(assetVat),ExpenseVAT:Math.round(expenseVat),PaymentMethod:reportType===1?1:0,NumberOfPayments:reportType===1?1:0};document.getElementById('payloadPreview').textContent=JSON.stringify(payload,null,2);
+ const payload={BookkeepingCorporateNumber:Number(String(profile.bookkeepingCorporateNumber||profile.representativeNumber||'').replace(/\D/g,''))||0,CorporateNumber:Number(String(profile.businessId||profile.taxId||'').replace(/\D/g,''))||0,ReportPeriod:rg.reportPeriod,ReportType:reportType,TotalVAT:total,ExemptIncome:Math.round(exempt),IncomeItems:[{Income:Math.round(income),VATRate:rate,IncomeVAT:Math.round(incomeVat)}],AssetVAT:Math.round(assetVat),ExpenseVAT:Math.round(expenseVat),PaymentMethod:reportType===1?1:0,NumberOfPayments:reportType===1?1:0};lastPayload=payload;document.getElementById('payloadPreview').textContent=JSON.stringify(payload,null,2);
 }
-async function load(user){const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);profile=us.exists()?us.data():{email:user.email};const ledger=ls.exists()?ls.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';const type=String(profile.businessType||'').toLowerCase();document.getElementById('ptorNotice').style.display=type==='ptor'?'block':'none';const d=new Date();d.setMonth(d.getMonth()-1);document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;calculate()}
+async function load(user){const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);profile=us.exists()?us.data():{email:user.email};const ledger=ls.exists()?ls.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';const type=String(profile.businessType||'').toLowerCase();const isPtor=type==='ptor';document.getElementById('ptorNotice').style.display=isPtor?'block':'none';document.getElementById('apiSend').disabled=isPtor;const d=new Date();d.setMonth(d.getMonth()-1);document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;calculate()}
+function renderValidationResult(data,httpOk){
+ const card=document.getElementById('apiValidationCard'),box=document.getElementById('apiValidationResult');card.style.display='block';box.innerHTML='';
+ const title=document.createElement('b');
+ if(data?.ready===true){box.className='validation-box good';title.textContent='✓ הנתונים והחיבור עברו את בדיקת המוכנות.'}
+ else if(httpOk&&data?.ok){box.className='validation-box warn';title.textContent='בדיקת המוכנות הסתיימה — יש נקודות שצריך להשלים.'}
+ else{box.className='validation-box badbox';title.textContent='לא ניתן להשלים כרגע את בדיקת המוכנות.'}
+ box.appendChild(title);
+ const p=document.createElement('div');p.textContent=data?.message||data?.error||'לא נשלח שום דוח לרשות המסים.';box.appendChild(p);
+ const errors=Array.isArray(data?.validation?.errors)?data.validation.errors:[];
+ const warnings=Array.isArray(data?.validation?.warnings)?data.validation.warnings:[];
+ if(errors.length){const h=document.createElement('div');h.style.marginTop='8px';h.innerHTML='<b>צריך לתקן:</b>';box.appendChild(h);const ul=document.createElement('ul');errors.forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li)});box.appendChild(ul)}
+ if(warnings.length){const h=document.createElement('div');h.style.marginTop='8px';h.innerHTML='<b>לתשומת לב:</b>';box.appendChild(h);const ul=document.createElement('ul');warnings.forEach(x=>{const li=document.createElement('li');li.textContent=x;ul.appendChild(li)});box.appendChild(ul)}
+ if(data?.connection){const c=document.createElement('div');c.style.marginTop='10px';c.textContent=data.connection.ok?'חיבור VATReportV3Api: תקין (Health 200).':`חיבור VATReportV3Api: לא אושר בבדיקה (HTTP ${data.connection.status||0}).`;box.appendChild(c)}
+ const safe=document.createElement('div');safe.style.marginTop='10px';safe.className='status';safe.textContent='מצב בטוח: הפעולה הזו אינה קוראת ל־SendVatReporting ואינה מגישה דוח.';box.appendChild(safe);
+ card.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function validateApiReadiness(){
+ const btn=document.getElementById('apiSend');if(!lastPayload){calculate();if(!lastPayload)return}
+ btn.disabled=true;const old=btn.textContent;btn.textContent='בודק…';
+ try{
+  const response=await fetch('/api/vat-report/validate',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify({payload:lastPayload})});
+  const data=await response.json().catch(()=>({ok:false,error:'התקבלה תשובה לא תקינה משירות הבדיקה.'}));
+  renderValidationResult(data,response.ok);
+ }catch(e){console.error(e);renderValidationResult({ok:false,error:'לא ניתן להגיע כרגע לשירות בדיקת המע״מ.'},false)}
+ finally{const type=String(profile.businessType||'').toLowerCase();btn.disabled=type==='ptor';btn.textContent=old}
+}
+document.getElementById('apiSend').addEventListener('click',validateApiReadiness);
+
 ['endMonth','cycle','exemptIncome'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 onAuthStateChanged(auth,u=>{if(!u){location.href='/';return}load(u).catch(e=>{console.error(e);document.getElementById('status').innerHTML='<span class="bad">שגיאה בטעינה</span>'})});
 </script>
