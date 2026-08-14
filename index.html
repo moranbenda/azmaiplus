@@ -1066,7 +1066,7 @@ body.account-frozen .readonly-disabled{
         <button type="button" class="home-card" id="homeGoVat">
           <div class="ico">🧾</div>
           <div class="title">דיווח מע״מ</div>
-          <div class="desc">מעבר לעמוד הדיווח באתר Gov.il.</div>
+          <div class="desc">חישוב, הכנה ודיווח מע״מ — דרך עצמאי פלוס או באתר רשות המסים.</div>
         </button>
         <button type="button" class="home-card" id="homeGoCategories">
           <div class="ico">🏷️</div>
@@ -2879,12 +2879,12 @@ const EXPENSE_ITEMS = [
   { item: "ציוד משרדי ומתכלה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
   { item: "דואר / שליחויות", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
   { item: "הדפסות / צילום / כריכה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
-  { item: "מחשב / טאבלט", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true },
-  { item: "ציוד אלקטרוני", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true },
-  { item: "מדפסת", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true },
-  { item: "טלפון נייד (מכשיר)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true },
-  { item: "ריהוט וציוד קבוע", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true },
-  { item: "ציוד (כללי)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "מחשב / טאבלט", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד אלקטרוני", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "מדפסת", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "טלפון נייד (מכשיר)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ריהוט וציוד קבוע", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד (כללי)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות", vatInputType: "asset" },
 
   // תוכנה, פרסום ואינטרנט
   { item: "CANVA", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
@@ -5612,11 +5612,23 @@ function filterByDateRange(from, to) {
   });
 }
 
+function isEquipmentVatExpense(row) {
+  const meta = getExpenseMeta(row);
+  return meta?.vatInputType === "asset" || meta?.category === "ציוד ונכסים";
+}
+
 function buildVatSummary(from, to) {
   const incomeList  = filterByDateAndType("income",  from, to);
   const expenseList = filterByDateAndType("expense", from, to);
   const { totals: incTotals } = addVatInfo(incomeList);
-  const { totals: expTotals } = addVatInfo(expenseList);
+  const { rows: expRows, totals: expTotals } = addVatInfo(expenseList);
+  let equipmentVat = 0;
+  let otherInputVat = 0;
+  expRows.forEach(r => {
+    const v = Number(r.vat || 0);
+    if (isEquipmentVatExpense(r)) equipmentVat += v;
+    else otherInputVat += v;
+  });
   return {
     incomeNet: incTotals.net,
     incomeVat: incTotals.vat,
@@ -5624,7 +5636,9 @@ function buildVatSummary(from, to) {
     expenseNet: expTotals.net,
     expenseVat: expTotals.vat,
     expenseGross: expTotals.gross,
-    vatToPay: incTotals.vat - expTotals.vat
+    equipmentVat,
+    otherInputVat,
+    vatToPay: incTotals.vat - equipmentVat - otherInputVat
   };
 }
 
@@ -5906,8 +5920,8 @@ btnReportCsv.onclick = async () => {
 
   if (type === "vat") {
     const vat = buildVatSummary(from, to);
-    const equipmentVat = 0;
-    const otherInputVat = vat.expenseVat;
+    const equipmentVat = vat.equipmentVat;
+    const otherInputVat = vat.otherInputVat;
     const totalInputVat = equipmentVat + otherInputVat;
     const lines = [
       "field,amount",
@@ -6146,12 +6160,12 @@ btnReportPdf.onclick = async () => {
 
   if (type === "vat") {
     const vat = buildVatSummary(from, to);
-    const equipmentVat = 0;
-    const otherInputVat = vat.expenseVat;
+    const equipmentVat = vat.equipmentVat;
+    const otherInputVat = vat.otherInputVat;
     const totalInputVat = equipmentVat + otherInputVat;
     const vatToPay = vat.incomeVat - totalInputVat;
     openReportWindow('דו"ח מע"מ', `
-      <p style="margin:0 0 10px;color:#555;line-height:1.6">הנתונים להלן מסודרים לפי השדות המרכזיים בדיווח מע״מ. נכון לעכשיו תשומות ציוד מוצגות כ־0 עד לחיבור אוטומטי לרכוש קבוע/פחת.</p>
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">הנתונים להלן מסודרים לפי השדות המרכזיים בדיווח מע״מ. תשומות ציוד ותשומות אחרות מחושבות בנפרד לפי סיווג ההוצאה במערכת.</p>
       <table>
         <thead>
           <tr><th>שדה באתר הדיווח</th><th>מה להזין</th><th>הערה</th></tr>
@@ -6159,7 +6173,7 @@ btnReportPdf.onclick = async () => {
         <tbody>
           <tr><td>עסקאות חייבות בשיעור 18%</td><td>${toMoney(vat.incomeNet)}</td><td>סה״כ הכנסות ללא מע״מ</td></tr>
           <tr><td>מס עסקאות</td><td>${toMoney(vat.incomeVat)}</td><td>מע״מ על ההכנסות</td></tr>
-          <tr><td>תשומות ציוד</td><td>${toMoney(equipmentVat)}</td><td>כרגע ידני/0 עד חיבור לרכוש קבוע</td></tr>
+          <tr><td>תשומות ציוד</td><td>${toMoney(equipmentVat)}</td><td>מע״מ מוכר על רכישות שסווגו כציוד ונכסים</td></tr>
           <tr><td>תשומות אחרות</td><td>${toMoney(otherInputVat)}</td><td>מע״מ מוכר מהוצאות שוטפות</td></tr>
           <tr><td>סה״כ מס תשומות</td><td>${toMoney(totalInputVat)}</td><td>ציוד + תשומות אחרות</td></tr>
           <tr><td><b>סכום לתשלום</b></td><td><b>${toMoney(Math.max(vatToPay, 0))}</b></td><td>${vatToPay >= 0 ? "לתשלום" : "אין תשלום — קיימת יתרת החזר"}</td></tr>
@@ -6708,7 +6722,7 @@ function initAppLogic(uid) {
     if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
     if (homeGoImport) homeGoImport.onclick = () => dataManageDialog?.showModal();
     if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
-    if (homeGoVat) homeGoVat.onclick = () => window.open("https://www.gov.il/he/service/reporting-or-payment-of-vat-reports", "_blank", "noopener");
+    if (homeGoVat) homeGoVat.onclick = () => { window.location.href = "/vat-report.html"; };
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
     if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
     if (btnHomeApplyRange) btnHomeApplyRange.onclick = applyHomeRange;
