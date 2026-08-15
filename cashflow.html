@@ -55,7 +55,7 @@ table{width:100%;border-collapse:collapse} th,td{padding:9px 8px;border-bottom:1
 th{background:#f8fafc;color:#475467;font-weight:700;position:sticky;top:0} .table-wrap{overflow:auto;max-height:350px;border:1px solid var(--line);border-radius:12px}
 .status{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700} .status.paid{background:#e9f8ef;color:#0b6b32} .status.unpaid{background:#fff4e5;color:#8a5300}
 .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap} .spacer{flex:1}
-.month-plan{display:grid;grid-template-columns:1fr 1fr;gap:10px} .plan-box{border:1px solid var(--line);border-radius:14px;padding:12px}
+.month-plan{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(360px,.9fr);gap:10px} .plan-box{border:1px solid var(--line);border-radius:14px;padding:12px}
 .plan-box input{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:10px;padding:9px}
 .empty{padding:22px;text-align:center;color:var(--muted)}
 .footer-note{font-size:11px;color:var(--muted);line-height:1.5}
@@ -103,7 +103,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
   </div>
 
   <div class="dashboard">
-    <div class="kpi good"><div class="label">הכנסות בפועל</div><div class="value" id="kIncome">₪0</div><div class="sub">מתנועות החודש במערכת</div></div>
+    <div class="kpi good"><div class="label">הכנסות בפועל</div><div class="value" id="kIncome">₪0</div><div class="sub">מתקבולים בפועל כולל מע״מ</div></div>
     <div class="kpi bad"><div class="label">הוצאות בפועל</div><div class="value" id="kExpenses">₪0</div><div class="sub">הוצאות עסקיות + תשלומים אישיים שנרשמו</div></div>
     <div class="kpi warn"><div class="label">התחייבויות החודש</div><div class="value" id="kCommitments">₪0</div><div class="sub">תשלומים קבועים המתוכננים לחודש</div></div>
     <div class="kpi warn"><div class="label">הפרשות לרשויות</div><div class="value" id="kAuthorities">₪0</div><div class="sub">מע״מ + מקדמות מס הכנסה משוערות</div></div>
@@ -483,13 +483,6 @@ function renderObligations(c){
       <td><span class="status paid">מחושב אוטומטית</span></td><td></td>
     </tr>`);
   }
-  if(c.vatReserve>0){
-    systemRows.push(`<tr>
-      <td><b>מע״מ צפוי לתשלום</b><div class="tiny muted">אומדן אוטומטי לפי עסקאות ותשומות</div></td>
-      <td>${money(c.vatReserve)}</td><td>לפי תקופת הדיווח</td><td>לפי מועד הדיווח</td>
-      <td><span class="status paid">מחושב אוטומטית</span></td><td></td>
-    </tr>`);
-  }
 
   const all=[...systemRows,...manualRows];
   obTbody.innerHTML=all.length?all.join(""):'<tr><td colspan="6" class="empty">אין התחייבויות לחודש זה.</td></tr>';
@@ -525,7 +518,7 @@ function resetObligationForm(){
 function renderRows(c){
   const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.displayAmount??o.amount)||0}});
   if(c.advanceRate>0) planned.push({date:`${monthKey()}-15`,type:"planned",desc:"מקדמות מס הכנסה",category:"מחושב אוטומטית",amount:c.advanceReserve});
-  if(c.vatReserve>0) planned.push({date:`${monthKey()}-15`,type:"planned",desc:"מע״מ צפוי לתשלום",category:"מחושב אוטומטית",amount:c.vatReserve});
+
   const combined=[...c.list,...planned].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   rowsCount.textContent=`${combined.length} תנועות ותשלומים מתוכננים`;
   rowsTbody.innerHTML=combined.length?combined.map(r=>`<tr><td>${esc(r.date||"")}</td><td>${r.type==="income"?"הכנסה":r.type==="planned"?"תשלום קבוע":"הוצאה"}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
