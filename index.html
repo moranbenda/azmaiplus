@@ -644,15 +644,15 @@ header.app-header{
 .home-summary .metric .v{ font-size:18px;font-weight:750;margin-top:4px; }
 .home-actions{
   display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:12px;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
 }
 .home-card{
   border:1px solid var(--line);
   background:rgba(255,255,255,.94);
-  border-radius:20px;
-  padding:16px;
-  min-height:112px;
+  border-radius:18px;
+  padding:12px 13px;
+  min-height:96px;
   box-shadow:0 10px 24px rgba(15,23,42,.06);
   display:flex;
   flex-direction:column;
@@ -668,7 +668,7 @@ header.app-header{
 .home-card:active{ transform:translateY(0); }
 .home-card.disabled{ opacity:.58; cursor:default; }
 .home-card.disabled:hover{ transform:none; box-shadow:0 10px 24px rgba(15,23,42,.06); }
-.home-card .ico{ font-size:26px; line-height:1; }
+.home-card .ico{ font-size:23px; line-height:1; }
 .home-card .title{ font-weight:750; font-size:15px; }
 .home-card .desc{ font-size:12px; color:var(--text-dim); line-height:1.45; }
 .home-card .soon{ display:inline-block;margin-top:auto;font-size:11px;border:1px solid #dbe4f0;border-radius:999px;padding:3px 8px;color:#64748b;background:#f8fafc;width:max-content; }
@@ -818,9 +818,9 @@ body.account-frozen .readonly-disabled{
   text-align:right;
 }
 .billing-freeze-card h2{margin:0 0 6px;font-size:20px;color:var(--text)}
-.billing-freeze-card p{margin:6px 0;color:var(--muted);line-height:1.65}
+.billing-freeze-card p{margin:6px 0;color:#334155;line-height:1.65;font-weight:600}
 .billing-freeze-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-start;margin-top:12px}
-.billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:10px;color:var(--muted);font-size:14px}
+.billing-freeze-note{background:#f8fafc;border:1px solid var(--line);border-radius:14px;padding:10px;margin-top:10px;color:#334155;font-size:14px;font-weight:600}
 .google-auth-separator{
   display:flex;
   align-items:center;
@@ -1053,6 +1053,11 @@ body.account-frozen .readonly-disabled{
           <div class="title">הכנסות והוצאות</div>
           <div class="desc">הזנה ידנית של הוצאות וצפייה בתנועות.</div>
         </button>
+        <a class="home-card" id="homeGoCashflow" href="/cashflow.html">
+          <div class="ico">📈</div>
+          <div class="title">תזרים ותכנון פיננסי</div>
+          <div class="desc">תמונה חודשית, התחייבויות, תשלומים לרשויות ותכנון תזרים.</div>
+        </a>
         <button type="button" class="home-card" id="homeGoImport">
           <div class="ico">📥</div>
           <div class="title">ייבוא נתונים</div>
@@ -1063,10 +1068,11 @@ body.account-frozen .readonly-disabled{
           <div class="title">דוחות</div>
           <div class="desc">דוחות הכנסות, הוצאות, תנועות, לקוחות ומע״מ.</div>
         </button>
-        <button type="button" class="home-card" id="homeGoVat">
+        <button type="button" class="home-card disabled" id="homeGoVat" disabled aria-disabled="true" title="דיווח ישיר למע״מ ייפתח בקרוב">
           <div class="ico">🧾</div>
           <div class="title">דיווח מע״מ</div>
-          <div class="desc">חישוב, הכנה ודיווח מע״מ — דרך עצמאי פלוס או באתר רשות המסים.</div>
+          <div class="desc">חישוב והכנת נתוני מע״מ. הדיווח הישיר מרשות המסים ייפתח בקרוב.</div>
+          <span class="soon">בקרוב</span>
         </button>
         <button type="button" class="home-card" id="homeGoCategories">
           <div class="ico">🏷️</div>
@@ -1349,6 +1355,11 @@ body.account-frozen .readonly-disabled{
         <div>
           <label>אחוז מע"מ (לעוסק מורשה/חברה)</label>
           <input type="number" id="pVatRate" step="0.1" min="0" />
+        </div>
+        <div>
+          <label>אחוז מקדמות מס הכנסה</label>
+          <input type="number" id="pAdvanceTaxRate" step="0.1" min="0" max="100" placeholder="0" />
+          <div class="hint" style="margin-top:5px">אם לא נקבעו מקדמות לעסק, יש להשאיר 0%.</div>
         </div>
       </div>
       <div style="margin-top:12px">
@@ -1812,6 +1823,7 @@ const pBusinessId = document.getElementById("pBusinessId");
 const pPhone = document.getElementById("pPhone");
 const pBusinessType = document.getElementById("pBusinessType");
 const pVatRate = document.getElementById("pVatRate");
+const pAdvanceTaxRate = document.getElementById("pAdvanceTaxRate");
 const pBusinessLogoFile = document.getElementById("pBusinessLogoFile");
 const pBusinessLogoPreview = document.getElementById("pBusinessLogoPreview");
 const btnRemoveBusinessLogo = document.getElementById("btnRemoveBusinessLogo");
@@ -2452,6 +2464,7 @@ async function createDefaultProfile(uid, email, opts = {}) {
     phone: opts.phone || "",
     businessType: opts.businessType || "ptor",
     vatRate: opts.businessType === "ptor" ? 0 : DEFAULT_VAT,
+    advanceTaxRate: Math.max(0, Number(opts.advanceTaxRate || 0)),
     createdAt
   };
 
@@ -3282,6 +3295,7 @@ function applyProfileToUI() {
   pPhone.value        = userProfile.phone || "";
   pBusinessType.value = normalizeBusinessType(userProfile.businessType);
   pVatRate.value      = normalizeBusinessType(userProfile.businessType) === "ptor" ? 0 : getEffectiveVatRate(userProfile.vatRate);
+  pAdvanceTaxRate.value = Math.max(0, Number(userProfile.advanceTaxRate || 0));
   renderBusinessLogoPreview(userProfile.businessLogoDataUrl || "");
 
   const type = normalizeBusinessType(userProfile.businessType);
@@ -3343,6 +3357,7 @@ async function loadUserProfile(uid) {
       businessName: "",
       businessId: "",
       phone: "",
+      advanceTaxRate: 0,
       businessType: "morasha",
       vatRate: DEFAULT_VAT,
       businessLogoDataUrl: "",
@@ -3407,6 +3422,7 @@ btnSaveProfile.onclick = async () => {
     phone:        pPhone.value.trim(),
     businessType: pBusinessType.value,
     vatRate:      parseFloat(pVatRate.value || "0"),
+    advanceTaxRate: Math.max(0, parseFloat(pAdvanceTaxRate.value || "0") || 0),
     businessLogoDataUrl: userProfile?.businessLogoDataUrl || ""
   };
 
@@ -3416,7 +3432,8 @@ btnSaveProfile.onclick = async () => {
     writeAuditLog("profile_update", "user_profile", currentUid, {
       fields: Object.keys(payload),
       businessType: payload.businessType || "",
-      vatRate: payload.vatRate || 0
+      vatRate: payload.vatRate || 0,
+      advanceTaxRate: payload.advanceTaxRate || 0
     });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
@@ -6722,7 +6739,7 @@ function initAppLogic(uid) {
     if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
     if (homeGoImport) homeGoImport.onclick = () => dataManageDialog?.showModal();
     if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
-    if (homeGoVat) homeGoVat.onclick = () => { window.location.href = "/vat-report.html"; };
+    // דיווח מע"מ מסומן "בקרוב" במסך הבית ולכן הכרטיס אינו לחיץ כרגע.
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
     if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
     if (btnHomeApplyRange) btnHomeApplyRange.onclick = applyHomeRange;
