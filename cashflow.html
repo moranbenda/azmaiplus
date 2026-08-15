@@ -28,6 +28,7 @@ button,input,select{font:inherit}
 .month-title{text-align:center} .month-title strong{font-size:22px} .month-title span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
 .month-arrow{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:22px}
 .month-arrow:hover{border-color:var(--accent);color:var(--accent)}
+.month-tools{display:flex;justify-content:center;gap:8px;margin-top:8px;flex-wrap:wrap}.month-tools select,.month-tools button{border:1px solid var(--line);background:#fff;border-radius:9px;padding:6px 9px;font:inherit;color:var(--text);cursor:pointer}.annual-view{display:none;margin-bottom:14px}.annual-view.open{display:block}.annual-table td,.annual-table th{white-space:nowrap}
 .dashboard{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);min-height:106px}
 .kpi .label{color:var(--muted);font-size:12px;margin-bottom:8px} .kpi .value{font-size:23px;font-weight:800} .kpi .sub{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.35}
@@ -81,17 +82,24 @@ th{background:#f8fafc;color:#475467;font-weight:700;position:sticky;top:0} .tabl
 
   <div class="month-nav">
     <button class="month-arrow" id="nextMonth" title="החודש הבא">‹</button>
-    <div class="month-title"><strong id="monthLabel"></strong><span id="monthMeta"></span></div>
+    <div class="month-title"><strong id="monthLabel"></strong><span id="monthMeta"></span>
+      <div class="month-tools"><input type="month" id="monthPicker" title="בחירת חודש"><button type="button" id="btnAnnual">תצוגה שנתית</button></div>
+    </div>
     <button class="month-arrow" id="prevMonth" title="החודש הקודם">›</button>
   </div>
 
   <div class="dashboard">
     <div class="kpi good"><div class="label">הכנסות בפועל</div><div class="value" id="kIncome">₪0</div><div class="sub">מתנועות החודש במערכת</div></div>
     <div class="kpi bad"><div class="label">הוצאות בפועל</div><div class="value" id="kExpenses">₪0</div><div class="sub">הוצאות עסקיות + תשלומים אישיים שנרשמו</div></div>
-    <div class="kpi warn"><div class="label">התחייבויות שטרם שולמו</div><div class="value" id="kCommitments">₪0</div><div class="sub">הוצאות קבועות שתוכננו לחודש</div></div>
+    <div class="kpi warn"><div class="label">התחייבויות החודש</div><div class="value" id="kCommitments">₪0</div><div class="sub">תשלומים קבועים המתוכננים לחודש</div></div>
     <div class="kpi warn"><div class="label">הפרשות לרשויות</div><div class="value" id="kAuthorities">₪0</div><div class="sub">מע״מ + מקדמות מס הכנסה משוערות</div></div>
-    <div class="kpi" id="balanceCard"><div class="label">יתרה צפויה</div><div class="value" id="kBalance">₪0</div><div class="sub">כולל הכנסות צפויות נוספות והתחייבויות</div></div>
+    <div class="kpi" id="balanceCard"><div class="label">יתרה לאחר התחייבויות והפרשות</div><div class="value" id="kBalance">₪0</div><div class="sub">הכנסות פחות הוצאות, התחייבויות והפרשות לרשויות</div></div>
   </div>
+
+  <section class="card annual-view" id="annualView">
+    <div class="card-hd"><h2 id="annualTitle">תמונה שנתית</h2><span class="tiny muted">12 חודשים במקום אחד</span></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
+  </section>
 
   <div class="grid">
     <div>
@@ -123,41 +131,26 @@ th{background:#f8fafc;color:#475467;font-weight:700;position:sticky;top:0} .tabl
         </div>
       </section>
 
-      <section class="card">
-        <div class="card-hd"><h2>תכנון הכנסה לחודש</h2><span class="tiny muted">שימושי במיוחד לחודשים עתידיים</span></div>
-        <div class="card-bd month-plan">
-          <div class="plan-box">
-            <b>הכנסה צפויה נוספת</b>
-            <div class="tiny muted">מעבר להכנסות שכבר נרשמו במערכת.</div>
-            <input type="number" min="0" step="1" id="expectedExtraIncome" placeholder="0">
-          </div>
-          <div class="plan-box">
-            <b>הערה לחודש</b>
-            <div class="tiny muted">למשל: חופשה, פרויקט גדול, תשלום שנתי.</div>
-            <input type="text" id="monthNote" placeholder="הערה לתכנון">
-          </div>
-          <div style="grid-column:1/-1;text-align:left"><button class="btn small" id="saveMonthPlan">שמירת תכנון לחודש</button></div>
-        </div>
-      </section>
+
     </div>
 
     <div>
       <section class="card">
-        <div class="card-hd"><h2>הוצאות קבועות והתחייבויות</h2><span class="tiny muted">אפשר להגדיר פעם אחת והן יופיעו אוטומטית</span></div>
+        <div class="card-hd"><h2>התחייבויות ותשלומים קבועים</h2><span class="tiny muted">מגדירים פעם אחת והם נכללים אוטומטית בתזרים בכל מועד רלוונטי</span></div>
         <div class="card-bd">
           <div class="form-grid">
             <div class="field"><label>שם התחייבות</label><input id="obName" list="obPresets" placeholder="למשל ביטוח לאומי"></div>
             <div class="field"><label>סכום</label><input id="obAmount" type="number" min="0" step="1" placeholder="0"></div>
             <div class="field"><label>תדירות</label><select id="obFreq"><option value="monthly">חודשי</option><option value="bimonthly">דו-חודשי</option><option value="quarterly">רבעוני</option><option value="yearly">שנתי</option><option value="once">חד-פעמי</option></select></div>
             <div class="field"><label>יום בחודש</label><input id="obDay" type="number" min="1" max="31" value="15"></div>
-            <div class="field"><label>סוג</label><select id="obType"><option value="fixed">הוצאה קבועה</option><option value="authority">רשות/חיסכון</option></select></div>
+            <div class="field"><label>סוג</label><select id="obType"><option value="fixed">התחייבות קבועה</option><option value="authority">רשות / חיסכון לעצמאי</option></select></div>
             <button class="btn small" id="addObligation">הוספה</button>
           </div>
           <datalist id="obPresets">
-            <option value="ביטוח לאומי עצמאי"><option value="פנסיה / קופת גמל לעצמאי"><option value="קרן השתלמות לעצמאי"><option value="ביטוח אובדן כושר עבודה"><option value="שכירות משרד / קליניקה / סטודיו"><option value="הלוואה עסקית"><option value="ביטוח אחריות מקצועית"><option value="תוכנות ומנויים"><option value="אחר">
+            <option value="ביטוח לאומי עצמאי"><option value="פנסיה / קופת גמל לעצמאי"><option value="קרן השתלמות לעצמאי"><option value="ביטוח אובדן כושר עבודה"><option value="הלוואה עסקית"><option value="ביטוח אחריות מקצועית"><option value="אחר">
           </datalist>
           <div class="table-wrap" style="margin-top:12px">
-            <table><thead><tr><th>התחייבות</th><th>סכום</th><th>תדירות</th><th>מועד</th><th>סטטוס החודש</th><th></th></tr></thead><tbody id="obTbody"></tbody></table>
+            <table><thead><tr><th>התחייבות</th><th>סכום</th><th>תדירות</th><th>מועד</th><th>אופן רישום</th><th></th></tr></thead><tbody id="obTbody"></tbody></table>
           </div>
         </div>
       </section>
@@ -352,18 +345,18 @@ function calcMonth(d=selected){
       expVat+=Math.max(0,s.vat)*vatDeductFactor(r);
     }
   }
-  const obs=selectedObligations(d), unpaidObs=obs.filter(o=>!isObPaid(o,d));
-  const unpaidFixed=unpaidObs.filter(o=>o.type!=="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
-  const unpaidAuthority=unpaidObs.filter(o=>o.type==="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
+  const obs=selectedObligations(d), unpaidObs=obs;
+  const unpaidFixed=obs.filter(o=>o.type!=="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
+  const unpaidAuthority=obs.filter(o=>o.type==="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
   const adjustment=config.monthlyAdjustments?.[monthKey(d)]||{};
-  const extraIncome=Math.max(0,Number(adjustment.extraIncome)||0);
+  const extraIncome=0;
   const advanceRate=profileAdvanceRate();
   const advanceReserve=Math.max(0,incomeNet*advanceRate/100);
   const vatReserve=businessType()==="ptor"?0:Math.max(0,incVat-expVat);
   const actualOut=businessExpenseGross+personalPaid;
   const commitments=unpaidFixed+unpaidAuthority;
   const authorityReserve=advanceReserve+vatReserve;
-  const balance=incomeGross+extraIncome-actualOut-commitments-authorityReserve;
+  const balance=incomeGross-actualOut-commitments-authorityReserve;
   return{list,incomeGross,incomeNet,businessExpenseGross,personalPaid,incVat,expVat,vatReserve,advanceReserve,advanceRate,unpaidFixed,unpaidAuthority,commitments,authorityReserve,actualOut,extraIncome,balance,obs,unpaidObs,adjustment};
 }
 
@@ -377,9 +370,10 @@ function render(){
   advanceAmount.textContent=money(c.advanceReserve);
   advanceDesc.textContent=`שיעור בפרופיל: ${c.advanceRate}% · בסיס חישוב משוער: מחזור הכנסות ללא מע״מ ${money(c.incomeNet)}`;
   vatAmount.textContent=money(c.vatReserve);personalPaidAmount.textContent=money(c.personalPaid);
-  expectedExtraIncome.value=c.adjustment.extraIncome||"";monthNote.value=c.adjustment.note||"";
+  monthPicker.value=monthKey();
   renderDonut(c);renderObligations(c);renderRows(c);
-  chartCaption.textContent=c.extraIncome?`כולל ${money(c.extraIncome)} הכנסה צפויה נוספת`:"ללא הכנסה עתידית נוספת";
+  chartCaption.textContent="מבוסס על נתונים בפועל והתחייבויות שהוגדרו";
+  if(annualView.classList.contains("open"))renderAnnual();
 }
 
 function renderDonut(c){
@@ -401,18 +395,15 @@ function renderDonut(c){
 function renderObligations(c){
   const obs=c.obs;
   obTbody.innerHTML=obs.length?obs.map(o=>{
-    const paid=isObPaid(o),day=Math.max(1,Math.min(31,Number(o.day)||15));
+    const day=Math.max(1,Math.min(31,Number(o.day)||15));
     return `<tr>
-      <td><b>${esc(o.name)}</b><div class="tiny muted">${o.type==="authority"?"רשות / חיסכון":"הוצאה קבועה"}</div></td>
+      <td><b>${esc(o.name)}</b><div class="tiny muted">${o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה"}</div></td>
       <td>${money(o.amount)}</td><td>${FREQ_LABEL[o.freq]||o.freq}</td><td>${day} בחודש</td>
-      <td><button class="btn small ${paid?"secondary":""}" data-paid="${o.id}" ${readOnly?"disabled":""}>${paid?"סומן כשולם":"סימון כשולם"}</button></td>
+      <td><span class="status paid">אוטומטי בתזרים</span></td>
       <td><button class="btn ghost small" data-del="${o.id}" ${readOnly?"disabled":""}>מחיקה</button></td>
     </tr>`;
   }).join(""):'<tr><td colspan="6" class="empty">אין התחייבויות לחודש זה.</td></tr>';
 
-  obTbody.querySelectorAll("[data-paid]").forEach(b=>b.onclick=async()=>{
-    const id=b.dataset.paid,k=paymentKey(id);config.paymentStatus=config.paymentStatus||{};config.paymentStatus[k]=!config.paymentStatus[k];await saveConfig();render();
-  });
   obTbody.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("למחוק את ההתחייבות הקבועה?"))return;
     config.obligations=(config.obligations||[]).filter(o=>o.id!==b.dataset.del);await saveConfig();render();
@@ -420,8 +411,10 @@ function renderObligations(c){
 }
 
 function renderRows(c){
-  rowsCount.textContent=`${c.list.length} תנועות`;
-  rowsTbody.innerHTML=c.list.length?c.list.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(r=>`<tr><td>${esc(r.date||"")}</td><td>${r.type==="income"?"הכנסה":"הוצאה"}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
+  const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.amount)||0}});
+  const combined=[...c.list,...planned].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  rowsCount.textContent=`${combined.length} תנועות ותשלומים מתוכננים`;
+  rowsTbody.innerHTML=combined.length?combined.map(r=>`<tr><td>${esc(r.date||"")}</td><td>${r.type==="income"?"הכנסה":r.type==="planned"?"תשלום קבוע":"הוצאה"}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
 }
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
@@ -440,7 +433,7 @@ async function loadData(user){
   config=ledger.cashflowConfigV1||local||{obligations:[],monthlyAdjustments:{},paymentStatus:{}};
   config.obligations=Array.isArray(config.obligations)?config.obligations:[];config.monthlyAdjustments=config.monthlyAdjustments||{};config.paymentStatus=config.paymentStatus||{};
   readOnly=profile.isExemptFromBilling!==true&&profile.isPaid!==true&&profile.trialEndsAt&&Date.parse(profile.trialEndsAt)<=Date.now();
-  readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#saveMonthPlan,#obName,#obAmount,#obFreq,#obDay,#obType,#expectedExtraIncome,#monthNote").forEach(el=>el.disabled=readOnly);
+  readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#obName,#obAmount,#obFreq,#obDay,#obType").forEach(el=>el.disabled=readOnly);
   bizLabel.textContent=`${profile.businessName||profile.displayName||"העסק שלי"} · תכנון חודשי, התחייבויות ותשלומים לרשויות`;
   render();
 }
@@ -451,43 +444,47 @@ addObligation.onclick=async()=>{
   const ob={id:crypto.randomUUID(),name,amount,freq:obFreq.value,day:Number(obDay.value)||15,type:obType.value,startMonth:monthKey(),active:true};
   config.obligations.push(ob);obName.value="";obAmount.value="";await saveConfig();render();
 };
-saveMonthPlan.onclick=async()=>{
-  if(readOnly)return;
-  config.monthlyAdjustments[monthKey()]={extraIncome:Math.max(0,Number(expectedExtraIncome.value)||0),note:monthNote.value.trim()};
-  await saveConfig();render();
-};
 prevMonth.onclick=()=>{selected.setMonth(selected.getMonth()-1);render()};
 nextMonth.onclick=()=>{selected.setMonth(selected.getMonth()+1);render()};
+monthPicker.onchange=()=>{if(!monthPicker.value)return;const [y,m]=monthPicker.value.split("-").map(Number);selected=new Date(y,m-1,1);render()};
+function renderAnnual(){
+  const year=selected.getFullYear(); annualTitle.textContent=`תמונה שנתית · ${year}`;
+  annualTbody.innerHTML=Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),x=calcMonthForExport(d),label=new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d);return `<tr><td><b>${label}</b></td><td>${money(x.incomeGross)}</td><td>${money(x.actualOut)}</td><td>${money(x.commitments)}</td><td>${money(x.advanceReserve)}</td><td>${money(x.vatReserve)}</td><td><b>${money(x.balance)}</b></td></tr>`}).join("");
+}
+btnAnnual.onclick=()=>{annualView.classList.toggle("open");btnAnnual.textContent=annualView.classList.contains("open")?"סגירת תצוגה שנתית":"תצוגה שנתית";if(annualView.classList.contains("open"))renderAnnual()};
 btnBack.onclick=()=>location.href="/";
 
 function calcMonthForExport(d){
   const old=selected;selected=new Date(d.getFullYear(),d.getMonth(),1);const out=calcMonth(selected);selected=old;return out;
 }
 function exportExcel(){
-  const wb=XLSX.utils.book_new(),c=calcMonth();
-  const summary=[
-    ["עצמאי פלוס - תזרים העסק"],["חודש",monthKey()],["שם העסק",profile.businessName||profile.displayName||""],[],
-    ["מדד","סכום"],
-    ["הכנסות בפועל",c.incomeGross],["הכנסה צפויה נוספת",c.extraIncome],["הוצאות בפועל",c.actualOut],
-    ["התחייבויות שטרם שולמו",c.commitments],["מקדמות מס הכנסה - הפרשה",c.advanceReserve],["מע״מ צפוי - הפרשה",c.vatReserve],["יתרה צפויה",c.balance],[],
-    ["שיעור מקדמות בפרופיל",c.advanceRate/100],["הערת חודש",c.adjustment.note||""]
-  ];
-  const ws1=XLSX.utils.aoa_to_sheet(summary);ws1["!cols"]=[{wch:32},{wch:22}];ws1["!freeze"]={xSplit:0,ySplit:5};XLSX.utils.book_append_sheet(wb,ws1,"סיכום חודש");
+  const wb=XLSX.utils.book_new(),c=calcMonth(),year=selected.getFullYear();
+  wb.Workbook={Views:[{RTL:true}]};
+  const moneyFmt='#,##0.00 [$₪-he-IL]';
+  function finishSheet(ws,cols,filterRef){
+    ws['!cols']=cols; ws['!freeze']={xSplit:0,ySplit:1}; if(filterRef)ws['!autofilter']={ref:filterRef};
+    ws['!views']=[{rightToLeft:true}];
+    const range=XLSX.utils.decode_range(ws['!ref']||'A1:A1');
+    for(let R=range.s.r;R<=range.e.r;R++)for(let C=range.s.c;C<=range.e.c;C++){const cell=ws[XLSX.utils.encode_cell({r:R,c:C})];if(cell&&typeof cell.v==='number')cell.z=moneyFmt}
+    return ws;
+  }
+  const summary=[[`עצמאי פלוס | דוח תזרים מזומנים | ${monthKey()}`],["שם העסק",profile.businessName||profile.displayName||""],[],["מדד","סכום"],["הכנסות בפועל",c.incomeGross],["הוצאות בפועל",c.actualOut],["התחייבויות החודש",c.commitments],["מקדמות מס הכנסה - הפרשה",c.advanceReserve],["מע״מ צפוי - הפרשה",c.vatReserve],["יתרה לאחר התחייבויות והפרשות",c.balance],["שיעור מקדמות בפרופיל",c.advanceRate/100]];
+  const ws1=finishSheet(XLSX.utils.aoa_to_sheet(summary),[{wch:38},{wch:24}]);XLSX.utils.book_append_sheet(wb,ws1,"סיכום חודש");
 
   const trans=[["תאריך","סוג","תיאור","קטגוריה","סכום","כולל מע״מ","תשלום אישי/סטטוטורי"]];
   rows.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).forEach(r=>trans.push([r.date||"",r.type==="income"?"הכנסה":"הוצאה",r.desc||"",r.category||"",Number(r.amount)||0,r.incVat?"כן":"לא",isPersonal(r)?"כן":"לא"]));
-  const ws2=XLSX.utils.aoa_to_sheet(trans);ws2["!cols"]=[{wch:12},{wch:10},{wch:36},{wch:28},{wch:14},{wch:12},{wch:20}];ws2["!autofilter"]={ref:`A1:G${trans.length}`};XLSX.utils.book_append_sheet(wb,ws2,"כל התנועות");
+  const ws2=finishSheet(XLSX.utils.aoa_to_sheet(trans),[{wch:14},{wch:12},{wch:38},{wch:30},{wch:16},{wch:14},{wch:22}],`A1:G${trans.length}`);XLSX.utils.book_append_sheet(wb,ws2,"כל התנועות");
 
   const obs=[["התחייבות","סכום","תדירות","יום בחודש","סוג","חודש התחלה","חודש סיום","פעיל"]];
-  (config.obligations||[]).forEach(o=>obs.push([o.name||"",Number(o.amount)||0,FREQ_LABEL[o.freq]||o.freq,Number(o.day)||15,o.type==="authority"?"רשות / חיסכון":"הוצאה קבועה",o.startMonth||"",o.endMonth||"",o.active===false?"לא":"כן"]));
-  const ws3=XLSX.utils.aoa_to_sheet(obs);ws3["!cols"]=[{wch:30},{wch:14},{wch:14},{wch:13},{wch:18},{wch:13},{wch:13},{wch:10}];XLSX.utils.book_append_sheet(wb,ws3,"התחייבויות קבועות");
+  (config.obligations||[]).forEach(o=>obs.push([o.name||"",Number(o.amount)||0,FREQ_LABEL[o.freq]||o.freq,Number(o.day)||15,o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",o.startMonth||"",o.endMonth||"",o.active===false?"לא":"כן"]));
+  const ws3=finishSheet(XLSX.utils.aoa_to_sheet(obs),[{wch:32},{wch:16},{wch:14},{wch:14},{wch:24},{wch:14},{wch:14},{wch:10}],`A1:H${obs.length}`);XLSX.utils.book_append_sheet(wb,ws3,"התחייבויות קבועות");
 
-  const year=selected.getFullYear(),monthly=[["חודש","הכנסות בפועל","הכנסה צפויה נוספת","הוצאות בפועל","התחייבויות","מקדמות מס","מע״מ צפוי","יתרה צפויה","הערה"]];
-  for(let m=0;m<12;m++){const d=new Date(year,m,1),x=calcMonthForExport(d);monthly.push([`${year}-${String(m+1).padStart(2,"0")}`,x.incomeGross,x.extraIncome,x.actualOut,x.commitments,x.advanceReserve,x.vatReserve,x.balance,x.adjustment.note||""])}
-  const ws4=XLSX.utils.aoa_to_sheet(monthly);ws4["!cols"]=[{wch:12},{wch:16},{wch:20},{wch:16},{wch:16},{wch:14},{wch:14},{wch:16},{wch:32}];XLSX.utils.book_append_sheet(wb,ws4,`תכנון ${year}`);
-
+  const monthly=[["חודש","הכנסות בפועל","הוצאות בפועל","התחייבויות","מקדמות מס","מע״מ צפוי","יתרה לאחר התחייבויות והפרשות"]];
+  for(let m=0;m<12;m++){const d=new Date(year,m,1),x=calcMonthForExport(d);monthly.push([new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(d),x.incomeGross,x.actualOut,x.commitments,x.advanceReserve,x.vatReserve,x.balance])}
+  const ws4=finishSheet(XLSX.utils.aoa_to_sheet(monthly),[{wch:18},{wch:18},{wch:18},{wch:18},{wch:16},{wch:16},{wch:30}],`A1:G${monthly.length}`);XLSX.utils.book_append_sheet(wb,ws4,`תזרים ${year}`);
   XLSX.writeFile(wb,`azmai-plus-cashflow-${monthKey()}.xlsx`);
 }
+
 btnExcel.onclick=exportExcel;
 
 onAuthStateChanged(auth,user=>{if(!user){location.href="/";return}loadData(user).catch(err=>{console.error(err);alert("לא הצלחנו לטעון את נתוני התזרים. נסי לרענן את העמוד.")})});
