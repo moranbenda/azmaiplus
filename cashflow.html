@@ -59,6 +59,20 @@ th{background:#f8fafc;color:#475467;font-weight:700;position:sticky;top:0} .tabl
 .plan-box input{width:100%;margin-top:6px;border:1px solid var(--line);border-radius:10px;padding:9px}
 .empty{padding:22px;text-align:center;color:var(--muted)}
 .footer-note{font-size:11px;color:var(--muted);line-height:1.5}
+
+dialog.year-dialog{
+  border:0;border-radius:18px;padding:0;width:min(720px,calc(100vw - 24px));
+  box-shadow:0 24px 70px rgba(20,30,55,.25);color:var(--text)
+}
+dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
+.year-dialog .dlg-hd{padding:18px 20px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.year-dialog .dlg-hd h3{margin:0;font-size:20px}
+.year-dialog .dlg-bd{padding:16px 20px;max-height:60vh;overflow:auto}
+.year-dialog .dlg-ft{padding:14px 20px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap}
+.year-review-row{display:grid;grid-template-columns:1fr 150px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid var(--line)}
+.year-review-row:last-child{border-bottom:0}
+.year-review-row input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px}
+
 @media(max-width:1000px){.dashboard{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:700px){.wrap{padding:10px}.dashboard{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr 1fr}.donut-wrap{grid-template-columns:1fr}.month-plan{grid-template-columns:1fr}}
 @media(max-width:480px){.dashboard{grid-template-columns:1fr}.brand h1{font-size:22px}.form-grid{grid-template-columns:1fr}}
@@ -170,6 +184,23 @@ th{background:#f8fafc;color:#475467;font-weight:700;position:sticky;top:0} .tabl
     מקדמות מס הכנסה מחושבות בעמוד זה לפי שיעור המקדמות שבפרופיל כפול מחזור ההכנסות ללא מע״מ. רשות המסים מתארת מקדמות לפי שיעור כמכפלת המחזור בשיעור שנקבע; מחזור העסקאות לצורכי מס אינו כולל מע״מ. בפועל יש לפעול לפי הדרישה והתדירות שנקבעו לעסק.
   </div>
 </div>
+
+
+<dialog id="yearReviewDialog" class="year-dialog">
+  <div class="dlg-hd">
+    <div>
+      <h3 id="yearReviewTitle">עדכון התחייבויות לשנה החדשה</h3>
+      <div class="tiny muted" style="margin-top:5px">עברו על הסכומים. אפשר להשאיר אותם כפי שהם או לעדכן רק את מה שהשתנה.</div>
+    </div>
+  </div>
+  <div class="dlg-bd">
+    <div id="yearReviewRows"></div>
+  </div>
+  <div class="dlg-ft">
+    <button class="btn" id="confirmYearReview">אישור והעברה לשנה החדשה</button>
+    <button class="btn secondary" id="keepYearReview">העבר את כל הסכומים כמו שהם</button>
+  </div>
+</dialog>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
@@ -291,7 +322,8 @@ const PERSONAL_ITEMS = new Set(EXPENSE_ITEMS.filter(x=>x.personalTaxItem).map(x=
 const PERSONAL_CATEGORIES = new Set(EXPENSE_ITEMS.filter(x=>x.personalTaxItem).map(x=>norm(x.category)));
 const FREQ_LABEL={monthly:"חודשי",bimonthly:"דו-חודשי",quarterly:"רבעוני",yearly:"שנתי",once:"חד-פעמי"};
 
-let uid=null,profile={},ledger={},rows=[],config={obligations:[],monthlyAdjustments:{},paymentStatus:{}},readOnly=false;
+let uid=null,profile={},ledger={},rows=[],config={obligations:[],monthlyAdjustments:{},paymentStatus:{},yearReviews:{}},readOnly=false;
+let editingObligationId=null;
 let selected=new Date(); selected.setDate(1);
 
 function norm(v=""){return String(v||"").trim().toLowerCase().replace(/["'׳״]/g,"").replace(/\s+/g," ")}
@@ -331,7 +363,46 @@ function obligationOccurs(ob,d=selected){
 }
 function paymentKey(obId,d=selected){return `${monthKey(d)}:${obId}`}
 function isObPaid(ob,d=selected){return config.paymentStatus?.[paymentKey(ob.id,d)]===true}
-function selectedObligations(d=selected){return (config.obligations||[]).filter(ob=>ob.active!==false&&obligationOccurs(ob,d))}
+
+function ensureAmountHistory(ob){
+  if(!ob) return ob;
+  if(!Array.isArray(ob.amountHistory) || !ob.amountHistory.length){
+    ob.amountHistory=[{fromMonth:ob.startMonth||monthKey(),amount:Number(ob.amount)||0}];
+  }
+  ob.amountHistory=ob.amountHistory
+    .filter(x=>x && x.fromMonth)
+    .map(x=>({fromMonth:String(x.fromMonth),amount:Number(x.amount)||0}))
+    .sort((a,b)=>a.fromMonth.localeCompare(b.fromMonth));
+  return ob;
+}
+function obligationAmount(ob,d=selected){
+  ensureAmountHistory(ob);
+  const mk=monthKey(d);
+  let amount=Number(ob.amount)||0;
+  for(const h of ob.amountHistory){
+    if(h.fromMonth<=mk) amount=Number(h.amount)||0;
+    else break;
+  }
+  return amount;
+}
+function setObligationAmountFrom(ob,fromMonth,amount){
+  ensureAmountHistory(ob);
+  const mk=String(fromMonth);
+  const next=ob.amountHistory.filter(h=>h.fromMonth!==mk);
+  next.push({fromMonth:mk,amount:Number(amount)||0});
+  ob.amountHistory=next.sort((a,b)=>a.fromMonth.localeCompare(b.fromMonth));
+  ob.amount=Number(amount)||0;
+}
+function selectedObligations(d=selected){
+  return (config.obligations||[])
+    .filter(ob=>ob.active!==false&&obligationOccurs(ob,d))
+    .map(ob=>({...ob,displayAmount:obligationAmount(ob,d)}));
+}
+function sameObligation(aName,bName){return norm(aName)===norm(bName)}
+function isSystemCalculatedName(name){
+  const n=norm(name);
+  return n===norm("מקדמות מס הכנסה") || n===norm("תשלום מע״מ") || n===norm("מע״מ");
+}
 
 function calcMonth(d=selected){
   const list=monthRows(d), rate=vatRate();
@@ -346,8 +417,8 @@ function calcMonth(d=selected){
     }
   }
   const obs=selectedObligations(d), unpaidObs=obs;
-  const unpaidFixed=obs.filter(o=>o.type!=="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
-  const unpaidAuthority=obs.filter(o=>o.type==="authority").reduce((s,o)=>s+(Number(o.amount)||0),0);
+  const unpaidFixed=obs.filter(o=>o.type!=="authority").reduce((s,o)=>s+(Number(o.displayAmount??o.amount)||0),0);
+  const unpaidAuthority=obs.filter(o=>o.type==="authority").reduce((s,o)=>s+(Number(o.displayAmount??o.amount)||0),0);
   const adjustment=config.monthlyAdjustments?.[monthKey(d)]||{};
   const extraIncome=0;
   const advanceRate=profileAdvanceRate();
@@ -393,25 +464,68 @@ function renderDonut(c){
 }
 
 function renderObligations(c){
-  const obs=c.obs;
-  obTbody.innerHTML=obs.length?obs.map(o=>{
+  const manualRows=c.obs.map(o=>{
     const day=Math.max(1,Math.min(31,Number(o.day)||15));
+    const amount=Number(o.displayAmount??o.amount)||0;
     return `<tr>
       <td><b>${esc(o.name)}</b><div class="tiny muted">${o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה"}</div></td>
-      <td>${money(o.amount)}</td><td>${FREQ_LABEL[o.freq]||o.freq}</td><td>${day} בחודש</td>
+      <td>${money(amount)}</td><td>${FREQ_LABEL[o.freq]||o.freq}</td><td>${day} בחודש</td>
       <td><span class="status paid">אוטומטי בתזרים</span></td>
-      <td><button class="btn ghost small" data-del="${o.id}" ${readOnly?"disabled":""}>מחיקה</button></td>
+      <td><div class="inline"><button class="btn secondary small" data-edit="${o.id}" ${readOnly?"disabled":""}>עריכה</button><button class="btn ghost small" data-del="${o.id}" ${readOnly?"disabled":""}>מחיקה</button></div></td>
     </tr>`;
-  }).join(""):'<tr><td colspan="6" class="empty">אין התחייבויות לחודש זה.</td></tr>';
+  });
+
+  const systemRows=[];
+  if(c.advanceRate>0){
+    systemRows.push(`<tr>
+      <td><b>מקדמות מס הכנסה</b><div class="tiny muted">מחושב אוטומטית לפי האחוז שבפרופיל</div></td>
+      <td>${money(c.advanceReserve)}</td><td>לפי נתוני החודש</td><td>לפי מועד הדיווח</td>
+      <td><span class="status paid">מחושב אוטומטית</span></td><td></td>
+    </tr>`);
+  }
+  if(c.vatReserve>0){
+    systemRows.push(`<tr>
+      <td><b>מע״מ צפוי לתשלום</b><div class="tiny muted">אומדן אוטומטי לפי עסקאות ותשומות</div></td>
+      <td>${money(c.vatReserve)}</td><td>לפי תקופת הדיווח</td><td>לפי מועד הדיווח</td>
+      <td><span class="status paid">מחושב אוטומטית</span></td><td></td>
+    </tr>`);
+  }
+
+  const all=[...systemRows,...manualRows];
+  obTbody.innerHTML=all.length?all.join(""):'<tr><td colspan="6" class="empty">אין התחייבויות לחודש זה.</td></tr>';
+
+  obTbody.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{
+    const ob=(config.obligations||[]).find(o=>o.id===b.dataset.edit);
+    if(!ob)return;
+    editingObligationId=ob.id;
+    obName.value=ob.name||"";
+    obAmount.value=obligationAmount(ob,selected);
+    obFreq.value=ob.freq||"monthly";
+    obDay.value=Number(ob.day)||15;
+    obType.value=ob.type||"fixed";
+    addObligation.textContent="שמירת שינוי";
+    obName.focus();
+    document.querySelector("#addObligation")?.scrollIntoView({behavior:"smooth",block:"center"});
+  });
 
   obTbody.querySelectorAll("[data-del]").forEach(b=>b.onclick=async()=>{
     if(!confirm("למחוק את ההתחייבות הקבועה?"))return;
-    config.obligations=(config.obligations||[]).filter(o=>o.id!==b.dataset.del);await saveConfig();render();
+    config.obligations=(config.obligations||[]).filter(o=>o.id!==b.dataset.del);
+    if(editingObligationId===b.dataset.del) resetObligationForm();
+    await saveConfig();render();
   });
 }
 
+function resetObligationForm(){
+  editingObligationId=null;
+  obName.value="";obAmount.value="";obFreq.value="monthly";obDay.value=15;obType.value="fixed";
+  addObligation.textContent="הוספה";
+}
+
 function renderRows(c){
-  const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.amount)||0}});
+  const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.displayAmount??o.amount)||0}});
+  if(c.advanceRate>0) planned.push({date:`${monthKey()}-15`,type:"planned",desc:"מקדמות מס הכנסה",category:"מחושב אוטומטית",amount:c.advanceReserve});
+  if(c.vatReserve>0) planned.push({date:`${monthKey()}-15`,type:"planned",desc:"מע״מ צפוי לתשלום",category:"מחושב אוטומטית",amount:c.vatReserve});
   const combined=[...c.list,...planned].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   rowsCount.textContent=`${combined.length} תנועות ותשלומים מתוכננים`;
   rowsTbody.innerHTML=combined.length?combined.map(r=>`<tr><td>${esc(r.date||"")}</td><td>${r.type==="income"?"הכנסה":r.type==="planned"?"תשלום קבוע":"הוצאה"}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
@@ -430,23 +544,105 @@ async function loadData(user){
   const [p,l]=await Promise.all([getDoc(doc(db,"users",uid)),getDoc(doc(db,"ledgers",uid))]);
   profile=p.exists()?p.data()||{}:{};ledger=l.exists()?l.data()||{}:{};rows=Array.isArray(ledger.rows)?ledger.rows:[];
   const local=(()=>{try{return JSON.parse(localStorage.getItem(`cashflowConfigV1_${uid}`)||"null")}catch{return null}})();
-  config=ledger.cashflowConfigV1||local||{obligations:[],monthlyAdjustments:{},paymentStatus:{}};
-  config.obligations=Array.isArray(config.obligations)?config.obligations:[];config.monthlyAdjustments=config.monthlyAdjustments||{};config.paymentStatus=config.paymentStatus||{};
+  config=ledger.cashflowConfigV1||local||{obligations:[],monthlyAdjustments:{},paymentStatus:{},yearReviews:{}};
+  config.obligations=Array.isArray(config.obligations)?config.obligations:[];config.obligations.forEach(ensureAmountHistory);config.monthlyAdjustments=config.monthlyAdjustments||{};config.paymentStatus=config.paymentStatus||{};config.yearReviews=config.yearReviews||{};
   readOnly=profile.isExemptFromBilling!==true&&profile.isPaid!==true&&profile.trialEndsAt&&Date.parse(profile.trialEndsAt)<=Date.now();
   readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#obName,#obAmount,#obFreq,#obDay,#obType").forEach(el=>el.disabled=readOnly);
   bizLabel.textContent=`${profile.businessName||profile.displayName||"העסק שלי"} · תכנון חודשי, התחייבויות ותשלומים לרשויות`;
-  render();
+  render();maybePromptYearReview();
 }
 
 addObligation.onclick=async()=>{
   if(readOnly)return;
-  const name=obName.value.trim(),amount=Number(obAmount.value)||0;if(!name||amount<=0){alert("יש למלא שם וסכום תקין.");return}
-  const ob={id:crypto.randomUUID(),name,amount,freq:obFreq.value,day:Number(obDay.value)||15,type:obType.value,startMonth:monthKey(),active:true};
-  config.obligations.push(ob);obName.value="";obAmount.value="";await saveConfig();render();
+  const name=obName.value.trim(),amount=Number(obAmount.value)||0;
+  if(!name||amount<=0){alert("יש למלא שם וסכום תקין.");return}
+  if(isSystemCalculatedName(name)){
+    alert("מקדמות מס הכנסה ומע״מ מחושבים אוטומטית מהנתונים ומהפרופיל, ולכן אין צורך להוסיף אותם כהתחייבות ידנית.");
+    return;
+  }
+
+  const effectiveMonth=monthKey();
+
+  if(editingObligationId){
+    const ob=(config.obligations||[]).find(o=>o.id===editingObligationId);
+    if(!ob)return;
+    const duplicate=(config.obligations||[]).find(o=>o.id!==ob.id&&o.active!==false&&sameObligation(o.name,name));
+    if(duplicate){
+      alert("כבר קיימת התחייבות אחרת בשם הזה. כדי למנוע כפל, ערכי את הרשומה הקיימת או מחקי אחת מהן.");
+      return;
+    }
+    ob.name=name;ob.freq=obFreq.value;ob.day=Number(obDay.value)||15;ob.type=obType.value;
+    setObligationAmountFrom(ob,effectiveMonth,amount);
+    await saveConfig();resetObligationForm();render();return;
+  }
+
+  const existing=(config.obligations||[]).find(o=>o.active!==false&&sameObligation(o.name,name));
+  if(existing){
+    const current=obligationAmount(existing,selected);
+    const ok=confirm(
+      `ההתחייבות "${name}" כבר קיימת במערכת בסכום ${money(current)}.\n\n`+
+      `במקום ליצור רשומה כפולה, לעדכן אותה ל-${money(amount)} החל מ-${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected)}?`
+    );
+    if(!ok)return;
+    existing.freq=obFreq.value;existing.day=Number(obDay.value)||15;existing.type=obType.value;
+    setObligationAmountFrom(existing,effectiveMonth,amount);
+    await saveConfig();resetObligationForm();render();return;
+  }
+
+  const ob={id:crypto.randomUUID(),name,amount,freq:obFreq.value,day:Number(obDay.value)||15,type:obType.value,startMonth:effectiveMonth,active:true,amountHistory:[{fromMonth:effectiveMonth,amount}]};
+  config.obligations.push(ob);resetObligationForm();await saveConfig();render();
 };
-prevMonth.onclick=()=>{selected.setMonth(selected.getMonth()-1);render()};
-nextMonth.onclick=()=>{selected.setMonth(selected.getMonth()+1);render()};
-monthPicker.onchange=()=>{if(!monthPicker.value)return;const [y,m]=monthPicker.value.split("-").map(Number);selected=new Date(y,m-1,1);render()};
+
+// RTL: החץ השמאלי מעביר קדימה, החץ הימני אחורה.
+prevMonth.onclick=()=>{selected.setMonth(selected.getMonth()+1);render();maybePromptYearReview()};
+nextMonth.onclick=()=>{selected.setMonth(selected.getMonth()-1);render()};
+monthPicker.onchange=()=>{if(!monthPicker.value)return;const [y,m]=monthPicker.value.split("-").map(Number);selected=new Date(y,m-1,1);render();maybePromptYearReview()};
+
+function obligationsForYearReview(year){
+  const jan=new Date(year,0,1);
+  const prevDec=new Date(year-1,11,1);
+  return (config.obligations||[])
+    .filter(o=>o.active!==false && o.freq!=="once")
+    .filter(o=>obligationOccurs(o,prevDec) || String(o.startMonth||"").slice(0,4)<String(year))
+    .map(o=>({ob:o,amount:obligationAmount(o,prevDec)}));
+}
+function maybePromptYearReview(){
+  if(readOnly || !uid)return;
+  const year=selected.getFullYear();
+  if(selected.getMonth()!==0)return;
+  if(config.yearReviews?.[year])return;
+  const review=obligationsForYearReview(year);
+  if(!review.length){config.yearReviews[year]=true;saveConfig();return}
+
+  yearReviewTitle.textContent=`עדכון התחייבויות לשנת ${year}`;
+  yearReviewRows.innerHTML=review.map(({ob,amount})=>`
+    <div class="year-review-row">
+      <div><b>${esc(ob.name)}</b><div class="tiny muted">${FREQ_LABEL[ob.freq]||ob.freq} · ${Math.max(1,Math.min(31,Number(ob.day)||15))} בחודש</div></div>
+      <div class="field"><label>סכום לשנת ${year}</label><input type="number" min="0" step="1" data-year-ob="${ob.id}" value="${Number(amount)||0}"></div>
+    </div>`).join("");
+  if(!yearReviewDialog.open) yearReviewDialog.showModal();
+}
+async function saveYearReview(keepAll=false){
+  const year=selected.getFullYear();
+  const fromMonth=`${year}-01`;
+  if(!keepAll){
+    yearReviewRows.querySelectorAll("[data-year-ob]").forEach(inp=>{
+      const ob=(config.obligations||[]).find(o=>o.id===inp.dataset.yearOb);
+      if(!ob)return;
+      const amount=Math.max(0,Number(inp.value)||0);
+      const prev=obligationAmount(ob,new Date(year-1,11,1));
+      if(amount!==prev) setObligationAmountFrom(ob,fromMonth,amount);
+    });
+  }
+  config.yearReviews=config.yearReviews||{};
+  config.yearReviews[year]=true;
+  await saveConfig();
+  yearReviewDialog.close();
+  render();
+}
+confirmYearReview.onclick=()=>saveYearReview(false);
+keepYearReview.onclick=()=>saveYearReview(true);
+
 function renderAnnual(){
   const year=selected.getFullYear(); annualTitle.textContent=`תמונה שנתית · ${year}`;
   annualTbody.innerHTML=Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),x=calcMonthForExport(d),label=new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d);return `<tr><td><b>${label}</b></td><td>${money(x.incomeGross)}</td><td>${money(x.actualOut)}</td><td>${money(x.commitments)}</td><td>${money(x.advanceReserve)}</td><td>${money(x.vatReserve)}</td><td><b>${money(x.balance)}</b></td></tr>`}).join("");
