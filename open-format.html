@@ -134,7 +134,7 @@ function makeC100(d,seq,link){
   let s='';
   s+=x('C100',4)+n(seq,9)+n(profile.businessId,9)+n(docCode(d),3)+x(d.number,20)+ymd(issued)+hm(issued);
   s+=x(d.customerName||c.name||c.businessName||'לקוח',50)+x(c.street||c.address||'',50)+x(c.houseNumber||'',10)+x(c.city||'',30)+x(c.zip||c.postalCode||'',8)+x(c.country||'ישראל',30)+x(c.countryCode||'IL',2)+x(c.phone||'',15)+n(c.taxId||c.vatId||c.businessId||c.idNumber||'',9);
-  s+=ymd(valueDate)+amt(0,15)+x('',3)+amt(before,15)+amt(discount,15,discount>0)+amt(d.net,15)+amt(d.vat,15)+amt(d.gross,15)+amt(d.withholdingTaxAmount||0,12)+x(shortCustomerKey(d),15)+x('',10)+x('',1)+ymd(d.date)+x((auth.currentUser?.email||'user').split('@')[0],9)+n(link,7)+x('',13);
+  s+=ymd(valueDate)+amt(0,15)+x('',3)+amt(before,15)+amt(discount,15,discount>0)+amt(d.net,15)+amt(d.vat,15)+amt(d.gross,15)+amt(d.withholdingTaxAmount||0,12)+x(shortCustomerKey(d),15)+x('',10)+x('',1)+ymd(d.date)+x((auth.currentUser?.email||'user').split('@')[0],9)+n(link,7)+x('',20);
   return fixed(s,444,'C100');
 }
 function makeD110(d,l,rowNo,seq,link){
