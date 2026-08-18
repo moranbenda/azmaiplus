@@ -948,7 +948,7 @@ body.account-frozen .readonly-disabled{
       <div class="top-right">
         <span class="tag" id="userEmailTag">מחובר/ת</span>
         <button class="btn secondary small" id="btnHomeOpen">בית</button>
-                <a class="btn secondary small" id="btnVatLink" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports" target="_blank" rel="noopener">דיווח למע&quot;מ</a>
+                <a class="btn secondary small" id="btnVatLink" href="/open-format.html">ממשק פתוח</a>
         <span class="nav-compat-hidden" style="display:none!important">
           <button class="btn secondary small" id="btnCategoriesOpen" type="button">טבלת קטגוריות</button>
           <button class="btn secondary small" id="btnReportsOpen" type="button">דוחות</button>
@@ -1344,6 +1344,11 @@ body.account-frozen .readonly-disabled{
         <div><label>שם עסק</label><input type="text" id="pBusinessName" /></div>
         <div><label>מספר עוסק / ח.פ</label><input type="text" id="pBusinessId" /></div>
         <div><label>טלפון</label><input type="tel" id="pPhone" /></div>
+        <div><label>רחוב העסק <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessStreet" /></div>
+        <div><label>מספר בית <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessHouseNumber" /></div>
+        <div><label>עיר <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessCity" /></div>
+        <div><label>מיקוד <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessZip" inputmode="numeric" /></div>
+        <div><label>מספר תיק ניכויים <span class="hint">(אם קיים)</span></label><input type="text" id="pWithholdingFileNumber" inputmode="numeric" /></div>
         <div>
           <label>סוג עוסק</label>
           <select id="pBusinessType">
@@ -1821,6 +1826,11 @@ const pDisplayName = document.getElementById("pDisplayName");
 const pBusinessName = document.getElementById("pBusinessName");
 const pBusinessId = document.getElementById("pBusinessId");
 const pPhone = document.getElementById("pPhone");
+const pBusinessStreet = document.getElementById("pBusinessStreet");
+const pBusinessHouseNumber = document.getElementById("pBusinessHouseNumber");
+const pBusinessCity = document.getElementById("pBusinessCity");
+const pBusinessZip = document.getElementById("pBusinessZip");
+const pWithholdingFileNumber = document.getElementById("pWithholdingFileNumber");
 const pBusinessType = document.getElementById("pBusinessType");
 const pVatRate = document.getElementById("pVatRate");
 const pAdvanceTaxRate = document.getElementById("pAdvanceTaxRate");
@@ -2462,6 +2472,11 @@ async function createDefaultProfile(uid, email, opts = {}) {
     businessName: opts.businessName || "",
     businessId: opts.businessId || "",
     phone: opts.phone || "",
+    businessStreet: opts.businessStreet || "",
+    businessHouseNumber: opts.businessHouseNumber || "",
+    businessCity: opts.businessCity || "",
+    businessZip: opts.businessZip || "",
+    withholdingFileNumber: opts.withholdingFileNumber || "",
     businessType: opts.businessType || "ptor",
     vatRate: opts.businessType === "ptor" ? 0 : DEFAULT_VAT,
     advanceTaxRate: Math.max(0, Number(opts.advanceTaxRate || 0)),
@@ -3293,6 +3308,11 @@ function applyProfileToUI() {
   pBusinessName.value = userProfile.businessName || "";
   pBusinessId.value   = userProfile.businessId || "";
   pPhone.value        = userProfile.phone || "";
+  if (pBusinessStreet) pBusinessStreet.value = userProfile.businessStreet || "";
+  if (pBusinessHouseNumber) pBusinessHouseNumber.value = userProfile.businessHouseNumber || "";
+  if (pBusinessCity) pBusinessCity.value = userProfile.businessCity || "";
+  if (pBusinessZip) pBusinessZip.value = userProfile.businessZip || "";
+  if (pWithholdingFileNumber) pWithholdingFileNumber.value = userProfile.withholdingFileNumber || "";
   pBusinessType.value = normalizeBusinessType(userProfile.businessType);
   pVatRate.value      = normalizeBusinessType(userProfile.businessType) === "ptor" ? 0 : getEffectiveVatRate(userProfile.vatRate);
   pAdvanceTaxRate.value = Math.max(0, Number(userProfile.advanceTaxRate || 0));
@@ -3420,6 +3440,11 @@ btnSaveProfile.onclick = async () => {
     businessName: pBusinessName.value.trim(),
     businessId:   pBusinessId.value.trim(),
     phone:        pPhone.value.trim(),
+    businessStreet: pBusinessStreet?.value.trim() || "",
+    businessHouseNumber: pBusinessHouseNumber?.value.trim() || "",
+    businessCity: pBusinessCity?.value.trim() || "",
+    businessZip: pBusinessZip?.value.trim() || "",
+    withholdingFileNumber: pWithholdingFileNumber?.value.trim() || "",
     businessType: pBusinessType.value,
     vatRate:      parseFloat(pVatRate.value || "0"),
     advanceTaxRate: Math.max(0, parseFloat(pAdvanceTaxRate.value || "0") || 0),
