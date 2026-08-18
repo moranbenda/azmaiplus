@@ -93,6 +93,31 @@ function crlf(lines){return lines.join('\r\n')+'\r\n'}
 function shortCustomerKey(doc){const raw=doc.customerId||doc.customerSnapshot?.id||doc.customerName||'1';return safeText(raw).replace(/[^0-9A-Za-zא-ת]/g,'').slice(0,15)||'1'}
 function docCode(d){return DOC_CODES[d.type]||0}
 function eligible(d){return !!docCode(d) && d.status!=='cancelled' && d.source==='issued'}
+
+function normalizePaymentMethod(v){
+  const raw=String(v||'').trim().toLowerCase();
+  if(['cash','מזומן'].includes(raw))return 'cash';
+  if(['check','cheque','צ׳ק','שיק','המחאה'].includes(raw))return 'check';
+  if(['credit_card','card','אשראי','כרטיס אשראי'].includes(raw))return 'credit_card';
+  if(['bank_transfer','transfer','העברה בנקאית','העברה'].includes(raw))return 'bank_transfer';
+  if(['payment_app','bit','paybox','אפליקציה','אפליקציית תשלום'].includes(raw))return 'payment_app';
+  return raw || 'other';
+}
+function paymentsForDoc(d){
+  if(Array.isArray(d.paymentEntries)&&d.paymentEntries.length){
+    return d.paymentEntries.map(p=>({...p,method:normalizePaymentMethod(p.method||p.paymentMethod)}));
+  }
+  if(!['receipt','tax_invoice_receipt'].includes(d.type))return [];
+  const legacyMethod=normalizePaymentMethod(d.paymentMethod||d.paymentType||'');
+  if(!legacyMethod || legacyMethod==='other' && !d.paymentMethod && !d.paymentType)return [];
+  return [{
+    method:legacyMethod,
+    amount:Number(d.gross||d.total||0),
+    reference:d.paymentRef||d.reference||'',
+    dueDate:d.paymentDate||d.dueDate||d.date||''
+  }];
+}
+
 function dateInRange(d,from,to){const s=String(d.date||'');return s>=from&&s<=to}
 function money(n){return (Number(n)||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function setStatus(msg,cls='ok'){const el=$('status');el.className='status '+cls;el.textContent=msg}
@@ -104,7 +129,7 @@ function makeC100(d,seq,link){
   const before=lines.reduce((s,l)=>s+(Number(l.qty)||0)*(Number(l.netPrice)||0),0);
   const discount=Math.max(0,before-(Number(d.net)||0));
   const issued=d.issuedAt||d.createdAt||d.date;
-  const paymentDates=(d.paymentEntries||[]).map(p=>p.dueDate).filter(Boolean).sort();
+  const paymentDates=paymentsForDoc(d).map(p=>p.dueDate).filter(Boolean).sort();
   const valueDate=paymentDates[0]||d.date;
   let s='';
   s+=x('C100',4)+n(seq,9)+n(profile.businessId,9)+n(docCode(d),3)+x(d.number,20)+ymd(issued)+hm(issued);
@@ -129,7 +154,7 @@ function fixed(s,len,label){if(s.length!==len)throw new Error(`${label}: אור�
 function buildBkmv(docs,mainId){
   const lines=[];let seq=1;const counts={A100:0,C100:0,D110:0,D120:0,Z900:0};
   lines.push(fixed(x('A100',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x('&1.31OF&',8)+x('',50),95,'A100'));counts.A100++;
-  docs.forEach((d,di)=>{const link=di+1;lines.push(makeC100(d,seq++,link));counts.C100++;(d.lines||[]).forEach((l,i)=>{lines.push(makeD110(d,l,i+1,seq++,link));counts.D110++});if(['receipt','tax_invoice_receipt'].includes(d.type)){(d.paymentEntries||[]).forEach((p,i)=>{lines.push(makeD120(d,p,i+1,seq++,link));counts.D120++})}});
+  docs.forEach((d,di)=>{const link=di+1;lines.push(makeC100(d,seq++,link));counts.C100++;(d.lines||[]).forEach((l,i)=>{lines.push(makeD110(d,l,i+1,seq++,link));counts.D110++});if(['receipt','tax_invoice_receipt'].includes(d.type)){paymentsForDoc(d).forEach((p,i)=>{lines.push(makeD120(d,p,i+1,seq++,link));counts.D120++})}});
   const total=lines.length+1;lines.push(fixed(x('Z900',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x('&1.31OF&',8)+n(total,15)+x('',50),110,'Z900'));counts.Z900++;
   return {text:crlf(lines),counts,total};
 }
@@ -142,7 +167,24 @@ function buildIni(bkmv,mainId,range,started,pathText,registrationNumber){
   return crlf([a,...summary]);
 }
 function validateDocs(docs){
-  const issues=[];docs.forEach(d=>{if(!d.number)issues.push(`מסמך ללא מספר (${d.id||''})`);if(!d.date)issues.push(`מסמך ${d.number||''}: חסר תאריך`);if(!d.customerName)issues.push(`מסמך ${d.number||''}: חסר שם לקוח`);if(!Array.isArray(d.lines)||!d.lines.length)issues.push(`מסמך ${d.number||''}: אין שורות מסמך`);if(['receipt','tax_invoice_receipt'].includes(d.type)&&(!Array.isArray(d.paymentEntries)||!d.paymentEntries.length))issues.push(`מסמך ${d.number||''}: אין פירוט תקבול`)});return issues}
+  const issues=[];
+  docs.forEach(d=>{
+    if(!d.number)issues.push(`מסמך ללא מספר (${d.id||''})`);
+    if(!d.date)issues.push(`מסמך ${d.number||''}: חסר תאריך`);
+    if(!d.customerName)issues.push(`מסמך ${d.number||''}: חסר שם לקוח`);
+    if(!Array.isArray(d.lines)||!d.lines.length)issues.push(`מסמך ${d.number||''}: אין שורות מסמך`);
+    if(['receipt','tax_invoice_receipt'].includes(d.type)){
+      const payments=paymentsForDoc(d);
+      if(!payments.length)issues.push(`מסמך ${d.number||''}: אין פירוט תקבול`);
+      payments.forEach(p=>{
+        if(p.method==='check' && (!p.bankNumber||!p.branchNumber||!p.accountNumber||!p.checkNumber)){
+          issues.push(`מסמך ${d.number||''}: חסרים פרטי המחאה הנדרשים לממשק הפתוח`);
+        }
+      });
+    }
+  });
+  return issues;
+}
 function profileIssues(){const out=[];if(!profile.businessName)out.push('חסר שם עסק');if(!digits(profile.businessId))out.push('חסר מספר עוסק/ח.פ');if(!profile.businessStreet||!profile.businessCity)out.push('כתובת העסק חלקית — השדות במפרט הם רשות, אך מומלץ להשלים בפרופיל');return out}
 
 async function saveFile(name,text){const bytes=iso88598Bytes(text);if(chosenDir){const handle=await chosenDir.getFileHandle(name,{create:true});const w=await handle.createWritable();await w.write(bytes);await w.close();return}const blob=new Blob([bytes],{type:'text/plain;charset=iso-8859-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
@@ -152,9 +194,9 @@ async function exportPackage(docs,{test=false}={}){
   await saveFile('INI.TXT',ini);await saveFile('BKMVDATA.TXT',bkmv.text);
   lastRun={started,range,folder,counts:bkmv.counts,total:bkmv.total,test,registrationNumber:$('registrationNumber').value};$('printRunReport').disabled=false;renderMetrics(docs,bkmv.counts);setStatus(`ההפקה הסתיימה בהצלחה. נוצרו ${bkmv.total.toLocaleString('he-IL')} רשומות בקובץ BKMVDATA.TXT.${test?' זו חבילת בדיקה בלבד.':''}`,'ok');return lastRun
 }
-function syntheticDocsFromTemplate(baseDocs){const template=baseDocs.find(d=>eligible(d));if(!template)throw new Error('צריך לפחות מסמך אחד אמיתי שישמש כתבנית לחבילת הבדיקה.');const per=1+(template.lines?.length||1)+(['receipt','tax_invoice_receipt'].includes(template.type)?Math.max(1,template.paymentEntries?.length||1):0);const needed=Math.ceil((2000-2)/per);const date=$('fromDate').value||new Date().toISOString().slice(0,10);const out=[];for(let i=1;i<=needed;i++){const clone=structuredClone(template);clone.id=`SIM-${i}`;clone.number=`SIM${String(i).padStart(8,'0')}`;clone.date=date;clone.issuedAt=`${date}T12:00:00`;clone.createdAt=clone.issuedAt;clone.customerId=`SIMCUST${String(i).padStart(7,'0')}`;out.push(clone)}return out}
+function syntheticDocsFromTemplate(baseDocs){const template=baseDocs.find(d=>eligible(d));if(!template)throw new Error('צריך לפחות מסמך אחד אמיתי שישמש כתבנית לחבילת הבדיקה.');const per=1+(template.lines?.length||1)+(['receipt','tax_invoice_receipt'].includes(template.type)?Math.max(1,paymentsForDoc(template).length||1):0);const needed=Math.ceil((2000-2)/per);const date=$('fromDate').value||new Date().toISOString().slice(0,10);const out=[];for(let i=1;i<=needed;i++){const clone=structuredClone(template);clone.id=`SIM-${i}`;clone.number=`SIM${String(i).padStart(8,'0')}`;clone.date=date;clone.issuedAt=`${date}T12:00:00`;clone.createdAt=clone.issuedAt;clone.customerId=`SIMCUST${String(i).padStart(7,'0')}`;out.push(clone)}return out}
 
-function renderMetrics(docs,counts=null){$('mDocs').textContent=docs.length;$('mC100').textContent=counts?.C100??docs.length;$('mD110').textContent=counts?.D110??docs.reduce((s,d)=>s+(d.lines?.length||0),0);$('mD120').textContent=counts?.D120??docs.reduce((s,d)=>s+(['receipt','tax_invoice_receipt'].includes(d.type)?(d.paymentEntries?.length||0):0),0);const pIssues=profileIssues(),dIssues=validateDocs(docs);const checks=[['פרטי עסק',pIssues.some(x=>!x.includes('כתובת'))?'err':pIssues.length?'warn':'ok',pIssues.join(' · ')||'תקין'],['מסמכים בטווח',docs.length?'ok':'warn',docs.length?`${docs.length} מסמכים ייכללו`:'אין מסמכים בטווח'],['פרטי תקבול',dIssues.some(x=>x.includes('תקבול'))?'err':'ok',dIssues.filter(x=>x.includes('תקבול')).slice(0,2).join(' · ')||'תקין'],['מבנה רשומות','ok','המחולל בודק אורך קבוע ל־A000/A100/C100/D110/D120/Z900 לפני הורדה'],['סט תווים','ok','ISO-8859-8'],['מספר רישום תוכנה',$('registrationNumber').value==='00000000'?'warn':'ok',$('registrationNumber').value==='00000000'?'טרם הוקצה — יש לאמת את ערך הבדיקה לפני הגשה':'הוזן מספר רישום']];$('checksBody').innerHTML=checks.map(r=>`<tr><td>${r[0]}</td><td><span class="pill ${r[1]}">${r[1]==='ok'?'תקין':r[1]==='warn'?'לתשומת לב':'חסר'}</span></td><td>${r[2]}</td></tr>`).join('');}
+function renderMetrics(docs,counts=null){$('mDocs').textContent=docs.length;$('mC100').textContent=counts?.C100??docs.length;$('mD110').textContent=counts?.D110??docs.reduce((s,d)=>s+(d.lines?.length||0),0);$('mD120').textContent=counts?.D120??docs.reduce((s,d)=>s+(['receipt','tax_invoice_receipt'].includes(d.type)?paymentsForDoc(d).length:0),0);const pIssues=profileIssues(),dIssues=validateDocs(docs);const checks=[['פרטי עסק',pIssues.some(x=>!x.includes('כתובת'))?'err':pIssues.length?'warn':'ok',pIssues.join(' · ')||'תקין'],['מסמכים בטווח',docs.length?'ok':'warn',docs.length?`${docs.length} מסמכים ייכללו`:'אין מסמכים בטווח'],['פרטי תקבול',dIssues.some(x=>x.includes('תקבול'))?'err':'ok',dIssues.filter(x=>x.includes('תקבול')).slice(0,2).join(' · ')||'תקין'],['מבנה רשומות','ok','המחולל בודק אורך קבוע ל־A000/A100/C100/D110/D120/Z900 לפני הורדה'],['סט תווים','ok','ISO-8859-8'],['מספר רישום תוכנה',$('registrationNumber').value==='00000000'?'warn':'ok',$('registrationNumber').value==='00000000'?'טרם הוקצה — יש לאמת את ערך הבדיקה לפני הגשה':'הוזן מספר רישום']];$('checksBody').innerHTML=checks.map(r=>`<tr><td>${r[0]}</td><td><span class="pill ${r[1]}">${r[1]==='ok'?'תקין':r[1]==='warn'?'לתשומת לב':'חסר'}</span></td><td>${r[2]}</td></tr>`).join('');}
 function verificationHtml(){const docs=selectedDocs();const sums={};Object.keys(DOC_LABELS).forEach(k=>sums[k]={count:0,total:0});docs.forEach(d=>{const c=docCode(d);if(!c)return;sums[c].count++;sums[c].total+=Number(d.gross)||0});return `<h2>דוח אימות נתונים – מסמכים</h2><p>בית עסק: <b>${profile.businessName||''}</b> · מספר עוסק: ${profile.businessId||''}</p><p>טווח: ${$('fromDate').value} עד ${$('toDate').value}</p><table><thead><tr><th>מספר מסמך</th><th>סוג מסמך</th><th>סה״כ כמותי</th><th>סה״כ כספי (₪)</th></tr></thead><tbody>${Object.entries(DOC_LABELS).map(([code,label])=>`<tr><td>${code}</td><td>${label}</td><td>${sums[code]?.count||0}</td><td>${money(sums[code]?.total||0)}</td></tr>`).join('')}</tbody></table>`}
 function runReportHtml(){if(!lastRun)return '<p>טרם בוצעה הפקה.</p>';return `<h2>הפקת קבצים במבנה אחיד עבור</h2><p><b>מספר עוסק:</b> ${profile.businessId||''}<br><b>שם בית העסק:</b> ${profile.businessName||''}<br><b>ביצוע ממשק פתוח הסתיים בהצלחה.</b><br><b>הנתונים נשמרו בנתיב:</b> ${lastRun.folder}<br><b>טווח תאריכים:</b> ${lastRun.range.from} עד ${lastRun.range.to}</p><table><thead><tr><th>קוד רשומה</th><th>תיאור</th><th>סך רשומות</th></tr></thead><tbody>${[['A100','רשומת פתיחה'],['C100','כותרת מסמך'],['D110','פרטי מסמך'],['D120','פרטי קבלות'],['Z900','רשומת סיום']].filter(([c])=>lastRun.counts[c]).map(([c,l])=>`<tr><td>${c}</td><td>${l}</td><td>${lastRun.counts[c]}</td></tr>`).join('')}</tbody></table><p>הנתונים הופקו באמצעות תוכנת ${SOFTWARE_NAME}, מספר תעודת הרישום: ${lastRun.registrationNumber||'00000000'}<br>בתאריך ${lastRun.started.toLocaleDateString('he-IL')} בשעה ${lastRun.started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>${lastRun.test?'<p><b>חבילת בדיקה לסימולטור — נתונים סינתטיים.</b></p>':''}`}
 function printHtml(html){$('printArea').innerHTML=html;window.print()}
