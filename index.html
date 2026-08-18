@@ -876,6 +876,33 @@ body.account-frozen .readonly-disabled{
 }
 .readonly-toast.show{display:block}
 
+
+/* Open Format profile fields: keep the profile form visually aligned */
+#profileDialog .grid2{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px 18px;
+  align-items:start;
+}
+#profileDialog .grid2 > div{
+  min-width:0;
+}
+#profileDialog .grid2 label{
+  display:block;
+  min-height:22px;
+  margin-bottom:6px;
+}
+#profileDialog .grid2 input,
+#profileDialog .grid2 select{
+  width:100%;
+}
+#profileDialog .grid2 .hint{
+  line-height:1.35;
+}
+@media(max-width:760px){
+  #profileDialog .grid2{grid-template-columns:1fr;}
+}
+
 </style>
 </head>
 <body>
@@ -1344,10 +1371,10 @@ body.account-frozen .readonly-disabled{
         <div><label>שם עסק</label><input type="text" id="pBusinessName" /></div>
         <div><label>מספר עוסק / ח.פ</label><input type="text" id="pBusinessId" /></div>
         <div><label>טלפון</label><input type="tel" id="pPhone" /></div>
-        <div><label>רחוב העסק <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessStreet" /></div>
-        <div><label>מספר בית <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessHouseNumber" /></div>
-        <div><label>עיר <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessCity" /></div>
-        <div><label>מיקוד <span class="hint">(למבנה אחיד)</span></label><input type="text" id="pBusinessZip" inputmode="numeric" /></div>
+        <div><label>רחוב העסק</label><input type="text" id="pBusinessStreet" /></div>
+        <div><label>מספר בית</label><input type="text" id="pBusinessHouseNumber" /></div>
+        <div><label>עיר</label><input type="text" id="pBusinessCity" /></div>
+        <div><label>מיקוד</label><input type="text" id="pBusinessZip" inputmode="numeric" /></div>
         <div><label>מספר תיק ניכויים <span class="hint">(אם קיים)</span></label><input type="text" id="pWithholdingFileNumber" inputmode="numeric" /></div>
         <div>
           <label>סוג עוסק</label>
@@ -3462,14 +3489,18 @@ btnSaveProfile.onclick = async () => {
     });
     userProfile = { ...(userProfile || {}), ...payload };
     profileStatus.textContent = "נשמר ✅";
-    // אם הפרופיל היה חובה – לאפשר המשך
-    if (profileDialog.dataset.required === "1" && isProfileComplete(userProfile)) {
+    const profileCompleteNow = isProfileComplete(userProfile);
+    if (profileCompleteNow) {
       profileDialog.dataset.required = "0";
-      profileDialog.close();
     }
     applyProfileToUI();
     // לעדכן גם את הסיכומים
     render();
+    // שמירה מוצלחת צריכה להרגיש כמו פעולה שהסתיימה: סוגרים אוטומטית.
+    // אם זה מסך חובה והפרופיל עדיין חסר, משאירים אותו פתוח כדי לא לעקוף את ההשלמה.
+    if (profileCompleteNow || profileDialog.dataset.required !== "1") {
+      profileDialog.close();
+    }
   } catch (err) {
     console.error(err);
     profileStatus.textContent = "שגיאה בשמירת פרופיל";
