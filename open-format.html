@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ממשק פתוח - עצמאי פלוס</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#718096;--line:#dbe3ef;--blue:#3867f4;--green:#169c55;--amber:#b7791f;--red:#d64545}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+a{color:inherit}.wrap{max-width:1180px;margin:0 auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}.top h1{margin:0;font-size:28px}.btn{border:0;border-radius:12px;padding:11px 16px;font-weight:800;cursor:pointer;background:var(--blue);color:#fff}.btn.secondary{background:#fff;color:var(--text);border:1px solid var(--line)}.btn.warn{background:#fff7e6;color:#8a5b00;border:1px solid #f0d18c}.btn:disabled{opacity:.45;cursor:not-allowed}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px rgba(23,32,51,.04)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.wide{grid-column:1/-1}label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}input,select{width:100%;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;font:inherit}.hint{font-size:13px;color:var(--muted);line-height:1.6}.status{padding:12px 14px;border-radius:12px;margin-top:12px;display:none}.status.ok{display:block;background:#eaf8f0;color:#12643b}.status.err{display:block;background:#fff0f0;color:#9c2525}.status.warn{display:block;background:#fff8e8;color:#805400}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.metric{border:1px solid var(--line);border-radius:16px;padding:14px}.metric .k{font-size:12px;color:var(--muted)}.metric .v{font-size:22px;font-weight:900;margin-top:6px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}table{width:100%;border-collapse:collapse;margin-top:12px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right;font-size:13px}th{background:#f7f9fc}.pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:800}.pill.ok{background:#eaf8f0;color:#12643b}.pill.warn{background:#fff8e8;color:#805400}.pill.err{background:#fff0f0;color:#9c2525}.note{border:1px solid #efd68e;background:#fff9ea;border-radius:14px;padding:13px;color:#6e5100;line-height:1.6}.report{display:none}@media(max-width:760px){.wrap{padding:14px}.grid,.metrics{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+@media print{body{background:#fff}.no-print{display:none!important}.card{box-shadow:none}.wrap{max-width:none}.report{display:block}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top no-print">
+    <div><h1>ממשק פתוח · מבנה אחיד 1.31</h1><div class="hint">הפקת קבצים, דוח אימות וחבילת בדיקה לסימולטור רשות המסים</div></div>
+    <a class="btn secondary" href="/">חזרה ללוח הבקרה</a>
+  </div>
+
+  <section class="card no-print">
+    <h2 style="margin-top:0">פרטי ההפקה</h2>
+    <div class="grid">
+      <div><label>בית העסק</label><input id="businessName" readonly></div>
+      <div><label>מספר עוסק / ח.פ</label><input id="businessId" readonly></div>
+      <div><label>מתאריך</label><input id="fromDate" type="date"></div>
+      <div><label>עד תאריך</label><input id="toDate" type="date"></div>
+      <div><label>מספר רישום התוכנה</label><input id="registrationNumber" value="00000000" inputmode="numeric" maxlength="8"><div class="hint">עד לקבלת תעודת רישום נשמר 00000000. לפני הגשה סופית יש לאמת מול רשות המסים שזה הערך הרצוי בבדיקת רישום ראשונה.</div></div>
+      <div><label>סט תווים</label><select id="charset"><option value="1">ISO-8859-8</option></select></div>
+      <div class="wide"><label>תיקיית יעד</label><div class="actions" style="margin-top:0"><button class="btn secondary" id="chooseDir" type="button">בחירת תיקייה</button><span class="hint" id="dirHint">אם הדפדפן לא תומך בבחירת תיקייה, הקבצים ירדו לתיקיית ההורדות.</span></div></div>
+    </div>
+    <div id="profileWarning" class="status warn"></div>
+    <div class="actions">
+      <button class="btn" id="buildExport" type="button">הפקת INI.TXT ו־BKMVDATA.TXT</button>
+      <button class="btn secondary" id="printVerification" type="button">דוח אימות</button>
+      <button class="btn secondary" id="printRunReport" type="button" disabled>דוח סיום הפקה</button>
+    </div>
+    <div id="status" class="status"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin-top:0">בדיקת מוכנות</h2>
+    <div class="metrics">
+      <div class="metric"><div class="k">מסמכים בטווח</div><div class="v" id="mDocs">0</div></div>
+      <div class="metric"><div class="k">C100</div><div class="v" id="mC100">0</div></div>
+      <div class="metric"><div class="k">D110</div><div class="v" id="mD110">0</div></div>
+      <div class="metric"><div class="k">D120</div><div class="v" id="mD120">0</div></div>
+    </div>
+    <table><thead><tr><th>בדיקה</th><th>מצב</th><th>הערה</th></tr></thead><tbody id="checksBody"></tbody></table>
+  </section>
+
+  <section class="card no-print">
+    <h2 style="margin-top:0">חבילת בדיקה לסימולטור</h2>
+    <div class="note">הכפתור הבא מייצר נתוני בדיקה סינתטיים בלבד על בסיס מבנה המסמכים של האפליקציה. הנתונים אינם נשמרים במסד הנתונים ואינם משפיעים על ספרור או הכנסות. מטרתם היחידה היא ליצור יותר מ־2,000 רשומות לבדיקת הסימולטור.</div>
+    <div class="actions"><button class="btn warn" id="buildSimulatorPack" type="button">יצירת חבילת בדיקה 2,000+ רשומות</button></div>
+  </section>
+
+  <section class="card report" id="printArea"></section>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+const firebaseConfig={apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",authDomain:"freelance-accounting-6c3bb.firebaseapp.com",projectId:"freelance-accounting-6c3bb",storageBucket:"freelance-accounting-6c3bb.firebasestorage.app",messagingSenderId:"196974556694",appId:"1:196974556694:web:60ba710567f2a7c67c6737"};
+const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
+const $=id=>document.getElementById(id);
+let uid=null, profile={}, documents=[], chosenDir=null, lastRun=null;
+
+const SOFTWARE_NAME='עצמאי פלוס';
+const SOFTWARE_VERSION='1.0.0';
+const MAKER_NAME='עצמאי פלוס';
+const DOC_CODES={deal_invoice:300,tax_invoice:305,tax_invoice_receipt:320,credit_note:330,receipt:400};
+const DOC_LABELS={100:'הזמנה',200:'תעודת משלוח',205:'תעודת משלוח סוכן',210:'תעודת החזרה',300:'חשבונית/חשבונית עסקה',305:'חשבונית מס',310:'חשבונית ריכוז',320:'חשבונית מס/קבלה',330:'חשבונית מס זיכוי',340:'חשבונית שריון',345:'חשבונית סוכן',400:'קבלה',405:'קבלה על תרומות',410:'יציאה מקופה',420:'הפקדת בנק',500:'הזמנת רכש',600:'תעודת משלוח רכש',610:'החזרת רכש',700:'חשבונית מס רכש',710:'זיכוי רכש',800:'יתרת פתיחה',810:'כניסה כללית למלאי',820:'יציאה כללית מהמלאי',830:'העברה בין מחסנים',840:'עדכון בעקבות ספירה',900:'דוח ייצור-כניסה',910:'דוח ייצור-יציאה'};
+const PAYMENT_CODE={cash:1,check:2,credit_card:3,bank_transfer:4,payment_app:9,other:9};
+const CLEARING_CODE={isracard:1,cal:2,diners:3,amex:4,max:6};
+const CREDIT_TYPE={regular:1,installments:2,credit:3,deferred:4,other:5};
+const TX_TYPE={service:1,sale:2,mixed:3};
+
+function digits(v=''){return String(v??'').replace(/\D/g,'');}
+function safeText(v=''){return String(v??'').replace(/[\u200e\u200f]/g,'').replace(/[״”]/g,'"').replace(/[׳’]/g,"'").replace(/־/g,'-');}
+function x(v,len){let s=safeText(v);return s.slice(0,len).padEnd(len,' ')}
+function n(v,len){return digits(v).slice(-len).padStart(len,'0')}
+function amt(v,len=15,negative=false){const cents=Math.round(Math.abs(Number(v)||0)*100);const sign=(negative&&cents?'-':'+');return sign+String(cents).padStart(len-1,'0').slice(-(len-1));}
+function qty(v){const scaled=Math.round(Math.abs(Number(v)||0)*10000);return '+'+String(scaled).padStart(16,'0').slice(-16)}
+function vatRate(v){return String(Math.round((Number(v)||0)*100)).padStart(4,'0').slice(-4)}
+function ymd(v){if(!v)return '00000000';const d=new Date(String(v).length===10?v+'T12:00:00':v);if(Number.isNaN(d.getTime()))return '00000000';return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`}
+function hm(v){const d=v?new Date(v):new Date();if(Number.isNaN(d.getTime()))return '0000';return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`}
+function random15(){let s='';for(let i=0;i<15;i++)s+=Math.floor(Math.random()*10);return s}
+function iso88598Bytes(str){const out=[];for(const ch of String(str)){const c=ch.codePointAt(0);if(c<=0x7f)out.push(c);else if(c>=0x05d0&&c<=0x05ea)out.push(0xe0+(c-0x05d0));else out.push(0x3f)}return new Uint8Array(out)}
+function crlf(lines){return lines.join('\r\n')+'\r\n'}
+function shortCustomerKey(doc){const raw=doc.customerId||doc.customerSnapshot?.id||doc.customerName||'1';return safeText(raw).replace(/[^0-9A-Za-zא-ת]/g,'').slice(0,15)||'1'}
+function docCode(d){return DOC_CODES[d.type]||0}
+function eligible(d){return !!docCode(d) && d.status!=='cancelled' && d.source==='issued'}
+function dateInRange(d,from,to){const s=String(d.date||'');return s>=from&&s<=to}
+function money(n){return (Number(n)||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function setStatus(msg,cls='ok'){const el=$('status');el.className='status '+cls;el.textContent=msg}
+function getRange(){return {from:$('fromDate').value,to:$('toDate').value}}
+function selectedDocs(){const {from,to}=getRange();return documents.filter(d=>eligible(d)&&dateInRange(d,from,to))}
+
+function makeC100(d,seq,link){
+  const c=d.customerSnapshot||{};const lines=Array.isArray(d.lines)?d.lines:[];
+  const before=lines.reduce((s,l)=>s+(Number(l.qty)||0)*(Number(l.netPrice)||0),0);
+  const discount=Math.max(0,before-(Number(d.net)||0));
+  const issued=d.issuedAt||d.createdAt||d.date;
+  const paymentDates=(d.paymentEntries||[]).map(p=>p.dueDate).filter(Boolean).sort();
+  const valueDate=paymentDates[0]||d.date;
+  let s='';
+  s+=x('C100',4)+n(seq,9)+n(profile.businessId,9)+n(docCode(d),3)+x(d.number,20)+ymd(issued)+hm(issued);
+  s+=x(d.customerName||c.name||c.businessName||'לקוח',50)+x(c.street||c.address||'',50)+x(c.houseNumber||'',10)+x(c.city||'',30)+x(c.zip||c.postalCode||'',8)+x(c.country||'ישראל',30)+x(c.countryCode||'IL',2)+x(c.phone||'',15)+n(c.taxId||c.vatId||c.businessId||c.idNumber||'',9);
+  s+=ymd(valueDate)+amt(0,15)+x('',3)+amt(before,15)+amt(discount,15,discount>0)+amt(d.net,15)+amt(d.vat,15)+amt(d.gross,15)+amt(d.withholdingTaxAmount||0,12)+x(shortCustomerKey(d),15)+x('',10)+x('',1)+ymd(d.date)+x((auth.currentUser?.email||'user').split('@')[0],9)+n(link,7)+x('',13);
+  return fixed(s,444,'C100');
+}
+function makeD110(d,l,rowNo,seq,link){
+  const tx=TX_TYPE[l.transactionType]||1;const unit=l.unit||'יחידה';const lineBefore=(Number(l.qty)||0)*(Number(l.netPrice)||0);const disc=Number(l.lineDiscount)||0;const lineNet=Math.max(0,lineBefore-disc);
+  let s='';
+  s+=x('D110',4)+n(seq,9)+n(profile.businessId,9)+n(docCode(d),3)+x(d.number,20)+n(rowNo,4)+n('',3)+x('',20)+n(tx,1)+x('',20)+x(l.desc||'שירות',30)+x('',50)+x('',30)+x(unit,20)+qty(l.qty)+amt(l.netPrice,15)+amt(disc,15,disc>0)+amt(lineNet,15)+vatRate(d.vatRate||profile.vatRate||0)+x('',7)+ymd(d.date)+n(link,7)+x('',7)+x('',21);
+  return fixed(s,339,'D110');
+}
+function makeD120(d,p,rowNo,seq,link){
+  const method=PAYMENT_CODE[p.method]||9;
+  let s='';
+  s+=x('D120',4)+n(seq,9)+n(profile.businessId,9)+n(docCode(d),3)+x(d.number,20)+n(rowNo,4)+n(method,1)+n(p.method==='check'?p.bankNumber:'',10)+n(p.method==='check'?p.branchNumber:'',10)+n(p.method==='check'?p.accountNumber:'',15)+n(p.method==='check'?p.checkNumber:'',10)+ymd((p.method==='check'||p.method==='credit_card')?p.dueDate:'')+amt(p.amount,15)+n(CLEARING_CODE[p.clearingCompany]||'',1)+x(p.cardName||'',20)+n(CREDIT_TYPE[p.creditTransactionType]||'',1)+x('',7)+ymd(d.date)+n(link,7)+x('',60);
+  return fixed(s,222,'D120');
+}
+function fixed(s,len,label){if(s.length!==len)throw new Error(`${label}: אורך רשומה ${s.length} במקום ${len}`);return s}
+
+function buildBkmv(docs,mainId){
+  const lines=[];let seq=1;const counts={A100:0,C100:0,D110:0,D120:0,Z900:0};
+  lines.push(fixed(x('A100',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x('&1.31OF&',8)+x('',50),95,'A100'));counts.A100++;
+  docs.forEach((d,di)=>{const link=di+1;lines.push(makeC100(d,seq++,link));counts.C100++;(d.lines||[]).forEach((l,i)=>{lines.push(makeD110(d,l,i+1,seq++,link));counts.D110++});if(['receipt','tax_invoice_receipt'].includes(d.type)){(d.paymentEntries||[]).forEach((p,i)=>{lines.push(makeD120(d,p,i+1,seq++,link));counts.D120++})}});
+  const total=lines.length+1;lines.push(fixed(x('Z900',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x('&1.31OF&',8)+n(total,15)+x('',50),110,'Z900'));counts.Z900++;
+  return {text:crlf(lines),counts,total};
+}
+function buildIni(bkmv,mainId,range,started,pathText,registrationNumber){
+  const reg=n(registrationNumber||0,8);const makerId=n(profile.softwareMakerId||profile.businessId,9);
+  let a='';
+  a+=x('A000',4)+x('',5)+n(bkmv.total,15)+n(profile.businessId,9)+n(mainId,15)+x('&1.31OF&',8)+reg+x(SOFTWARE_NAME,20)+x(SOFTWARE_VERSION,20)+makerId+x(MAKER_NAME,20)+n(2,1)+x(pathText,50)+n(1,1)+x('',1)+n('',9)+n(profile.withholdingFileNumber||'',9)+x('',10)+x(profile.businessName||'',50)+x(profile.businessStreet||'',50)+x(profile.businessHouseNumber||'',10)+x(profile.businessCity||'',30)+x(profile.businessZip||'',8)+n('',4)+ymd(range.from)+ymd(range.to)+ymd(started)+hm(started)+n(0,1)+n(1,1)+x('Browser',20)+x('ILS',3)+n(0,1)+x('',46);
+  a=fixed(a,466,'A000');
+  const summary=[];for(const code of ['A100','C100','D110','D120','Z900']){const count=bkmv.counts[code]||0;if(count)summary.push(x(code,4)+n(count,15))}
+  return crlf([a,...summary]);
+}
+function validateDocs(docs){
+  const issues=[];docs.forEach(d=>{if(!d.number)issues.push(`מסמך ללא מספר (${d.id||''})`);if(!d.date)issues.push(`מסמך ${d.number||''}: חסר תאריך`);if(!d.customerName)issues.push(`מסמך ${d.number||''}: חסר שם לקוח`);if(!Array.isArray(d.lines)||!d.lines.length)issues.push(`מסמך ${d.number||''}: אין שורות מסמך`);if(['receipt','tax_invoice_receipt'].includes(d.type)&&(!Array.isArray(d.paymentEntries)||!d.paymentEntries.length))issues.push(`מסמך ${d.number||''}: אין פירוט תקבול`)});return issues}
+function profileIssues(){const out=[];if(!profile.businessName)out.push('חסר שם עסק');if(!digits(profile.businessId))out.push('חסר מספר עוסק/ח.פ');if(!profile.businessStreet||!profile.businessCity)out.push('כתובת העסק חלקית — השדות במפרט הם רשות, אך מומלץ להשלים בפרופיל');return out}
+
+async function saveFile(name,text){const bytes=iso88598Bytes(text);if(chosenDir){const handle=await chosenDir.getFileHandle(name,{create:true});const w=await handle.createWritable();await w.write(bytes);await w.close();return}const blob=new Blob([bytes],{type:'text/plain;charset=iso-8859-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+async function exportPackage(docs,{test=false}={}){
+  const range=getRange();if(!range.from||!range.to||range.from>range.to)throw new Error('יש לבחור טווח תאריכים תקין.');if(!docs.length)throw new Error('אין מסמכים מתאימים בטווח שנבחר.');const issues=validateDocs(docs);if(issues.length)throw new Error(`נמצאו בעיות בנתונים: ${issues.slice(0,3).join(' | ')}`);
+  const started=new Date();const mainId=random15();const bkmv=buildBkmv(docs,mainId);const folder=`OPENFRMT/${n(profile.businessId,9)}.${String(started.getFullYear()).slice(-2)}/${String(started.getMonth()+1).padStart(2,'0')}${String(started.getDate()).padStart(2,'0')}${String(started.getHours()).padStart(2,'0')}${String(started.getMinutes()).padStart(2,'0')}`;const ini=buildIni(bkmv,mainId,range,started,folder,$('registrationNumber').value);
+  await saveFile('INI.TXT',ini);await saveFile('BKMVDATA.TXT',bkmv.text);
+  lastRun={started,range,folder,counts:bkmv.counts,total:bkmv.total,test,registrationNumber:$('registrationNumber').value};$('printRunReport').disabled=false;renderMetrics(docs,bkmv.counts);setStatus(`ההפקה הסתיימה בהצלחה. נוצרו ${bkmv.total.toLocaleString('he-IL')} רשומות בקובץ BKMVDATA.TXT.${test?' זו חבילת בדיקה בלבד.':''}`,'ok');return lastRun
+}
+function syntheticDocsFromTemplate(baseDocs){const template=baseDocs.find(d=>eligible(d));if(!template)throw new Error('צריך לפחות מסמך אחד אמיתי שישמש כתבנית לחבילת הבדיקה.');const per=1+(template.lines?.length||1)+(['receipt','tax_invoice_receipt'].includes(template.type)?Math.max(1,template.paymentEntries?.length||1):0);const needed=Math.ceil((2000-2)/per);const date=$('fromDate').value||new Date().toISOString().slice(0,10);const out=[];for(let i=1;i<=needed;i++){const clone=structuredClone(template);clone.id=`SIM-${i}`;clone.number=`SIM${String(i).padStart(8,'0')}`;clone.date=date;clone.issuedAt=`${date}T12:00:00`;clone.createdAt=clone.issuedAt;clone.customerId=`SIMCUST${String(i).padStart(7,'0')}`;out.push(clone)}return out}
+
+function renderMetrics(docs,counts=null){$('mDocs').textContent=docs.length;$('mC100').textContent=counts?.C100??docs.length;$('mD110').textContent=counts?.D110??docs.reduce((s,d)=>s+(d.lines?.length||0),0);$('mD120').textContent=counts?.D120??docs.reduce((s,d)=>s+(['receipt','tax_invoice_receipt'].includes(d.type)?(d.paymentEntries?.length||0):0),0);const pIssues=profileIssues(),dIssues=validateDocs(docs);const checks=[['פרטי עסק',pIssues.some(x=>!x.includes('כתובת'))?'err':pIssues.length?'warn':'ok',pIssues.join(' · ')||'תקין'],['מסמכים בטווח',docs.length?'ok':'warn',docs.length?`${docs.length} מסמכים ייכללו`:'אין מסמכים בטווח'],['פרטי תקבול',dIssues.some(x=>x.includes('תקבול'))?'err':'ok',dIssues.filter(x=>x.includes('תקבול')).slice(0,2).join(' · ')||'תקין'],['מבנה רשומות','ok','המחולל בודק אורך קבוע ל־A000/A100/C100/D110/D120/Z900 לפני הורדה'],['סט תווים','ok','ISO-8859-8'],['מספר רישום תוכנה',$('registrationNumber').value==='00000000'?'warn':'ok',$('registrationNumber').value==='00000000'?'טרם הוקצה — יש לאמת את ערך הבדיקה לפני הגשה':'הוזן מספר רישום']];$('checksBody').innerHTML=checks.map(r=>`<tr><td>${r[0]}</td><td><span class="pill ${r[1]}">${r[1]==='ok'?'תקין':r[1]==='warn'?'לתשומת לב':'חסר'}</span></td><td>${r[2]}</td></tr>`).join('');}
+function verificationHtml(){const docs=selectedDocs();const sums={};Object.keys(DOC_LABELS).forEach(k=>sums[k]={count:0,total:0});docs.forEach(d=>{const c=docCode(d);if(!c)return;sums[c].count++;sums[c].total+=Number(d.gross)||0});return `<h2>דוח אימות נתונים – מסמכים</h2><p>בית עסק: <b>${profile.businessName||''}</b> · מספר עוסק: ${profile.businessId||''}</p><p>טווח: ${$('fromDate').value} עד ${$('toDate').value}</p><table><thead><tr><th>מספר מסמך</th><th>סוג מסמך</th><th>סה״כ כמותי</th><th>סה״כ כספי (₪)</th></tr></thead><tbody>${Object.entries(DOC_LABELS).map(([code,label])=>`<tr><td>${code}</td><td>${label}</td><td>${sums[code]?.count||0}</td><td>${money(sums[code]?.total||0)}</td></tr>`).join('')}</tbody></table>`}
+function runReportHtml(){if(!lastRun)return '<p>טרם בוצעה הפקה.</p>';return `<h2>הפקת קבצים במבנה אחיד עבור</h2><p><b>מספר עוסק:</b> ${profile.businessId||''}<br><b>שם בית העסק:</b> ${profile.businessName||''}<br><b>ביצוע ממשק פתוח הסתיים בהצלחה.</b><br><b>הנתונים נשמרו בנתיב:</b> ${lastRun.folder}<br><b>טווח תאריכים:</b> ${lastRun.range.from} עד ${lastRun.range.to}</p><table><thead><tr><th>קוד רשומה</th><th>תיאור</th><th>סך רשומות</th></tr></thead><tbody>${[['A100','רשומת פתיחה'],['C100','כותרת מסמך'],['D110','פרטי מסמך'],['D120','פרטי קבלות'],['Z900','רשומת סיום']].filter(([c])=>lastRun.counts[c]).map(([c,l])=>`<tr><td>${c}</td><td>${l}</td><td>${lastRun.counts[c]}</td></tr>`).join('')}</tbody></table><p>הנתונים הופקו באמצעות תוכנת ${SOFTWARE_NAME}, מספר תעודת הרישום: ${lastRun.registrationNumber||'00000000'}<br>בתאריך ${lastRun.started.toLocaleDateString('he-IL')} בשעה ${lastRun.started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>${lastRun.test?'<p><b>חבילת בדיקה לסימולטור — נתונים סינתטיים.</b></p>':''}`}
+function printHtml(html){$('printArea').innerHTML=html;window.print()}
+
+$('fromDate').value=`${new Date().getFullYear()}-01-01`;$('toDate').value=new Date().toISOString().slice(0,10);
+$('fromDate').onchange=$('toDate').onchange=()=>renderMetrics(selectedDocs());$('registrationNumber').oninput=()=>renderMetrics(selectedDocs());
+$('chooseDir').onclick=async()=>{if(!window.showDirectoryPicker){$('dirHint').textContent='הדפדפן הזה לא תומך בבחירת תיקייה. הקבצים יישמרו בהורדות.';return}try{chosenDir=await window.showDirectoryPicker();$('dirHint').textContent=`נבחרה תיקייה: ${chosenDir.name}`}catch(e){if(e.name!=='AbortError')console.error(e)}};
+$('buildExport').onclick=async()=>{try{await exportPackage(selectedDocs())}catch(e){console.error(e);setStatus(e.message||'שגיאה בהפקה','err')}};
+$('buildSimulatorPack').onclick=async()=>{try{const testDocs=syntheticDocsFromTemplate(selectedDocs().length?selectedDocs():documents);await exportPackage(testDocs,{test:true})}catch(e){console.error(e);setStatus(e.message||'שגיאה בהפקת חבילת בדיקה','err')}};
+$('printVerification').onclick=()=>printHtml(verificationHtml());$('printRunReport').onclick=()=>printHtml(runReportHtml());
+
+onAuthStateChanged(auth,async user=>{if(!user){location.href='/';return}uid=user.uid;try{const [pSnap,docsSnap]=await Promise.all([getDoc(doc(db,'users',uid)),getDocs(collection(db,'ledgers',uid,'documents'))]);profile=pSnap.exists()?pSnap.data():{};documents=docsSnap.docs.map(x=>({id:x.id,...x.data()}));$('businessName').value=profile.businessName||'';$('businessId').value=profile.businessId||'';const warns=profileIssues();if(warns.length){$('profileWarning').textContent=warns.join(' · ');$('profileWarning').style.display='block'}renderMetrics(selectedDocs())}catch(e){console.error(e);setStatus('לא ניתן לטעון את נתוני העסק/המסמכים.','err')}});
+</script>
+</body>
+</html>
