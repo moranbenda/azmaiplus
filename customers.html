@@ -1628,7 +1628,7 @@ async function resendStoredDocument(docId){
           .totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}
           .totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}
           .totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}
-          @page{size:A4 portrait;margin:14mm}
+          @page{size:A4 landscape;margin:12mm}
         </style>
       </head>
       <body>
@@ -1813,8 +1813,8 @@ function renderSelected(){
     <section class="customer-documents-section">
       <div class="section-title-row">
         <div>
-          <h4>מסמכים</h4>
-          <div class="hint">כל המסמכים שהופקו ללקוח, כולל צפייה, PDF ושליחה חוזרת במייל.</div>
+          <h4>מסמכים והיסטוריית לקוח</h4>
+          <div class="hint">מסמכים שהופקו במערכת, ובנפרד גם הכנסות היסטוריות שיובאו ושויכו ללקוח. הכנסה מיובאת אינה מוצגת כאילו הופקה בעצמאי פלוס.</div>
         </div>
       </div>
       ${docsHtml}
@@ -1884,7 +1884,7 @@ function printCustomerLedger(id){
     </tr>`;
   }).join("");
   const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>כרטסת לקוח</title>
-  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}
+  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px;table-layout:auto}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}
     .customer-card{text-align:right;direction:rtl}
     .customer-card .name,.customer-card .hint{text-align:right}
     .customer-card .chips{justify-content:flex-start}
