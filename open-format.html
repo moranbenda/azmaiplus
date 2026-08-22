@@ -138,6 +138,40 @@ function makeC100(d,seq,link){
   s+=ymd(valueDate)+amt(0,15)+x('',3)+amt(before,15)+amt(discount,15,discount>0)+amt(d.net,15)+amt(d.vat,15)+amt(d.gross,15)+amt(d.withholdingTaxAmount||0,12)+x(shortCustomerKey(d),15)+x('',10)+x('',1)+ymd(d.date)+x('',7)+x((auth.currentUser?.email||'user').split('@')[0],9)+n(link,7)+x('',13);
   return fixed(s,444,'C100');
 }
+function makeB110(account,seq){
+  const c=account.customer||{};
+  let s='';
+  s+=x('B110',4)+n(seq,9)+n(profile.businessId,9)+x(account.key,15)+x(account.name||'לקוח',50);
+  s+=x('',15)+x('',30);
+  s+=x(c.street||c.address||'',50)+x(c.houseNumber||'',10)+x(c.city||'',30)+x(c.zip||c.postalCode||'',8)+x(c.country||'ישראל',30)+x(c.countryCode||'IL',2);
+  s+=x('',15);                       // חשבון מרכז
+  s+=amt(0,15);                      // יתרה בתחילת החתך
+  s+=amt(account.debit||0,15);       // סה"כ חובה
+  s+=amt(account.credit||0,15);      // סה"כ זכות
+  s+=n('',4);                        // קוד בסיווג החשבונאי
+  s+=n(c.taxId||c.vatId||c.businessId||c.idNumber||'',9);
+  s+=x('',7);                        // מזהה סניף/ענף
+  s+=amt(0,15)+x('',3)+x('',16);     // מט"ח + שטח עתידי
+  return fixed(s,376,'B110');
+}
+
+function accountRowsForDocs(docs){
+  const map=new Map();
+  docs.forEach(d=>{
+    const key=shortCustomerKey(d);
+    const c=d.customerSnapshot||{};
+    if(!map.has(key)) map.set(key,{key,name:d.customerName||c.name||c.businessName||'לקוח',customer:c,debit:0,credit:0});
+    const a=map.get(key);
+    const total=Math.abs(Number(d.gross||d.total||0));
+    const label=String(d.type||'');
+    if(label==='credit_note') a.credit+=total;
+    else if(label==='receipt') a.credit+=total;
+    else if(label==='tax_invoice_receipt'){a.debit+=total;a.credit+=total;}
+    else a.debit+=total;
+  });
+  return [...map.values()];
+}
+
 function makeD110(d,l,rowNo,seq,link){
   const tx=TX_TYPE[l.transactionType]||1;const unit=l.unit||'יחידה';const lineBefore=(Number(l.qty)||0)*(Number(l.netPrice)||0);const disc=Number(l.lineDiscount)||0;const lineNet=Math.max(0,lineBefore-disc);
   let s='';
@@ -153,8 +187,9 @@ function makeD120(d,p,rowNo,seq,link){
 function fixed(s,len,label){if(s.length!==len)throw new Error(`${label}: אורך רשומה ${s.length} במקום ${len}`);return s}
 
 function buildBkmv(docs,mainId){
-  const lines=[];let seq=1;const counts={A100:0,C100:0,D110:0,D120:0,Z900:0};
+  const lines=[];let seq=1;const counts={A100:0,B110:0,C100:0,D110:0,D120:0,Z900:0};
   lines.push(fixed(x('A100',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x(SYSTEM_CONSTANT,8)+x('',50),95,'A100'));counts.A100++;
+  accountRowsForDocs(docs).forEach(a=>{lines.push(makeB110(a,seq++));counts.B110++});
   docs.forEach((d,di)=>{const link=di+1;lines.push(makeC100(d,seq++,link));counts.C100++;(d.lines||[]).forEach((l,i)=>{lines.push(makeD110(d,l,i+1,seq++,link));counts.D110++});if(['receipt','tax_invoice_receipt'].includes(d.type)){paymentsForDoc(d).forEach((p,i)=>{lines.push(makeD120(d,p,i+1,seq++,link));counts.D120++})}});
   const total=lines.length+1;lines.push(fixed(x('Z900',4)+n(seq++,9)+n(profile.businessId,9)+n(mainId,15)+x(SYSTEM_CONSTANT,8)+n(total,15)+x('',50),110,'Z900'));counts.Z900++;
   return {text:crlf(lines),counts,total};
@@ -164,7 +199,7 @@ function buildIni(bkmv,mainId,range,started,pathText,registrationNumber){
   let a='';
   a+=x('A000',4)+x('',5)+n(bkmv.total,15)+n(profile.businessId,9)+n(mainId,15)+x(SYSTEM_CONSTANT,8)+reg+x(SOFTWARE_NAME,20)+x(SOFTWARE_VERSION,20)+makerId+x(MAKER_NAME,20)+n(2,1)+x(pathText,50)+n(0,1)+x('',1)+n('',9)+n(profile.withholdingFileNumber||'',9)+x('',10)+x(profile.businessName||'',50)+x(profile.businessStreet||'',50)+x(profile.businessHouseNumber||'',10)+x(profile.businessCity||'',30)+x(profile.businessZip||'',8)+n('',4)+ymd(range.from)+ymd(range.to)+ymd(started)+hm(started)+n(0,1)+n(1,1)+x('Browser',20)+x('ILS',3)+n(0,1)+x('',46);
   a=fixed(a,466,'A000');
-  const summary=[];for(const code of ['A100','C100','D110','D120','Z900']){const count=bkmv.counts[code]||0;if(count)summary.push(x(code,4)+n(count,15))}
+  const summary=[];for(const code of ['A100','B110','C100','D110','D120','Z900']){const count=bkmv.counts[code]||0;if(count)summary.push(x(code,4)+n(count,15))}
   return crlf([a,...summary]);
 }
 function validateDocs(docs){
@@ -197,9 +232,9 @@ async function exportPackage(docs,{test=false}={}){
 }
 function syntheticDocsFromTemplate(baseDocs){const template=baseDocs.find(d=>eligible(d));if(!template)throw new Error('צריך לפחות מסמך אחד אמיתי שישמש כתבנית לחבילת הבדיקה.');const per=1+(template.lines?.length||1)+(['receipt','tax_invoice_receipt'].includes(template.type)?Math.max(1,paymentsForDoc(template).length||1):0);const needed=Math.ceil((2000-2)/per);const date=$('fromDate').value||new Date().toISOString().slice(0,10);const out=[];for(let i=1;i<=needed;i++){const clone=structuredClone(template);clone.id=`SIM-${i}`;clone.number=`SIM${String(i).padStart(8,'0')}`;clone.date=date;clone.issuedAt=`${date}T12:00:00`;clone.createdAt=clone.issuedAt;clone.customerId=`SIMCUST${String(i).padStart(7,'0')}`;out.push(clone)}return out}
 
-function renderMetrics(docs,counts=null){$('mDocs').textContent=docs.length;$('mC100').textContent=counts?.C100??docs.length;$('mD110').textContent=counts?.D110??docs.reduce((s,d)=>s+(d.lines?.length||0),0);$('mD120').textContent=counts?.D120??docs.reduce((s,d)=>s+(['receipt','tax_invoice_receipt'].includes(d.type)?paymentsForDoc(d).length:0),0);const pIssues=profileIssues(),dIssues=validateDocs(docs);const checks=[['פרטי עסק',pIssues.some(x=>!x.includes('כתובת'))?'err':pIssues.length?'warn':'ok',pIssues.join(' · ')||'תקין'],['מסמכים בטווח',docs.length?'ok':'warn',docs.length?`${docs.length} מסמכים ייכללו`:'אין מסמכים בטווח'],['פרטי תקבול',dIssues.some(x=>x.includes('תקבול'))?'err':'ok',dIssues.filter(x=>x.includes('תקבול')).slice(0,2).join(' · ')||'תקין'],['מבנה רשומות','ok','מבנה 1.31: קבוע מערכת רשמי, קישור C100↔D110/D120 ואורכי רשומות נבדקים לפני הורדה'],['סט תווים','ok','ISO-8859-8'],['מספר רישום תוכנה',$('registrationNumber').value==='00000000'?'warn':'ok',$('registrationNumber').value==='00000000'?'טרם הוקצה — יש לאמת את ערך הבדיקה לפני הגשה':'הוזן מספר רישום']];$('checksBody').innerHTML=checks.map(r=>`<tr><td>${r[0]}</td><td><span class="pill ${r[1]}">${r[1]==='ok'?'תקין':r[1]==='warn'?'לתשומת לב':'חסר'}</span></td><td>${r[2]}</td></tr>`).join('');}
+function renderMetrics(docs,counts=null){$('mDocs').textContent=docs.length;$('mC100').textContent=counts?.C100??docs.length;$('mD110').textContent=counts?.D110??docs.reduce((s,d)=>s+(d.lines?.length||0),0);$('mD120').textContent=counts?.D120??docs.reduce((s,d)=>s+(['receipt','tax_invoice_receipt'].includes(d.type)?paymentsForDoc(d).length:0),0);const pIssues=profileIssues(),dIssues=validateDocs(docs);const checks=[['פרטי עסק',pIssues.some(x=>!x.includes('כתובת'))?'err':pIssues.length?'warn':'ok',pIssues.join(' · ')||'תקין'],['מסמכים בטווח',docs.length?'ok':'warn',docs.length?`${docs.length} מסמכים ייכללו`:'אין מסמכים בטווח'],['פרטי תקבול',dIssues.some(x=>x.includes('תקבול'))?'err':'ok',dIssues.filter(x=>x.includes('תקבול')).slice(0,2).join(' · ')||'תקין'],['מבנה רשומות','ok','מבנה 1.31: A100/B110/C100/D110/D120/Z900, קישורים ואורכי רשומות נבדקים לפני הורדה'],['סט תווים','ok','ISO-8859-8'],['מספר רישום תוכנה',$('registrationNumber').value==='00000000'?'warn':'ok',$('registrationNumber').value==='00000000'?'טרם הוקצה — יש לאמת את ערך הבדיקה לפני הגשה':'הוזן מספר רישום']];$('checksBody').innerHTML=checks.map(r=>`<tr><td>${r[0]}</td><td><span class="pill ${r[1]}">${r[1]==='ok'?'תקין':r[1]==='warn'?'לתשומת לב':'חסר'}</span></td><td>${r[2]}</td></tr>`).join('');}
 function verificationHtml(){const docs=selectedDocs();const sums={};Object.keys(DOC_LABELS).forEach(k=>sums[k]={count:0,total:0});docs.forEach(d=>{const c=docCode(d);if(!c)return;sums[c].count++;sums[c].total+=Number(d.gross)||0});return `<h2>דוח אימות נתונים – מסמכים</h2><p>בית עסק: <b>${profile.businessName||''}</b> · מספר עוסק: ${profile.businessId||''}</p><p>טווח: ${$('fromDate').value} עד ${$('toDate').value}</p><table><thead><tr><th>מספר מסמך</th><th>סוג מסמך</th><th>סה״כ כמותי</th><th>סה״כ כספי (₪)</th></tr></thead><tbody>${Object.entries(DOC_LABELS).map(([code,label])=>`<tr><td>${code}</td><td>${label}</td><td>${sums[code]?.count||0}</td><td>${money(sums[code]?.total||0)}</td></tr>`).join('')}</tbody></table>`}
-function runReportHtml(){if(!lastRun)return '<p>טרם בוצעה הפקה.</p>';return `<h2>הפקת קבצים במבנה אחיד עבור</h2><p><b>מספר עוסק:</b> ${profile.businessId||''}<br><b>שם בית העסק:</b> ${profile.businessName||''}<br><b>ביצוע ממשק פתוח הסתיים בהצלחה.</b><br><b>הנתונים נשמרו בנתיב:</b> ${lastRun.folder}<br><b>טווח תאריכים:</b> ${lastRun.range.from} עד ${lastRun.range.to}</p><table><thead><tr><th>קוד רשומה</th><th>תיאור</th><th>סך רשומות</th></tr></thead><tbody>${[['A100','רשומת פתיחה'],['C100','כותרת מסמך'],['D110','פרטי מסמך'],['D120','פרטי קבלות'],['Z900','רשומת סיום']].filter(([c])=>lastRun.counts[c]).map(([c,l])=>`<tr><td>${c}</td><td>${l}</td><td>${lastRun.counts[c]}</td></tr>`).join('')}</tbody></table><p>הנתונים הופקו באמצעות תוכנת ${SOFTWARE_NAME}, מספר תעודת הרישום: ${lastRun.registrationNumber||'00000000'}<br>בתאריך ${lastRun.started.toLocaleDateString('he-IL')} בשעה ${lastRun.started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>${lastRun.test?'<p><b>חבילת בדיקה לסימולטור — נתונים סינתטיים.</b></p>':''}`}
+function runReportHtml(){if(!lastRun)return '<p>טרם בוצעה הפקה.</p>';return `<h2>הפקת קבצים במבנה אחיד עבור</h2><p><b>מספר עוסק:</b> ${profile.businessId||''}<br><b>שם בית העסק:</b> ${profile.businessName||''}<br><b>ביצוע ממשק פתוח הסתיים בהצלחה.</b><br><b>הנתונים נשמרו בנתיב:</b> ${lastRun.folder}<br><b>טווח תאריכים:</b> ${lastRun.range.from} עד ${lastRun.range.to}</p><table><thead><tr><th>קוד רשומה</th><th>תיאור</th><th>סך רשומות</th></tr></thead><tbody>${[['A100','רשומת פתיחה'],['B110','חשבון בהנהלת חשבונות'],['C100','כותרת מסמך'],['D110','פרטי מסמך'],['D120','פרטי קבלות'],['Z900','רשומת סיום']].filter(([c])=>lastRun.counts[c]).map(([c,l])=>`<tr><td>${c}</td><td>${l}</td><td>${lastRun.counts[c]}</td></tr>`).join('')}</tbody></table><p>הנתונים הופקו באמצעות תוכנת ${SOFTWARE_NAME}, מספר תעודת הרישום: ${lastRun.registrationNumber||'00000000'}<br>בתאריך ${lastRun.started.toLocaleDateString('he-IL')} בשעה ${lastRun.started.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>${lastRun.test?'<p><b>חבילת בדיקה לסימולטור — נתונים סינתטיים.</b></p>':''}`}
 function printHtml(html){$('printArea').innerHTML=html;window.print()}
 
 $('fromDate').value=`${new Date().getFullYear()}-01-01`;$('toDate').value=new Date().toISOString().slice(0,10);
