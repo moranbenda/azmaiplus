@@ -142,7 +142,10 @@ function makeB110(account,seq){
   const c=account.customer||{};
   let s='';
   s+=x('B110',4)+n(seq,9)+n(profile.businessId,9)+x(account.key,15)+x(account.name||'לקוח',50);
-  s+=x('',15)+x('',30);
+  // שדות 1405–1406 הם שדות חובה במבנה אחיד 1.31.
+  // מאחר שהאפליקציה אינה מנהלת הנה"ח כפולה/מאזן בוחן מלא,
+  // אנו נותנים לכל כרטיס לקוח קוד מאזן פנימי יציב ותיאור ברור.
+  s+=x('CUSTOMERS',15)+x('לקוחות',30);
   s+=x(c.street||c.address||'',50)+x(c.houseNumber||'',10)+x(c.city||'',30)+x(c.zip||c.postalCode||'',8)+x(c.country||'ישראל',30)+x(c.countryCode||'IL',2);
   s+=x('',15);                       // חשבון מרכז
   s+=amt(0,15);                      // יתרה בתחילת החתך
