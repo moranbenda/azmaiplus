@@ -1121,6 +1121,8 @@ function docsForCustomer(customer){
       gross: Number(r.amount || 0),
       desc: r.desc || "",
       valueDate: r.valueDate || "",
+      paid: !!r.paid,
+      paidAt: r.paidAt || null,
       _importedIncome: true,
       createdAt: r.createdAt || ""
     }));
@@ -1210,6 +1212,85 @@ function openInvoiceSummary(docs){
     count: openDocs.length,
     total: openDocs.reduce((sum, d) => sum + documentDisplayTotal(d), 0)
   };
+}
+
+async function setImportedIncomePaidStatus(rowId, paid, paymentDate){
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
+    showToast("לא ניתן לעדכן את התשלום בהכנסה המיובאת הזו.", true);
+    return;
+  }
+
+  const previousPaid = !!ledgerRows[idx].paid;
+  const previousPaidAt = ledgerRows[idx].paidAt || null;
+
+  let paidAt = null;
+  if (paid) {
+    const chosen = String(paymentDate || "").trim() || String(ledgerRows[idx].date || "").slice(0,10);
+    paidAt = chosen ? `${chosen}T12:00:00.000Z` : new Date().toISOString();
+  }
+
+  ledgerRows[idx] = {
+    ...ledgerRows[idx],
+    paid: !!paid,
+    paidAt
+  };
+
+  try {
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
+
+    await writeAuditLog(paid ? "הכנסה מיובאת סומנה כשולמה" : "הכנסה מיובאת נפתחה מחדש לתשלום", {
+      entityType: "הכנסה מיובאת",
+      entityId: rowId,
+      paid: !!paid,
+      paidAt
+    });
+
+    renderSelected();
+    showToast(paid ? "ההכנסה סומנה כשולמה." : "ההכנסה סומנה כפתוחה לתשלום.");
+  } catch (err) {
+    console.error("Imported income payment update failed:", err);
+    ledgerRows[idx] = {
+      ...ledgerRows[idx],
+      paid: previousPaid,
+      paidAt: previousPaidAt
+    };
+    showToast("שמירת סטטוס התשלום נכשלה.", true);
+    renderSelected();
+  }
+}
+
+async function setImportedIncomePaymentDate(rowId, paymentDate){
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
+    showToast("לא ניתן לעדכן את תאריך התשלום.", true);
+    return;
+  }
+  if (!ledgerRows[idx].paid) return;
+
+  const previousPaidAt = ledgerRows[idx].paidAt || null;
+  const chosen = String(paymentDate || "").trim();
+  ledgerRows[idx] = {
+    ...ledgerRows[idx],
+    paidAt: chosen ? `${chosen}T12:00:00.000Z` : previousPaidAt
+  };
+
+  try {
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
+    renderSelected();
+    showToast("תאריך התשלום עודכן.");
+  } catch (err) {
+    console.error("Imported income payment date update failed:", err);
+    ledgerRows[idx] = {...ledgerRows[idx], paidAt: previousPaidAt};
+    showToast("שמירת תאריך התשלום נכשלה.", true);
+    renderSelected();
+  }
 }
 
 async function setDocumentPaidStatus(docId, paid){
@@ -1754,7 +1835,10 @@ function renderSelected(){
           ${docs.map(d => {
             const payable = isPayableInvoice(d);
             const paid = !!d.paid;
-            const canPersistPaid = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
+            const importedPayable = payable && !!d._importedIncome && !!d.id;
+            const issuedPayable = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
+            const canPersistPaid = importedPayable || issuedPayable;
+            const paymentDate = d.paidAt ? String(d.paidAt).slice(0,10) : String(d.date || "").slice(0,10);
 
             return `
               <tr class="${payable && !paid ? "open-payment-row" : ""}">
@@ -1764,13 +1848,24 @@ function renderSelected(){
                 <td data-label="סכום"><strong>${money(documentDisplayTotal(d))}</strong></td>
                 <td data-label="סטטוס תשלום">
                   ${payable ? `
-                    <label class="payment-check-label">
-                      <input type="checkbox"
-                             data-paid-doc="${escapeHtml(d.id || "")}"
-                             ${paid ? "checked" : ""}
-                             ${canPersistPaid ? "" : "disabled"} />
-                      <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
-                    </label>
+                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                      <label class="payment-check-label">
+                        <input type="checkbox"
+                               ${d._importedIncome ? `data-paid-import="${escapeHtml(d.id || "")}"` : `data-paid-doc="${escapeHtml(d.id || "")}"`}
+                               ${paid ? "checked" : ""}
+                               ${canPersistPaid ? "" : "disabled"} />
+                        <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
+                      </label>
+                      ${d._importedIncome && paid ? `
+                        <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
+                          תאריך תשלום
+                          <input type="date"
+                                 data-paid-date-import="${escapeHtml(d.id || "")}"
+                                 value="${escapeHtml(paymentDate)}"
+                                 style="width:auto;padding:5px 7px;font-size:12px" />
+                        </label>
+                      ` : ""}
+                    </div>
                   ` : `<span class="payment-na">—</span>`}
                 </td>
                 <td data-label="פעולות">
@@ -1880,6 +1975,23 @@ function renderSelected(){
       await setDocumentPaidStatus(input.dataset.paidDoc, input.checked);
     });
   });
+
+  body.querySelectorAll("[data-paid-import]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      const rowId = input.dataset.paidImport;
+      const d = docs.find(x => String(x.id || "") === String(rowId || "") && x._importedIncome);
+      const defaultDate = String(d?.paidAt || d?.date || "").slice(0,10);
+      await setImportedIncomePaidStatus(rowId, input.checked, defaultDate);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-date-import]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      await setImportedIncomePaymentDate(input.dataset.paidDateImport, input.value);
+    });
+  });
 }
 
 function addDaysToIso(dateStr, days){
@@ -1931,21 +2043,51 @@ function printCustomerLedger(id){
   const c = customers.find(x => x.id === id);
   if (!c) return;
   const docs = docsForCustomer(c).slice().sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")));
-  let runningBalance = 0;
-  const rows = docs.map(d => {
+  const movements = [];
+  docs.forEach(d => {
     const {debit, credit} = ledgerDebitCredit(d);
-    runningBalance += debit - credit;
     const detailsBase = d.documentTitle || d.title || d.desc || documentDisplayType(d);
     const details = `${detailsBase || documentDisplayType(d)}${d._importedIncome ? " · היסטוריה מיובאת" : ""}`;
-    const valueDate = ledgerValueDate(d, c);
+    movements.push({
+      date: d.date || "",
+      valueDate: ledgerValueDate(d, c),
+      details,
+      number: d.number || "",
+      debit,
+      credit,
+      order: 1
+    });
+
+    if (d._importedIncome && isPayableInvoice(d) && d.paid) {
+      const paidDate = String(d.paidAt || d.date || "").slice(0,10);
+      movements.push({
+        date: paidDate,
+        valueDate: paidDate,
+        details: `תשלום עבור ${documentDisplayType(d)} ${d.number || ""} · היסטוריה מיובאת`,
+        number: d.number || "",
+        debit: 0,
+        credit: Math.abs(documentDisplayTotal(d)),
+        order: 2
+      });
+    }
+  });
+
+  movements.sort((a,b) =>
+    String(a.date || "").localeCompare(String(b.date || "")) ||
+    Number(a.order || 0) - Number(b.order || 0)
+  );
+
+  let runningBalance = 0;
+  const rows = movements.map(m => {
+    runningBalance += Number(m.debit || 0) - Number(m.credit || 0);
     return `
     <tr>
-      <td><span class="ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
-      <td><span class="ltr">${escapeHtml(formatDisplayDate(valueDate || ""))}</span></td>
-      <td>${escapeHtml(details)}</td>
-      <td>${escapeHtml(d.number || "")}</td>
-      <td class="money">${debit ? Number(debit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
-      <td class="money">${credit ? Number(credit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
+      <td><span class="ltr">${escapeHtml(formatDisplayDate(m.date || ""))}</span></td>
+      <td><span class="ltr">${escapeHtml(formatDisplayDate(m.valueDate || ""))}</span></td>
+      <td>${escapeHtml(m.details || "")}</td>
+      <td>${escapeHtml(m.number || "")}</td>
+      <td class="money">${m.debit ? Number(m.debit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
+      <td class="money">${m.credit ? Number(m.credit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
       <td class="money balance">${Number(runningBalance).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
     </tr>`;
   }).join("");
