@@ -359,6 +359,18 @@
     .customers-table td:first-child{font-size:14px;color:#0f2748}
     .customer-id-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
 
+
+    .customer-switcher{position:relative;min-width:280px;max-width:380px;flex:1 1 300px}
+    .customer-switcher input{height:40px;padding:9px 12px;border-radius:12px;background:#fff}
+    .customer-switcher-results{position:absolute;top:calc(100% + 6px);right:0;left:0;z-index:50;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 36px rgba(15,39,72,.16);overflow:hidden;display:none;max-height:300px;overflow-y:auto}
+    .customer-switcher-results.open{display:block}
+    .customer-switcher-item{width:100%;border:0;border-bottom:1px solid #edf1f7;background:#fff;padding:10px 12px;text-align:right;cursor:pointer;font:inherit;color:var(--text)}
+    .customer-switcher-item:last-child{border-bottom:0}
+    .customer-switcher-item:hover,.customer-switcher-item.active{background:#eef6ff}
+    .customer-switcher-item strong{display:block;color:#0f2748}
+    .customer-switcher-item span{display:block;margin-top:2px;font-size:12px;color:var(--text-dim)}
+    .customer-switcher-empty{padding:12px;color:var(--text-dim);font-size:13px}
+    @media(max-width:700px){.customer-switcher{min-width:100%;max-width:none;order:3}}
     .back-customers-btn{
       background:#0f4b63;
       border-color:#0f4b63;
@@ -723,6 +735,10 @@
       <h3>כרטיס לקוח</h3>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div class="status" id="selectedStatus">בחרו לקוח מהרשימה</div>
+        <div class="customer-switcher" id="customerSwitcher">
+          <input id="customerSwitcherInput" type="search" placeholder="חיפוש ומעבר ללקוח אחר…" autocomplete="off" aria-label="חיפוש ומעבר ללקוח אחר" />
+          <div class="customer-switcher-results" id="customerSwitcherResults" role="listbox"></div>
+        </div>
         <button class="btn back-customers-btn" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
       </div>
     </div>
@@ -1839,6 +1855,51 @@ async function resendStoredDocument(docId){
   }
 }
 
+function closeCustomerSwitcher(){
+  const results = $("customerSwitcherResults");
+  if (results) {
+    results.classList.remove("open");
+    results.innerHTML = "";
+  }
+}
+
+function renderCustomerSwitcherResults(){
+  const input = $("customerSwitcherInput");
+  const results = $("customerSwitcherResults");
+  if (!input || !results || !selectedId) return;
+
+  const q = String(input.value || "").trim();
+  if (!q) {
+    closeCustomerSwitcher();
+    return;
+  }
+
+  const matches = customers
+    .filter(c => c.id !== selectedId && customerMatches(c, q))
+    .sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "he"))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    results.innerHTML = `<div class="customer-switcher-empty">לא נמצאו לקוחות מתאימים.</div>`;
+    results.classList.add("open");
+    return;
+  }
+
+  results.innerHTML = matches.map(c => {
+    const secondary = [c.taxId, c.email, c.phone].filter(Boolean).join(" · ");
+    return `<button type="button" class="customer-switcher-item" data-customer-switch-id="${escapeHtml(c.id)}" role="option"><strong>${escapeHtml(c.name || "—")}</strong>${secondary ? `<span>${escapeHtml(secondary)}</span>` : ""}</button>`;
+  }).join("");
+  results.classList.add("open");
+}
+
+function switchDirectlyToCustomer(id){
+  if (!id || id === selectedId || !customers.some(c => c.id === id)) return;
+  closeCustomerSwitcher();
+  const input = $("customerSwitcherInput");
+  if (input) input.value = "";
+  selectCustomer(id);
+}
+
 function renderSelected(){
   const c = customers.find(x => x.id === selectedId);
   const status = $("selectedStatus");
@@ -1853,6 +1914,9 @@ function renderSelected(){
 
   $("selectedCard").style.display = "";
   status.textContent = c.name;
+  const switcherInput = $("customerSwitcherInput");
+  if (switcherInput) switcherInput.value = "";
+  closeCustomerSwitcher();
 
   const docs = docsForCustomer(c);
   const revenueTotal = customerRevenueTotal(docs);
@@ -2381,6 +2445,35 @@ $("btnSaveCustomer").addEventListener("click", saveCurrentCustomer);
     render();
   });
 });
+const customerSwitcherInput = $("customerSwitcherInput");
+const customerSwitcherResults = $("customerSwitcherResults");
+customerSwitcherInput?.addEventListener("input", renderCustomerSwitcherResults);
+customerSwitcherInput?.addEventListener("focus", () => {
+  if (String(customerSwitcherInput.value || "").trim()) renderCustomerSwitcherResults();
+});
+customerSwitcherInput?.addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape") {
+    closeCustomerSwitcher();
+    customerSwitcherInput.blur();
+    return;
+  }
+  if (ev.key === "Enter") {
+    const first = customerSwitcherResults?.querySelector("[data-customer-switch-id]");
+    if (first) {
+      ev.preventDefault();
+      switchDirectlyToCustomer(first.dataset.customerSwitchId);
+    }
+  }
+});
+customerSwitcherResults?.addEventListener("click", (ev) => {
+  const btn = ev.target.closest("[data-customer-switch-id]");
+  if (btn) switchDirectlyToCustomer(btn.dataset.customerSwitchId);
+});
+document.addEventListener("click", (ev) => {
+  const switcher = $("customerSwitcher");
+  if (switcher && !switcher.contains(ev.target)) closeCustomerSwitcher();
+});
+
 $("btnExportCsv").addEventListener("click", exportCsv);
 $("btnPrint").addEventListener("click", printCustomersList);
 
