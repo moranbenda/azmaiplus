@@ -360,7 +360,24 @@
     .customer-id-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
 
 
-    .customer-switcher{position:relative;min-width:280px;max-width:380px;flex:1 1 300px}
+    .selected-card-nav{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      flex-wrap:wrap;
+      min-width:0;
+    }
+    .selected-card-nav-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:nowrap;
+      min-width:0;
+    }
+    .selected-customer-status{
+      white-space:nowrap;
+    }
+    .customer-switcher{position:relative;min-width:300px;max-width:380px;flex:0 1 380px}
     .customer-switcher input{height:40px;padding:9px 12px;border-radius:12px;background:#fff}
     .customer-switcher-results{position:absolute;top:calc(100% + 6px);right:0;left:0;z-index:50;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 36px rgba(15,39,72,.16);overflow:hidden;display:none;max-height:300px;overflow-y:auto}
     .customer-switcher-results.open{display:block}
@@ -370,7 +387,13 @@
     .customer-switcher-item strong{display:block;color:#0f2748}
     .customer-switcher-item span{display:block;margin-top:2px;font-size:12px;color:var(--text-dim)}
     .customer-switcher-empty{padding:12px;color:var(--text-dim);font-size:13px}
-    @media(max-width:700px){.customer-switcher{min-width:100%;max-width:none;order:3}}
+    @media(max-width:700px){
+      .selected-card-nav{width:100%;align-items:stretch}
+      .selected-customer-status{width:100%}
+      .selected-card-nav-actions{width:100%;flex-wrap:wrap}
+      .customer-switcher{min-width:100%;max-width:none;flex:1 1 100%}
+      .back-customers-btn{width:100%}
+    }
     .back-customers-btn{
       background:#0f4b63;
       border-color:#0f4b63;
@@ -733,13 +756,15 @@
   <section class="card" style="margin-top:14px;display:none" id="selectedCard">
     <div class="card-hd">
       <h3>כרטיס לקוח</h3>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <div class="status" id="selectedStatus">בחרו לקוח מהרשימה</div>
-        <div class="customer-switcher" id="customerSwitcher">
-          <input id="customerSwitcherInput" type="search" placeholder="חיפוש ומעבר ללקוח אחר…" autocomplete="off" aria-label="חיפוש ומעבר ללקוח אחר" />
-          <div class="customer-switcher-results" id="customerSwitcherResults" role="listbox"></div>
+      <div class="selected-card-nav">
+        <div class="status selected-customer-status" id="selectedStatus">בחרו לקוח מהרשימה</div>
+        <div class="selected-card-nav-actions">
+          <div class="customer-switcher" id="customerSwitcher">
+            <input id="customerSwitcherInput" type="search" placeholder="חיפוש ומעבר ללקוח אחר…" autocomplete="off" aria-label="חיפוש ומעבר ללקוח אחר" />
+            <div class="customer-switcher-results" id="customerSwitcherResults" role="listbox"></div>
+          </div>
+          <button class="btn back-customers-btn" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
         </div>
-        <button class="btn back-customers-btn" id="btnBackToCustomers" type="button">חזרה לרשימת הלקוחות</button>
       </div>
     </div>
     <div class="card-bd" id="selectedBody">
