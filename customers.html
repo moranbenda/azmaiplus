@@ -1177,7 +1177,11 @@ function isTransactionInvoiceDocument(d){
 
 function isPayableInvoice(d){
   const type = normalizedDocumentType(d);
-  const invoiceLike = isTaxInvoiceDocument(d) || isTransactionInvoiceDocument(d);
+  // Imported historical income can arrive with the generic document type "חשבונית".
+  // Treat that generic imported invoice as payable too, while still excluding
+  // receipts / invoice-receipts and credit documents.
+  const importedGenericInvoice = !!d._importedIncome && type.includes("חשבונית");
+  const invoiceLike = isTaxInvoiceDocument(d) || isTransactionInvoiceDocument(d) || importedGenericInvoice;
   return invoiceLike && !type.includes("קבלה") && !isCreditDocument(d);
 }
 
