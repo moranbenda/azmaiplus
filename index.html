@@ -1288,6 +1288,11 @@ body.account-frozen .readonly-disabled{
         <div><label>קטגוריה</label><select id="eCategory"><option value="">בחירת קטגוריה</option></select></div>
         <div><label>מס׳ חשבונית / אסמכתא</label><input type="text" id="eDocNumber" /></div>
         <div><label>סכום (₪)</label><input type="number" step="0.01" id="eAmount" /></div>
+        <div id="eCustomerWrap" style="grid-column:1 / -1">
+          <label>שיוך לכרטיס לקוח</label>
+          <select id="eCustomerId"><option value="">ללא שיוך</option></select>
+          <div class="hint">מיועד לנוחות והיסטוריית הלקוח בלבד. שיוך של הכנסה שיובאה מתוכנה קודמת אינו הופך אותה למסמך שהופק בעצמאי פלוס.</div>
+        </div>
         <div class="pill" style="align-self:end">
           <input type="checkbox" id="eIncVAT" />
           <label for="eIncVAT">סכום כולל מע"מ</label>
@@ -4711,12 +4716,28 @@ async function addRow() {
 
 let editingId = null;
 
-function openEdit(id) {
+async function openEdit(id) {
   updateFiltersUI();
   const r = rows.find(x => x.id === id);
   if (!r) return;
 
   editingId = id;
+  const eCustomerWrap = document.getElementById("eCustomerWrap");
+  const eCustomerId = document.getElementById("eCustomerId");
+  if (eCustomerWrap && eCustomerId) {
+    eCustomerWrap.style.display = r.type === "income" ? "" : "none";
+    if (r.type === "income") {
+      try { importCustomerOptions = await getCustomersForReports(); } catch { importCustomerOptions = []; }
+      const currentId = String(r.customerId || "");
+      eCustomerId.innerHTML = '<option value="">ללא שיוך</option>' + importCustomerOptions.map(c => {
+        const cid = String(c.id || "");
+        const cname = c.name || c.businessName || c.customerName || "לקוח";
+        return `<option value="${escapeHtml(cid)}" ${cid === currentId ? "selected" : ""}>${escapeHtml(cname)}</option>`;
+      }).join("");
+    } else {
+      eCustomerId.value = "";
+    }
+  }
   eDate.value = r.date;
   eType.value = r.type;
   eCategory.value = r.category || "";
@@ -4733,6 +4754,11 @@ function openEdit(id) {
 
   editDialog.showModal();
 }
+
+document.getElementById("eType")?.addEventListener("change", () => {
+  const wrap = document.getElementById("eCustomerWrap");
+  if (wrap) wrap.style.display = document.getElementById("eType")?.value === "income" ? "" : "none";
+});
 
 function saveEdit() {
   const r = rows.find(x => x.id === editingId);
@@ -4762,6 +4788,15 @@ function saveEdit() {
   r.desc = candidate.desc;
   r.docNumber = candidate.docNumber;
   r.amount = candidate.amount;
+  if (r.type === "income") {
+    const eCustomerId = document.getElementById("eCustomerId");
+    const linkedId = String(eCustomerId?.value || "");
+    r.customerId = linkedId;
+    const linkedCustomer = importCustomerOptions.find(c => String(c.id || "") === linkedId);
+    r.clientName = linkedCustomer ? (linkedCustomer.name || linkedCustomer.businessName || linkedCustomer.customerName || r.clientName || "") : (r.clientName || "");
+  } else {
+    r.customerId = "";
+  }
   r.incVat = !!eIncVAT.checked;
   r.deductPct = Math.max(0, Math.min(100, parseFloat(eDeduct.value || "100")));
 
@@ -4792,6 +4827,7 @@ function deleteRow() {
 
 let importIncomeRows = [];
 let importRawRows = [];
+let importCustomerOptions = [];
 
 function normalizeImportHeader(h = "") {
   return String(h || "").replace(/﻿/g, "").trim().toLowerCase();
@@ -5057,6 +5093,31 @@ function isImportedRowDuplicate(item, existingRows = []) {
   });
 }
 
+function normalizeImportCustomerName(v='') {
+  return String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function autoMatchImportCustomerId(clientName='') {
+  const key = normalizeImportCustomerName(clientName);
+  if (!key) return '';
+  const exact = importCustomerOptions.find(c => normalizeImportCustomerName(c.name || c.businessName || c.customerName) === key);
+  return exact ? String(exact.id || '') : '';
+}
+
+function importCustomerSelectOptions(row={}) {
+  const selected = String(row.customerId || autoMatchImportCustomerId(row.clientName) || '');
+  const options = ['<option value="">ללא שיוך</option>'];
+  for (const c of importCustomerOptions) {
+    const id = String(c.id || '');
+    if (!id) continue;
+    const name = c.name || c.businessName || c.customerName || 'לקוח';
+    options.push(`<option value="${escapeHtml(id)}" ${id === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`);
+  }
+  if (row.clientName && !selected) options.push('<option value="__create__" selected>+ יצירת לקוח חדש מהשם בקובץ</option>');
+  else if (row.clientName) options.push('<option value="__create__">+ יצירת לקוח חדש מהשם בקובץ</option>');
+  return options.join('');
+}
+
 function renderImportIncomePreview() {
   if (!importIncomePreviewBody) return;
   const kind = getImportKind();
@@ -5064,9 +5125,9 @@ function renderImportIncomePreview() {
   if (head) {
     head.innerHTML = kind === 'expense'
       ? '<th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>ספק / תיאור</th><th>קטגוריה</th><th>תיאור</th><th>סכום כולל</th>'
-      : '<th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>לקוח</th><th>תיאור</th><th>סכום כולל</th>';
+      : '<th>ייבוא</th><th>תאריך</th><th>סוג מסמך</th><th>מס׳ מסמך</th><th>שם לקוח בקובץ</th><th>שיוך לכרטיס לקוח</th><th>תיאור</th><th>סכום כולל</th>';
   }
-  const colspan = kind === 'expense' ? 8 : 7;
+  const colspan = kind === 'expense' ? 8 : 8;
   if (!importIncomeRows.length) {
     importIncomePreviewBody.innerHTML = `<tr><td colspan="${colspan}" class="muted" style="text-align:center;padding:16px">טרם נטען קובץ</td></tr>`;
     return;
@@ -5081,10 +5142,14 @@ function renderImportIncomePreview() {
     const categoryCell = kind === 'expense'
       ? `<td><select class="imp-category" style="min-width:160px">${expenseImportCategoryOptions(row.category || 'טרם סווג')}</select></td>`
       : '';
+    const customerLinkCell = kind === 'income'
+      ? `<td><select class="imp-customer-id" style="min-width:210px">${importCustomerSelectOptions(row)}</select></td>`
+      : '';
     return `
       <tr data-idx="${idx}">
         ${base}
         ${categoryCell}
+        ${customerLinkCell}
         <td><input class="imp-desc" type="text" value="${escapeHtml(row.desc || '')}" style="min-width:240px"></td>
         <td><input class="imp-amount" type="number" step="0.01" value="${Number.isFinite(row.amount) ? row.amount : ''}" style="min-width:100px"></td>
       </tr>`;
@@ -5100,6 +5165,7 @@ function syncImportIncomeRowsFromPreview() {
     docType: (tr.querySelector('.imp-doctype')?.value || '').trim(),
     docNumber: (tr.querySelector('.imp-doc')?.value || '').trim(),
     clientName: (tr.querySelector('.imp-client')?.value || '').trim(),
+    customerId: kind === 'income' ? (tr.querySelector('.imp-customer-id')?.value || '') : '',
     category: kind === 'expense' ? ((tr.querySelector('.imp-category')?.value || 'טרם סווג').trim()) : '',
     desc: (tr.querySelector('.imp-desc')?.value || '').trim(),
     amount: parseFloat(tr.querySelector('.imp-amount')?.value || '0') || 0,
@@ -5179,6 +5245,7 @@ function rowsFromParsedImportData(rawRows = [], kind = getImportKind()) {
       docType,
       docNumber,
       clientName: partyName,
+      customerId: autoMatchImportCustomerId(partyName),
       desc: buildImportedIncomeDescription(docNumber, partyName, subject, docType),
       amount,
       incVat: true,
@@ -5249,9 +5316,10 @@ function rebuildImportPreviewForCurrentKind() {
   }
 }
 
-function openIncomeImportDialog() {
+async function openIncomeImportDialog() {
   importIncomeRows = [];
   importRawRows = [];
+  try { importCustomerOptions = await getCustomersForReports(); } catch { importCustomerOptions = []; }
   if (importKind) importKind.value = 'income';
   if (importIncomeFile) importIncomeFile.value = '';
   if (importIncomeStatus) importIncomeStatus.textContent = '';
@@ -5259,7 +5327,7 @@ function openIncomeImportDialog() {
   importIncomeDialog?.showModal();
 }
 
-function confirmIncomeImport() {
+async function confirmIncomeImport() {
   syncImportIncomeRowsFromPreview();
   const selected = importIncomeRows.filter(r => r.include);
   if (!selected.length) {
@@ -5275,6 +5343,23 @@ function confirmIncomeImport() {
     if (duplicate) { skipped++; continue; }
 
     const rowType = kind === 'expense' ? 'expense' : 'income';
+    let linkedCustomerId = rowType === 'income' ? String(item.customerId || autoMatchImportCustomerId(item.clientName) || '') : '';
+    if (rowType === 'income' && linkedCustomerId === '__create__' && item.clientName) {
+      linkedCustomerId = crypto?.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+      const createdCustomer = { id: linkedCustomerId, name: item.clientName.trim(), type: 'private', createdAt: new Date().toISOString(), source: 'incomeImport' };
+      importCustomerOptions.push(createdCustomer);
+      if (currentUid) {
+        try {
+          const ledgerRef = doc(db, 'ledgers', currentUid);
+          const snap = await getDoc(ledgerRef);
+          const data = snap.exists() ? snap.data() : {};
+          const cloudCustomers = Array.isArray(data.customers) ? data.customers : [];
+          if (!cloudCustomers.some(c => String(c.id || '') === linkedCustomerId)) {
+            await setDoc(ledgerRef, { customers: [...cloudCustomers, createdCustomer] }, { merge: true });
+          }
+        } catch (err) { console.warn('import customer create failed', err); }
+      }
+    }
     const category = rowType === 'expense' ? (item.category && item.category !== 'טרם סווג' ? item.category : 'טרם סווג') : '';
     const rowForMeta = { type: rowType, category, desc: item.desc || '' };
     const meta = rowType === 'expense' ? getExpenseMeta(rowForMeta) : null;
@@ -5289,6 +5374,8 @@ function confirmIncomeImport() {
         : buildImportedIncomeDescription(item.docNumber, item.clientName, '', item.docType || '')),
       docNumber: item.docNumber || '',
       docType: item.docType || '',
+      customerId: linkedCustomerId || '',
+      clientName: item.clientName || '',
       amount: rowType === 'expense' ? Math.abs(item.amount) : item.amount,
       incVat: item.incVat !== false,
       deductPct: rowType === 'expense'
@@ -5800,12 +5887,19 @@ async function buildCustomerLedgerReport(customerId, from, to) {
   const docs = (await getIssuedDocumentsForReports())
     .filter(d => String(d.customerId || "") === String(customerId))
     .filter(d => !from || String(d.date || "") >= from)
-    .filter(d => !to || String(d.date || "") <= to)
+    .filter(d => !to || String(d.date || "") <= to);
+  const importedRows = rows
+    .filter(r => r.type === 'income' && r.source === 'csvImport' && String(r.customerId || '') === String(customerId))
+    .filter(r => !from || String(r.date || '') >= from)
+    .filter(r => !to || String(r.date || '') <= to)
+    .map(r => ({...r, _importedIncome:true, typeLabel:r.docType || 'הכנסה מיובאת', number:r.docNumber || '', gross:Number(r.amount || 0), notes:r.desc || ''}));
+  const ledgerItems = [...docs, ...importedRows]
     .sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
 
   let balance = 0;
-  const outRows = docs.map(d => {
-    const { debit, credit } = customerLedgerEffect(d);
+  const outRows = ledgerItems.map(d => {
+    const effect = d._importedIncome ? { debit:Math.max(0,Number(d.gross || d.amount || 0)), credit:Math.max(0,-Number(d.gross || d.amount || 0)) } : customerLedgerEffect(d);
+    const { debit, credit } = effect;
     balance += debit - credit;
     return {
       date: d.date || "",
@@ -6078,6 +6172,7 @@ btnReportPdf.onclick = async () => {
       <meta charset="UTF-8">
       <title>${title}</title>
       <style>
+        @page{size:${type === "customerLedger" ? "A4 landscape" : "A4 portrait"};margin:12mm}
         body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
         h1{margin:0 0 6px;font-size:20px}
         .meta{color:#555;margin-bottom:14px;line-height:1.6}
