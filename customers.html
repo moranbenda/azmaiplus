@@ -765,6 +765,7 @@ let currentUser = null;
 let userProfile = {};
 let customers = [];
 let ledgerDocuments = [];
+let ledgerRows = [];
 let editingId = null;
 let selectedId = null;
 
@@ -1100,12 +1101,26 @@ function money(value){
 function docsForCustomer(customer){
   const fullDocs = ledgerDocuments.filter(d => String(d.customerId || "") === String(customer.id || ""));
   const summaryDocs = Array.isArray(customer.documents) ? customer.documents : [];
+  const importedIncome = ledgerRows
+    .filter(r => r.type === "income" && r.source === "csvImport" && String(r.customerId || "") === String(customer.id || ""))
+    .map(r => ({
+      id: r.id || "",
+      date: r.date || "",
+      number: r.docNumber || "",
+      type: r.docType || "הכנסה מיובאת",
+      typeLabel: r.docType || "הכנסה מיובאת",
+      gross: Number(r.amount || 0),
+      desc: r.desc || "",
+      _importedIncome: true,
+      createdAt: r.createdAt || ""
+    }));
   const byKey = new Map();
   fullDocs.forEach(d => byKey.set(String(d.id || `${d.type}-${d.number}`), d));
   summaryDocs.forEach(d => {
     const key = String(d.id || `${d.type}-${d.number}`);
     if (!byKey.has(key)) byKey.set(key, d);
   });
+  importedIncome.forEach(d => byKey.set(`import-${d.id || `${d.date}-${d.number}-${d.gross}`}`, d));
   return Array.from(byKey.values()).sort((a,b) => String(b.issuedAt || b.createdAt || b.date || "").localeCompare(String(a.issuedAt || a.createdAt || a.date || "")));
 }
 
@@ -1356,7 +1371,7 @@ function openStoredDocument(docId, shouldPrint=false){
   const baseHtml = d.printHtml || d.previewHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
   <style>
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
-    .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}.customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}.doc-parties:after{content:"";display:block;clear:both}.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}@page{size:A4 portrait;margin:14mm}
+    .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}.customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}.doc-parties:after{content:"";display:block;clear:both}.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}@page{size:A4 landscape;margin:12mm}
   </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
 
   const html = normalizeStoredDocumentHtml(baseHtml, d);
@@ -1734,9 +1749,11 @@ function renderSelected(){
                 </td>
                 <td data-label="פעולות">
                   <div class="docs-actions">
-                    <button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
-                    <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
-                    <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
+                    ${d._importedIncome
+                      ? `<span class="payment-na">היסטוריה מיובאת</span>`
+                      : `<button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
+                         <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
+                         <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>`}
                   </div>
                 </td>
               </tr>`;
@@ -1842,16 +1859,30 @@ function renderSelected(){
 function printCustomerLedger(id){
   const c = customers.find(x => x.id === id);
   if (!c) return;
-  const docs = Array.isArray(c.documents) ? c.documents : [];
-  const rows = docs.map(d => `
+  const docs = docsForCustomer(c).slice().sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")));
+  let runningBalance = 0;
+  const rows = docs.map(d => {
+    let debit = Number(d.debit || 0), credit = Number(d.credit || 0);
+    if (d._importedIncome) debit = Math.max(0, Number(d.gross || 0));
+    if (!d._importedIncome && !debit && !credit) {
+      const label = documentDisplayType(d);
+      const total = Math.abs(documentDisplayTotal(d));
+      if (label.includes("קבלה") && !label.includes("חשבונית מס/קבלה")) credit = total;
+      else if (label.includes("זיכוי")) credit = total;
+      else if (label.includes("חשבונית מס/קבלה")) { debit = total; credit = total; }
+      else if (label.includes("חשבונית")) debit = total;
+    }
+    runningBalance += debit - credit;
+    return `
     <tr>
       <td><span style="direction:ltr;unicode-bidi:isolate">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
-      <td>${escapeHtml(d.type || "מסמך")}</td>
+      <td>${escapeHtml(documentDisplayType(d))}${d._importedIncome ? ' · מיובא' : ''}</td>
       <td>${escapeHtml(d.number || "")}</td>
-      <td>${Number(d.debit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-      <td>${Number(d.credit || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-      <td>${Number(d.balance || 0).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-    </tr>`).join("");
+      <td>${Number(debit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      <td>${Number(credit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      <td>${Number(runningBalance).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+    </tr>`;
+  }).join("");
   const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>כרטסת לקוח</title>
   <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}
     .customer-card{text-align:right;direction:rtl}
@@ -2016,6 +2047,7 @@ async function loadData(){
     ]);
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
+    ledgerRows = Array.isArray(data.rows) ? data.rows : [];
 
     const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
     const subcollectionDocuments = documentsSnap.docs.map(snapshot => ({
