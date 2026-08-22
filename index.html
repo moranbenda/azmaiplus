@@ -1244,6 +1244,31 @@ body.account-frozen .readonly-disabled{
           <h3 style="margin:0;font-size:15px">תנועות</h3>
           <span class="muted" id="rowsCount">0 שורות</span>
         </div>
+        <div class="bd">
+          <div class="row" style="gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+            <label style="min-width:190px">חיפוש מהיר
+              <input id="txQuickSearch" placeholder="תיאור / קטגוריה" />
+            </label>
+            <label style="min-width:150px">סוג
+              <select id="txQuickType">
+                <option value="all">הכל</option>
+                <option value="income">הכנסות</option>
+                <option value="expense">הוצאות</option>
+              </select>
+            </label>
+            <label style="min-width:210px">קטגוריה
+              <select id="txQuickCategory"><option value="">כל הקטגוריות</option></select>
+            </label>
+            <label style="min-width:220px">שיוך לקוח
+              <select id="txQuickCustomer">
+                <option value="all">הכל</option>
+                <option value="unlinked">הכנסות ללא שיוך לקוח</option>
+                <option value="linked">הכנסות משויכות ללקוח</option>
+              </select>
+            </label>
+            <button class="btn secondary small" id="btnTxQuickReset" type="button">ניקוי סינון</button>
+          </div>
+        </div>
         <div class="bd tx-table-wrap" style="max-height:60vh;overflow:auto">
           <table>
             <thead>
@@ -2644,6 +2669,11 @@ const btnQuickToday = document.getElementById("btnQuickToday");
 /* סינון וסיכומים */
 const qText      = document.getElementById("qText");
 const qType      = document.getElementById("qType");
+const txQuickSearch = document.getElementById("txQuickSearch");
+const txQuickType = document.getElementById("txQuickType");
+const txQuickCategory = document.getElementById("txQuickCategory");
+const txQuickCustomer = document.getElementById("txQuickCustomer");
+const btnTxQuickReset = document.getElementById("btnTxQuickReset");
 const qMonth     = document.getElementById("qMonth");
 const qPeriod    = document.getElementById("qPeriod");
 const qCategory  = document.getElementById("qCategory");
@@ -3937,6 +3967,13 @@ function queryRows() {
   if (endStr) out = out.filter(r => r.date <= endStr);
   if (cat) out = out.filter(r => r.category === cat);
 
+  const customerFilter = txQuickCustomer?.value || "all";
+  if (customerFilter === "unlinked") {
+    out = out.filter(r => r.type === "income" && !String(r.customerId || "").trim());
+  } else if (customerFilter === "linked") {
+    out = out.filter(r => r.type === "income" && !!String(r.customerId || "").trim());
+  }
+
   out.sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : 0);
   return out;
 }
@@ -3971,6 +4008,13 @@ function render() {
   if (!currentUid) return;
 
   updateFiltersUI();
+  if (txQuickSearch && document.activeElement !== txQuickSearch) txQuickSearch.value = qText.value || "";
+  if (txQuickType && document.activeElement !== txQuickType) txQuickType.value = qType.value || "all";
+  if (txQuickCategory) {
+    const currentQuickCat = txQuickCategory.value;
+    txQuickCategory.innerHTML = qCategory.innerHTML;
+    txQuickCategory.value = qCategory.value || currentQuickCat || "";
+  }
   const list = queryRows();
   const sum  = summarize(list);
   renderHomeDashboard(sum);
@@ -6914,7 +6958,23 @@ function initAppLogic(uid) {
     };
 
     // סינון וניווט חודשים
-    ["input", "change"].forEach(evName => {
+  if (txQuickSearch) txQuickSearch.addEventListener("input", () => { qText.value = txQuickSearch.value; saveToLocal(); render(); });
+if (txQuickType) txQuickType.addEventListener("change", () => { qType.value = txQuickType.value; saveToLocal(); render(); });
+if (txQuickCategory) txQuickCategory.addEventListener("change", () => { qCategory.value = txQuickCategory.value; saveToLocal(); render(); });
+if (txQuickCustomer) txQuickCustomer.addEventListener("change", () => render());
+if (btnTxQuickReset) btnTxQuickReset.addEventListener("click", () => {
+  qText.value = "";
+  qType.value = "all";
+  qCategory.value = "";
+  if (txQuickSearch) txQuickSearch.value = "";
+  if (txQuickType) txQuickType.value = "all";
+  if (txQuickCategory) txQuickCategory.value = "";
+  if (txQuickCustomer) txQuickCustomer.value = "all";
+  saveToLocal();
+  render();
+});
+
+  ["input", "change"].forEach(evName => {
       qText.addEventListener(evName, () => { saveToLocal(); render(); });
       qType.addEventListener(evName, () => { saveToLocal(); render(); });
       qMonth.addEventListener(evName, () => { if (qYear && qMonth.value) qYear.value = qMonth.value.slice(0,4); saveRangeState(); render(); });
