@@ -1123,6 +1123,7 @@ function docsForCustomer(customer){
       valueDate: r.valueDate || "",
       paid: !!r.paid,
       paidAt: r.paidAt || null,
+      paymentMethod: r.paymentMethod || "",
       _importedIncome: true,
       createdAt: r.createdAt || ""
     }));
@@ -1133,7 +1134,13 @@ function docsForCustomer(customer){
     if (!byKey.has(key)) byKey.set(key, d);
   });
   importedIncome.forEach(d => byKey.set(`import-${d.id || `${d.date}-${d.number}-${d.gross}`}`, d));
-  return Array.from(byKey.values()).sort((a,b) => String(b.issuedAt || b.createdAt || b.date || "").localeCompare(String(a.issuedAt || a.createdAt || a.date || "")));
+  return Array.from(byKey.values()).sort((a,b) => {
+    const dateA = String(a.date || a.issuedAt || a.createdAt || "").slice(0,10);
+    const dateB = String(b.date || b.issuedAt || b.createdAt || "").slice(0,10);
+    const byDate = dateB.localeCompare(dateA); // newest document first
+    if (byDate) return byDate;
+    return String(b.number || "").localeCompare(String(a.number || ""), "he", {numeric:true});
+  });
 }
 
 function documentDisplayType(d){
@@ -1183,6 +1190,21 @@ function isPayableInvoice(d){
   const importedGenericInvoice = !!d._importedIncome && type.includes("חשבונית");
   const invoiceLike = isTaxInvoiceDocument(d) || isTransactionInvoiceDocument(d) || importedGenericInvoice;
   return invoiceLike && !type.includes("קבלה") && !isCreditDocument(d);
+}
+
+const importedPaymentMethodLabels = {
+  bank_transfer: "העברה בנקאית",
+  bit: "ביט",
+  cash: "מזומן",
+  credit_card: "כרטיס אשראי",
+  check: "צ׳ק",
+  paypal: "PayPal",
+  paybox: "PayBox",
+  other: "אחר"
+};
+
+function importedPaymentMethodLabel(value){
+  return importedPaymentMethodLabels[value] || value || "";
 }
 
 function customerRevenueTotal(docs){
@@ -1263,6 +1285,31 @@ async function setImportedIncomePaidStatus(rowId, paid, paymentDate){
       paidAt: previousPaidAt
     };
     showToast("שמירת סטטוס התשלום נכשלה.", true);
+    renderSelected();
+  }
+}
+
+async function setImportedIncomePaymentMethod(rowId, paymentMethod){
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
+    showToast("לא ניתן לעדכן את אמצעי התשלום.", true);
+    return;
+  }
+
+  const previous = ledgerRows[idx].paymentMethod || "";
+  ledgerRows[idx] = {...ledgerRows[idx], paymentMethod: String(paymentMethod || "")};
+
+  try {
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
+    renderSelected();
+    showToast("אמצעי התשלום עודכן.");
+  } catch (err) {
+    console.error("Imported income payment method update failed:", err);
+    ledgerRows[idx] = {...ledgerRows[idx], paymentMethod: previous};
+    showToast("שמירת אמצעי התשלום נכשלה.", true);
     renderSelected();
   }
 }
@@ -1861,13 +1908,25 @@ function renderSelected(){
                         <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
                       </label>
                       ${d._importedIncome && paid ? `
-                        <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
-                          תאריך תשלום
-                          <input type="date"
-                                 data-paid-date-import="${escapeHtml(d.id || "")}"
-                                 value="${escapeHtml(paymentDate)}"
-                                 style="width:auto;padding:5px 7px;font-size:12px" />
-                        </label>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                          <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
+                            תאריך תשלום
+                            <input type="date"
+                                   data-paid-date-import="${escapeHtml(d.id || "")}"
+                                   value="${escapeHtml(paymentDate)}"
+                                   style="width:auto;padding:5px 7px;font-size:12px" />
+                          </label>
+                          <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
+                            שולם באמצעות
+                            <select data-paid-method-import="${escapeHtml(d.id || "")}"
+                                    style="width:auto;padding:5px 7px;font-size:12px">
+                              <option value="">לא צוין</option>
+                              ${Object.entries(importedPaymentMethodLabels).map(([value,label]) =>
+                                `<option value="${escapeHtml(value)}" ${String(d.paymentMethod || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`
+                              ).join("")}
+                            </select>
+                          </label>
+                        </div>
                       ` : ""}
                     </div>
                   ` : `<span class="payment-na">—</span>`}
@@ -1996,6 +2055,13 @@ function renderSelected(){
       await setImportedIncomePaymentDate(input.dataset.paidDateImport, input.value);
     });
   });
+
+  body.querySelectorAll("[data-paid-method-import]").forEach(select => {
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      await setImportedIncomePaymentMethod(select.dataset.paidMethodImport, select.value);
+    });
+  });
 }
 
 function addDaysToIso(dateStr, days){
@@ -2051,7 +2117,7 @@ function printCustomerLedger(id){
   docs.forEach(d => {
     const {debit, credit} = ledgerDebitCredit(d);
     const detailsBase = d.documentTitle || d.title || d.desc || documentDisplayType(d);
-    const details = `${detailsBase || documentDisplayType(d)}${d._importedIncome ? " · היסטוריה מיובאת" : ""}`;
+    const details = `${detailsBase || documentDisplayType(d)}`;
     movements.push({
       date: d.date || "",
       valueDate: ledgerValueDate(d, c),
@@ -2067,7 +2133,7 @@ function printCustomerLedger(id){
       movements.push({
         date: paidDate,
         valueDate: paidDate,
-        details: `תשלום עבור ${documentDisplayType(d)} ${d.number || ""} · היסטוריה מיובאת`,
+        details: `תשלום עבור ${documentDisplayType(d)} ${d.number || ""}${d.paymentMethod ? ` · ${importedPaymentMethodLabel(d.paymentMethod)}` : ""}`,
         number: d.number || "",
         debit: 0,
         credit: Math.abs(documentDisplayTotal(d)),
@@ -2144,7 +2210,6 @@ function printCustomerLedger(id){
     </tr></thead>
     <tbody>${rows || `<tr><td colspan="7">אין תנועות להצגה.</td></tr>`}</tbody>
   </table>
-  <div class="foot">תנועות המסומנות "היסטוריה מיובאת" משמשות להצגת היסטוריית הלקוח ואינן מוצגות כאילו הופקו בעצמאי פלוס.</div>
   <script>window.onload=()=>{setTimeout(()=>window.print(),150);};<\/script>
   </body></html>`;
   const w = window.open("", "_blank");
