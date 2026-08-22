@@ -1107,10 +1107,20 @@ function docsForCustomer(customer){
       id: r.id || "",
       date: r.date || "",
       number: r.docNumber || "",
-      type: r.docType || "הכנסה מיובאת",
-      typeLabel: r.docType || "הכנסה מיובאת",
+      type: r.docType || "imported_income",
+      typeLabel: (() => {
+        if (r.docType) return r.docType;
+        const t = String(r.desc || "").replace(/\s+/g," ").trim();
+        if (/חשבונית\s*(מס\s*)?[/\-]?\s*קבלה|חשבונית\s+קבלה/i.test(t)) return "חשבונית מס/קבלה";
+        if (/זיכוי/i.test(t)) return "חשבונית זיכוי";
+        if (/חשבונית\s+עסקה/i.test(t)) return "חשבונית עסקה";
+        if (/קבלה/i.test(t) && !/חשבונית/i.test(t)) return "קבלה";
+        if (/חשבונית/i.test(t)) return "חשבונית מס";
+        return "הכנסה מיובאת";
+      })(),
       gross: Number(r.amount || 0),
       desc: r.desc || "",
+      valueDate: r.valueDate || "",
       _importedIncome: true,
       createdAt: r.createdAt || ""
     }));
@@ -1125,7 +1135,16 @@ function docsForCustomer(customer){
 }
 
 function documentDisplayType(d){
-  return d.typeLabel || d.type || "מסמך";
+  const raw = d.typeLabel || d.type || "מסמך";
+  const map = {
+    deal_invoice: "חשבונית עסקה",
+    tax_invoice: "חשבונית מס",
+    tax_invoice_receipt: "חשבונית מס/קבלה",
+    receipt: "קבלה",
+    credit_note: "חשבונית זיכוי",
+    quote: "הצעת מחיר"
+  };
+  return map[raw] || raw;
 }
 
 function documentDisplayTotal(d){
@@ -1161,21 +1180,28 @@ function isPayableInvoice(d){
 }
 
 function customerRevenueTotal(docs){
-  const taxInvoices = docs.filter(d => isTaxInvoiceDocument(d));
-  const receipts = docs.filter(d => isReceiptDocument(d) && !normalizedDocumentType(d).includes("חשבונית"));
-  const transactionInvoices = docs.filter(d => isTransactionInvoiceDocument(d));
-  const credits = docs.filter(d => isCreditDocument(d));
+  // Imported income linked to the customer is part of the customer's revenue history,
+  // but remains explicitly marked as imported and is not treated as a document issued here.
+  const importedIncome = docs.filter(d => d._importedIncome);
+  const issuedDocs = docs.filter(d => !d._importedIncome);
+
+  const taxInvoices = issuedDocs.filter(d => isTaxInvoiceDocument(d));
+  const receipts = issuedDocs.filter(d => isReceiptDocument(d) && !normalizedDocumentType(d).includes("חשבונית"));
+  const transactionInvoices = issuedDocs.filter(d => isTransactionInvoiceDocument(d));
+  const credits = issuedDocs.filter(d => isCreditDocument(d));
 
   let source = taxInvoices;
   if (!source.length) source = receipts;
   if (!source.length) source = transactionInvoices;
 
   const sourceWithCredits = source.length ? [...source, ...credits] : credits;
-
-  return sourceWithCredits.reduce((sum, d) => {
+  const issuedTotal = sourceWithCredits.reduce((sum, d) => {
     const sign = isCreditDocument(d) ? -1 : 1;
     return sum + (sign * documentDisplayTotal(d));
   }, 0);
+
+  const importedTotal = importedIncome.reduce((sum, d) => sum + Math.abs(documentDisplayTotal(d)), 0);
+  return issuedTotal + importedTotal;
 }
 
 function openInvoiceSummary(docs){
@@ -1856,63 +1882,125 @@ function renderSelected(){
   });
 }
 
+function addDaysToIso(dateStr, days){
+  const d = new Date(String(dateStr || "") + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return dateStr || "";
+  d.setDate(d.getDate() + Number(days || 0));
+  return d.toISOString().slice(0,10);
+}
+function monthEndPlus(dateStr, days){
+  const d = new Date(String(dateStr || "") + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return dateStr || "";
+  const eom = new Date(d.getFullYear(), d.getMonth()+1, 0, 12, 0, 0);
+  eom.setDate(eom.getDate() + Number(days || 0));
+  return eom.toISOString().slice(0,10);
+}
+function ledgerValueDate(d, customer){
+  if (d.valueDate || d.dueDate) return d.valueDate || d.dueDate;
+  const type = normalizedDocumentType(d);
+  const docDate = d.date || "";
+  if (type.includes("קבלה") || type.includes("זיכוי")) return docDate;
+  const terms = customer?.paymentTerms || "immediate";
+  if (terms === "net15") return monthEndPlus(docDate, 15);
+  if (terms === "net30") return monthEndPlus(docDate, 30);
+  if (terms === "net60") return monthEndPlus(docDate, 60);
+  return docDate;
+}
+function ledgerDebitCredit(d){
+  let debit = Number(d.debit || 0);
+  let credit = Number(d.credit || 0);
+  if (debit || credit) return {debit, credit};
+
+  const type = normalizedDocumentType(d);
+  const total = Math.abs(documentDisplayTotal(d));
+  if (type.includes("חשבונית מס/קבלה") || type.includes("חשבונית קבלה")) {
+    debit = total; credit = total;
+  } else if (type.includes("זיכוי")) {
+    credit = total;
+  } else if (type.includes("קבלה")) {
+    credit = total;
+  } else if (type.includes("חשבונית")) {
+    debit = total;
+  } else if (d._importedIncome) {
+    debit = total;
+  }
+  return {debit, credit};
+}
+
 function printCustomerLedger(id){
   const c = customers.find(x => x.id === id);
   if (!c) return;
   const docs = docsForCustomer(c).slice().sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")));
   let runningBalance = 0;
   const rows = docs.map(d => {
-    let debit = Number(d.debit || 0), credit = Number(d.credit || 0);
-    if (d._importedIncome) debit = Math.max(0, Number(d.gross || 0));
-    if (!d._importedIncome && !debit && !credit) {
-      const label = documentDisplayType(d);
-      const total = Math.abs(documentDisplayTotal(d));
-      if (label.includes("קבלה") && !label.includes("חשבונית מס/קבלה")) credit = total;
-      else if (label.includes("זיכוי")) credit = total;
-      else if (label.includes("חשבונית מס/קבלה")) { debit = total; credit = total; }
-      else if (label.includes("חשבונית")) debit = total;
-    }
+    const {debit, credit} = ledgerDebitCredit(d);
     runningBalance += debit - credit;
+    const detailsBase = d.documentTitle || d.title || d.desc || documentDisplayType(d);
+    const details = `${detailsBase || documentDisplayType(d)}${d._importedIncome ? " · היסטוריה מיובאת" : ""}`;
+    const valueDate = ledgerValueDate(d, c);
     return `
     <tr>
-      <td><span style="direction:ltr;unicode-bidi:isolate">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
-      <td>${escapeHtml(documentDisplayType(d))}${d._importedIncome ? ' · מיובא' : ''}</td>
+      <td><span class="ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
+      <td><span class="ltr">${escapeHtml(formatDisplayDate(valueDate || ""))}</span></td>
+      <td>${escapeHtml(details)}</td>
       <td>${escapeHtml(d.number || "")}</td>
-      <td>${Number(debit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-      <td>${Number(credit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-      <td>${Number(runningBalance).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+      <td class="money">${debit ? Number(debit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
+      <td class="money">${credit ? Number(credit).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2}) : ""}</td>
+      <td class="money balance">${Number(runningBalance).toLocaleString("he-IL", {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
     </tr>`;
   }).join("");
+  const address = [c.address, c.city, c.zip].filter(Boolean).join(", ");
   const html = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>כרטסת לקוח</title>
-  <style>body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}h1{margin:0 0 8px}.meta{color:#64748b;font-size:12px;line-height:1.7;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px;table-layout:auto}th,td{border:1px solid #dbe3ef;padding:8px;text-align:right}th{background:#f1f5f9}@page{size:A4 portrait;margin:14mm}
-    .customer-card{text-align:right;direction:rtl}
-    .customer-card .name,.customer-card .hint{text-align:right}
-    .customer-card .chips{justify-content:flex-start}
-    .doc-date-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
-    .doc-view-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,23,42,.55)}
-    .doc-view-modal.show{display:flex}
-    .doc-view-box{width:min(980px,96vw);height:min(92vh,920px);background:white;border-radius:22px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #dbe3ef;overflow:hidden;display:flex;flex-direction:column;direction:rtl}
-    .doc-view-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid #e5edf7;background:#f8fafc}
-    .doc-view-title{font-weight:900;color:#0f2748}
-    .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
-    .doc-view-close:hover{background:#eef6ff}
-    .doc-view-frame{border:0;width:100%;height:100%;background:white}
-    @media(max-width:760px){.doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}.docs-history-table{min-width:860px}.docs-actions{min-width:220px}}
-
-</style></head><body>
-  <h1>כרטסת לקוח</h1><div class="meta"><b>${escapeHtml(c.name)}</b>${c.taxId ? ` · ${escapeHtml(c.taxId)}` : ""}<br>הופק בתאריך ${formatDateForPrint()}</div>
-  <table><thead><tr><th>תאריך</th><th>סוג מסמך</th><th>מספר</th><th>חיוב</th><th>זיכוי</th><th>יתרה</th></tr></thead><tbody>${rows || `<tr><td colspan="6">אין מסמכים להצגה.</td></tr>`}</tbody></table>
-  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script>
-<div id="docViewModal" class="doc-view-modal" aria-hidden="true">
-  <div class="doc-view-box" role="dialog" aria-modal="true" aria-labelledby="docViewTitle">
-    <div class="doc-view-head">
-      <div id="docViewTitle" class="doc-view-title">צפייה במסמך</div>
-      <button id="docViewClose" class="doc-view-close" type="button">סגור</button>
+  <style>
+    @page{size:A4 landscape;margin:10mm}
+    html,body{margin:0;padding:0;background:#fff;color:#111827;font-family:Arial,"Segoe UI",sans-serif;direction:rtl}
+    body{padding:8mm 10mm}
+    .head{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:14px;border-bottom:2px solid #111827;padding-bottom:10px}
+    h1{font-size:24px;margin:0 0 6px}.business{font-size:13px;font-weight:700}
+    .customer{font-size:12px;line-height:1.7;text-align:right}.customer b{font-size:15px}
+    .meta{font-size:11px;color:#475569;line-height:1.6;text-align:left}
+    table{width:100%;border-collapse:collapse;font-size:10.5px;table-layout:fixed}
+    th{background:#eef2f7;border-top:1px solid #111827;border-bottom:1px solid #111827;padding:6px 5px;text-align:right}
+    td{border-bottom:1px solid #d7dde7;padding:6px 5px;vertical-align:top}
+    th:nth-child(1),td:nth-child(1){width:11%}
+    th:nth-child(2),td:nth-child(2){width:11%}
+    th:nth-child(3),td:nth-child(3){width:34%}
+    th:nth-child(4),td:nth-child(4){width:12%}
+    th:nth-child(5),td:nth-child(5),th:nth-child(6),td:nth-child(6),th:nth-child(7),td:nth-child(7){width:10.6%}
+    .money{direction:ltr;text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .balance{font-weight:700}.ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+    .foot{margin-top:8px;font-size:9.5px;color:#64748b}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <div class="head">
+    <div class="customer">
+      <h1>כרטסת לקוח</h1>
+      <b>${escapeHtml(c.name || "")}</b>${c.taxId ? ` · ${escapeHtml(c.taxId)}` : ""}
+      ${address ? `<br>${escapeHtml(address)}` : ""}
+      ${c.phone ? `<br>טלפון: ${escapeHtml(c.phone)}` : ""}
+      ${c.email ? `<br>מייל: ${escapeHtml(c.email)}` : ""}
+      <br>תנאי תשלום: ${escapeHtml(termsLabels[c.paymentTerms] || "מיידי")}
     </div>
-    <iframe id="docViewFrame" class="doc-view-frame" title="תצוגת מסמך"></iframe>
+    <div class="meta">
+      הופק בתאריך ${formatDateForPrint()}<br>
+      כרטסת תנועות לקוח
+    </div>
   </div>
-</div>
-</body></html>`;
+  <table>
+    <thead><tr>
+      <th>תאריך אסמכתא</th>
+      <th>תאריך ערך</th>
+      <th>פרטים</th>
+      <th>אסמכתא</th>
+      <th>חובה</th>
+      <th>זכות</th>
+      <th>יתרה</th>
+    </tr></thead>
+    <tbody>${rows || `<tr><td colspan="7">אין תנועות להצגה.</td></tr>`}</tbody>
+  </table>
+  <div class="foot">תנועות המסומנות "היסטוריה מיובאת" משמשות להצגת היסטוריית הלקוח ואינן מוצגות כאילו הופקו בעצמאי פלוס.</div>
+  <script>window.onload=()=>{setTimeout(()=>window.print(),150);};<\/script>
+  </body></html>`;
   const w = window.open("", "_blank");
   if (!w) return showToast("הדפדפן חסם את חלון ההדפסה.", true);
   w.document.open(); w.document.write(html); w.document.close();
