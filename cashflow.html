@@ -378,12 +378,26 @@ function ensureAmountHistory(ob){
 function obligationAmount(ob,d=selected){
   ensureAmountHistory(ob);
   const mk=monthKey(d);
+  const override=config.monthlyAdjustments?.[mk]?.[ob.id];
+  if(override!==undefined&&override!==null&&Number.isFinite(Number(override))) return Number(override);
   let amount=Number(ob.amount)||0;
   for(const h of ob.amountHistory){
     if(h.fromMonth<=mk) amount=Number(h.amount)||0;
     else break;
   }
   return amount;
+}
+function setObligationAmountForMonth(ob,month,amount){
+  const mk=String(month);
+  config.monthlyAdjustments=config.monthlyAdjustments||{};
+  config.monthlyAdjustments[mk]=config.monthlyAdjustments[mk]||{};
+  config.monthlyAdjustments[mk][ob.id]=Number(amount)||0;
+}
+function clearObligationAmountForMonth(ob,month){
+  const mk=String(month);
+  if(!config.monthlyAdjustments?.[mk]) return;
+  delete config.monthlyAdjustments[mk][ob.id];
+  if(!Object.keys(config.monthlyAdjustments[mk]).length) delete config.monthlyAdjustments[mk];
 }
 function setObligationAmountFrom(ob,fromMonth,amount){
   ensureAmountHistory(ob);
@@ -564,8 +578,27 @@ addObligation.onclick=async()=>{
       alert("כבר קיימת התחייבות אחרת בשם הזה. כדי למנוע כפל, ערכי את הרשומה הקיימת או מחקי אחת מהן.");
       return;
     }
+    const previousName=ob.name||"";
+    const previousFreq=ob.freq||"monthly";
+    const previousDay=Number(ob.day)||15;
+    const previousType=ob.type||"fixed";
     ob.name=name;ob.freq=obFreq.value;ob.day=Number(obDay.value)||15;ob.type=obType.value;
-    setObligationAmountFrom(ob,effectiveMonth,amount);
+
+    const applyForward=confirm(
+      `לשנות את הסכום של "${name}" גם בחודשים הבאים?\n\n`+
+      `אישור = החל מ-${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected)} והלאה\n`+
+      `ביטול = החודש הזה בלבד`
+    );
+    if(applyForward){
+      clearObligationAmountForMonth(ob,effectiveMonth);
+      setObligationAmountFrom(ob,effectiveMonth,amount);
+    }else{
+      setObligationAmountForMonth(ob,effectiveMonth,amount);
+    }
+
+    if((previousName!==name||previousFreq!==ob.freq||previousDay!==ob.day||previousType!==ob.type) && !applyForward){
+      alert("הסכום עודכן לחודש זה בלבד. שינויי שם/תדירות/יום/סוג הם מאפייני ההתחייבות עצמה ולכן חלים על הרשומה הקבועה.");
+    }
     await saveConfig();resetObligationForm();render();return;
   }
 
