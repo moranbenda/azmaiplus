@@ -3028,13 +3028,6 @@ const EXPENSE_ITEMS = [
   { item: "כנסים והשתלמויות", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
   { item: "ביגוד מקצועי / ממותג", category: "ביגוד מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
 
-  // תשלומים אישיים/סטטוטוריים — נשמרים בתנועות לצורך תמונת תזרים, אך אינם הוצאות 1320.
-  { item: "קרן השתלמות לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
-  { item: "פנסיה / קופת גמל לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
-  { item: "ביטוח אובדן כושר עבודה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
-  { item: "מקדמות מס הכנסה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
-  { item: "תרומות למוסדות מוכרים", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
-
   { item: "הוצאה אחרת", category: "הוצאות אחרות", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" }
 ];
 
@@ -6018,17 +6011,28 @@ async function buildPersonalTaxPayments(from, to) {
   const monthKeyForDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   const dateInRange = date => !!date && date >= effectiveFrom && date <= effectiveTo;
 
-  // 1) תשלומים אישיים/סטטוטוריים שנרשמו כתנועה בפועל באינדקס.
+  // 1) תאימות לאחור בלבד: תשלומים אישיים/סטטוטוריים שנשמרו בעבר כתנועה באינדקס.
+  //    הפריטים האלה אינם מוצגים עוד ברשימת ההוצאות; המקור השוטף שלהם הוא התזרים.
+  const legacyPersonalTaxLabels = [
+    "קרן השתלמות לעצמאי",
+    "פנסיה / קופת גמל לעצמאי",
+    "ביטוח אובדן כושר עבודה",
+    "ביטוח לאומי עצמאי",
+    "מקדמות מס הכנסה",
+    "תרומות למוסדות מוכרים"
+  ].map(normTaxText);
+
   filterByDateAndType("expense", effectiveFrom, effectiveTo).forEach(r => {
-    const meta = getExpenseMeta(r);
-    if (!meta?.personalTaxItem) return;
-    // מע"מ שייך לדוח המע"מ, לא לדוח התשלומים האישיים.
-    const label = meta.item || r.category || "";
-    if (normTaxText(label).includes("מעמ") || normTaxText(label).includes("מע מ")) return;
+    const rawLabel = String(r.category || r.desc || "").trim();
+    const normalized = normTaxText(rawLabel);
+    const isLegacyPersonal = legacyPersonalTaxLabels.some(x =>
+      normalized.includes(x) || x.includes(normalized)
+    );
+    if (!isLegacyPersonal) return;
     const { gross } = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
     data.push({
       date:r.date || "",
-      category:label,
+      category:rawLabel || "תשלום אישי/סטטוטורי",
       desc:r.desc || "",
       gross:Number(gross || r.amount || 0),
       docNumber:r.docNumber || "",
