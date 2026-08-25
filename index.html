@@ -3014,7 +3014,6 @@ const EXPENSE_ITEMS = [
   { item: "ביטוח משרד / עסק", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
   { item: "אגרות ורישיונות עסקיים", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
   { item: "אגרות משפט / בית משפט", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
-  { item: "חובות רעים", category: "חובות רעים", incomeTaxPct: 100, vatAllowed: false, report1320: "15-חובות רעים" },
 
   // נסיעות, כיבוד, הכשרה וביגוד
   { item: "תחבורה ציבורית", category: "נסיעות ותחבורה", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
@@ -6107,8 +6106,16 @@ async function buildPersonalTaxPayments(from, to) {
   while (cursor <= endMonth) {
     const mk = monthKeyForDate(cursor);
     for (const ob of obligations) {
-      if (ob?.active === false || ob?.type !== "authority" || !obligationOccurs(ob, cursor)) continue;
+      if (ob?.active === false || !obligationOccurs(ob, cursor)) continue;
       if (isVatName(ob.name || "")) continue;
+      // תשלומים אישיים/סטטוטוריים יכולים להישמר בתזרים גם כהתחייבות קבועה.
+      // לא מסתמכים רק על ob.type, אלא גם על שם התשלום כדי לא לאבד נתונים קיימים.
+      const obNameNorm = normTaxText(ob.name || "");
+      const personalByName = [
+        "ביטוח לאומי", "מס בריאות", "מקדמות מס הכנסה", "מס הכנסה",
+        "פנסיה", "קופת גמל", "קרן השתלמות", "אובדן כושר עבודה"
+      ].some(x => obNameNorm.includes(normTaxText(x)));
+      if (ob?.type !== "authority" && !personalByName) continue;
       const day = Math.max(1, Math.min(31, Number(ob.day)||15));
       const lastDay = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
       const date = `${mk}-${String(Math.min(day,lastDay)).padStart(2,"0")}`;
