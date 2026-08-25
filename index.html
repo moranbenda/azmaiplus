@@ -1494,14 +1494,13 @@ body.account-frozen .readonly-disabled{
         <select id="rType">
           <option value="income">דוח הכנסות</option>
           <option value="expense">דוח רשימת הוצאות</option>
-          <option value="both">דוח תנועות</option>
+          <option value="both">דוח הכנסות והוצאות</option>
           <option value="pnl">דו״ח רווח והפסד</option>
           <option value="vat">דוח מע״מ</option>
           <option value="customers">דוח רשימת לקוחות</option>
           <option value="customerLedger">כרטסת לקוח</option>
           <option value="report1320">סיכום הוצאות לפי 1320</option>
           <option value="personalTax">תשלומי מס וניכויים אישיים</option>
-          <option value="trialBalance">מאזן בוחן</option>
         </select>
       </div>
       <div id="reportCustomerWrap" hidden>
@@ -1530,7 +1529,7 @@ body.account-frozen .readonly-disabled{
         <button class="btn small" id="btnReportCsv">ייצוא לאקסל (CSV)</button>
         <button class="btn secondary small" id="btnReportPdf">ייצוא ל-PDF</button>
       </div>
-      <span class="hint">דוחות לפי טווח תאריכים: הכנסות, הוצאות, תנועות, רווח והפסד, מע״מ, לקוחות, כרטסת לקוח, מאזן בוחן, 1320 ותשלומי מס וניכויים אישיים.</span>
+      <span class="hint">דוחות לפי טווח תאריכים: הכנסות, הוצאות, הכנסות והוצאות, רווח והפסד, מע״מ, לקוחות, כרטסת לקוח, 1320 ותשלומי מס וניכויים אישיים.</span>
     </div>
   </div>
 </dialog>
@@ -3008,7 +3007,7 @@ const EXPENSE_ITEMS = [
   // מימון, בנק וסליקה
   { item: "עמלות בנק", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
   { item: "ריבית והפרשי הצמדה עסקיים", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
-  { item: "עמלות סליקה", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: true, report1320: "6-הוצאות מימון" },
+  { item: "עמלות סליקה", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: true, report1320: "6-הוצאות מימון" }, // מע״מ תשומות רק כאשר התנועה סומנה ככוללת מע״מ ועל בסיס מסמך מתאים
 
   // ביטוחים, אגרות וחובות
   { item: "ביטוח אחריות מקצועית", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
@@ -5700,7 +5699,7 @@ function exportPDF() {
     <meta charset="UTF-8">
     <title>${title}</title>
     <style>
-      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
+      body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:14px;font-size:12px;line-height:1.35}
       h1{margin:0 0 8px;font-size:18px}
       .meta{color:#555;margin-bottom:14px}
       table{border-collapse:collapse;width:100%;margin-top:10px}
@@ -6029,93 +6028,6 @@ function buildPersonalTaxPayments(from, to) {
 }
 
 
-function trialBalanceAccountCode(label, group = "") {
-  const fixed = {
-    "קופה / בנק / לקוחות": "1100",
-    "קופה / בנק / ספקים": "2100",
-    "הכנסות": "4000",
-    "מע״מ עסקאות": "2200",
-    "מע״מ תשומות": "1300"
-  };
-  if (fixed[label]) return fixed[label];
-  let hash = 0;
-  const text = String(group || label || "");
-  for (let i = 0; i < text.length; i++) hash = ((hash * 31) + text.charCodeAt(i)) >>> 0;
-  return String(5000 + (hash % 4000));
-}
-
-function buildTrialBalanceReport(from, to) {
-  const accounts = new Map();
-  const ensure = (name, group, code = "") => {
-    const key = `${group}|${name}`;
-    if (!accounts.has(key)) accounts.set(key, {
-      key, code: code || trialBalanceAccountCode(name, group), name, group,
-      opening: 0, debit: 0, credit: 0, closing: 0
-    });
-    return accounts.get(key);
-  };
-  const post = (accountName, group, amount, side, bucket, code = "") => {
-    const n = Math.abs(Number(amount) || 0);
-    if (!n) return;
-    const a = ensure(accountName, group, code);
-    const signed = side === "debit" ? n : -n;
-    if (bucket === "opening") a.opening += signed;
-    else if (side === "debit") a.debit += n;
-    else a.credit += n;
-  };
-  const postSigned = (accountName, group, amount, normalSide, bucket, code = "") => {
-    const n = Number(amount) || 0;
-    if (!n) return;
-    const side = n >= 0 ? normalSide : (normalSide === "debit" ? "credit" : "debit");
-    post(accountName, group, Math.abs(n), side, bucket, code);
-  };
-  const applyRow = (row, bucket) => {
-    if (!row || !["income", "expense"].includes(row.type)) return;
-    const settings = getSettings();
-    const raw = Number(row.amount || 0);
-    const split = splitVAT(Math.abs(raw), row.incVat, settings.vatEnabled ? settings.vatRate : 0);
-    const sign = raw < 0 ? -1 : 1;
-
-    if (row.type === "income") {
-      postSigned("קופה / בנק / לקוחות", "נכסים", split.gross * sign, "debit", bucket, "1100");
-      postSigned("הכנסות", "הכנסות", split.net * sign, "credit", bucket, "4000");
-      postSigned("מע״מ עסקאות", "התחייבויות", split.vat * sign, "credit", bucket, "2200");
-      return;
-    }
-
-    const vatFactor = getVatDeductibleFactorForRow(row);
-    const deductibleVat = split.vat * vatFactor;
-    const expenseAmount = split.gross - deductibleVat;
-    const meta = getExpenseMeta(row);
-    const expenseName = String(meta?.category || row.category || meta?.item || "הוצאות אחרות").trim() || "הוצאות אחרות";
-    postSigned(expenseName, "הוצאות", expenseAmount * sign, "debit", bucket);
-    postSigned("מע״מ תשומות", "נכסים", deductibleVat * sign, "debit", bucket, "1300");
-    postSigned("קופה / בנק / ספקים", "התחייבויות", split.gross * sign, "credit", bucket, "2100");
-  };
-
-  rows.forEach(r => {
-    const d = String(r?.date || "");
-    if (!d) return;
-    if (from && d < from) applyRow(r, "opening");
-    else if ((!from || d >= from) && (!to || d <= to)) applyRow(r, "period");
-  });
-
-  const groupOrder = {"נכסים":1,"התחייבויות":2,"הכנסות":3,"הוצאות":4};
-  const reportRows = Array.from(accounts.values()).map(a => ({...a, closing:a.opening + a.debit - a.credit}))
-    .filter(a => Math.abs(a.opening) > 0.004 || Math.abs(a.debit) > 0.004 || Math.abs(a.credit) > 0.004 || Math.abs(a.closing) > 0.004)
-    .sort((a,b) => (groupOrder[a.group]||9)-(groupOrder[b.group]||9) || String(a.code).localeCompare(String(b.code)) || a.name.localeCompare(b.name,"he"));
-
-  const totals = reportRows.reduce((t,a) => {
-    t.openingDebit += Math.max(a.opening,0); t.openingCredit += Math.max(-a.opening,0);
-    t.debit += a.debit; t.credit += a.credit;
-    t.closingDebit += Math.max(a.closing,0); t.closingCredit += Math.max(-a.closing,0);
-    return t;
-  }, {openingDebit:0,openingCredit:0,debit:0,credit:0,closingDebit:0,closingCredit:0});
-  totals.periodDifference = totals.debit - totals.credit;
-  totals.closingDifference = totals.closingDebit - totals.closingCredit;
-  return { rows:reportRows, totals };
-}
-
 function buildPnlReportData(from, to) {
   const incomeRows = addVatInfo(filterByDateAndType("income", from, to));
   const expenseBase = filterByDateAndType("expense", from, to);
@@ -6156,29 +6068,53 @@ function buildPnlReportData(from, to) {
   };
 }
 
+
+function buildIncomeExpenseSummary(from, to) {
+  const list = filterByDateRange(from, to);
+  const { rows: data } = addVatInfo(list);
+  const incomeRows = data.filter(r => r.type === "income");
+  const expenseRows = data.filter(r => r.type === "expense");
+  const incTotals = addVatInfo(incomeRows).totals;
+  const expTotals = addVatInfo(expenseRows).totals;
+
+  const byCategory = new Map();
+  const add = (kind, label, row) => {
+    const key = `${kind}|${label}`;
+    if (!byCategory.has(key)) byCategory.set(key, { kind, label, net:0, vat:0, gross:0, count:0 });
+    const item = byCategory.get(key);
+    item.net += Number(row.net || 0);
+    item.vat += Number(row.vat || 0);
+    item.gross += Number(row.gross || 0);
+    item.count += 1;
+  };
+
+  incomeRows.forEach(r => add("הכנסות", String(r.category || "הכנסות").trim() || "הכנסות", r));
+  expenseRows.forEach(r => {
+    const meta = getExpenseMeta(r);
+    const label = String(meta?.category || r.category || "הוצאות אחרות").trim() || "הוצאות אחרות";
+    add("הוצאות", label, r);
+  });
+
+  const categories = Array.from(byCategory.values()).sort((a,b) =>
+    a.kind.localeCompare(b.kind, "he") || a.label.localeCompare(b.label, "he")
+  );
+
+  return {
+    rows:data,
+    categories,
+    income:incTotals,
+    expenses:expTotals,
+    netResult:Number(incTotals.net || 0) - Number(expTotals.net || 0)
+  };
+}
+
 /* ------------ CSV לדוחות ------------ */
 btnReportCsv.onclick = async () => {
   const type = rType.value;
   const from = rFrom.value || null;
   const to   = rTo.value   || null;
 
-  if (type === "trialBalance") {
-    const report = buildTrialBalanceReport(from, to);
-    if (!report.rows.length) return alert("אין תנועות למאזן בוחן בטווח שנבחר");
-    const csv = [
-      "account_number,account_name,group,opening_debit,opening_credit,period_debit,period_credit,closing_debit,closing_credit",
-      ...report.rows.map(a => [
-        a.code, a.name, a.group,
-        Math.max(a.opening,0), Math.max(-a.opening,0), a.debit, a.credit,
-        Math.max(a.closing,0), Math.max(-a.closing,0)
-      ].map(v=>`"${String(v ?? "").replace(/"/g,'""')}"`).join(",")),
-      ["TOTAL","","",report.totals.openingDebit,report.totals.openingCredit,report.totals.debit,report.totals.credit,report.totals.closingDebit,report.totals.closingCredit].join(",")
-    ];
-    downloadFile("trial-balance.csv", csv.join("\n"));
-    return;
-  }
-
-  if (type === "pnl") {
+    if (type === "pnl") {
     const p = buildPnlReportData(from, to);
     const lines = [
       "section,amount",
@@ -6266,22 +6202,26 @@ btnReportCsv.onclick = async () => {
   }
 
   if (type === "both") {
-    const list = filterByDateRange(from, to);
-    if (!list.length) return alert("אין נתונים");
-    const { rows: data } = addVatInfo(list);
+    const report = buildIncomeExpenseSummary(from, to);
+    if (!report.rows.length) return alert("אין נתונים");
     const headers = ["date","type","category","desc","net","vat","gross"];
     const csv = [
       headers.join(","),
-      ...data.map(r =>
+      ...report.rows.map(r =>
         headers.map(h => `"${String(r[h] ?? "").replace(/"/g,'""')}"`).join(",")
-      )
+      ),
+      "",
+      "SUMMARY,net,vat,gross",
+      `"TOTAL_INCOME",${report.income.net},${report.income.vat},${report.income.gross}`,
+      `"TOTAL_EXPENSE",${report.expenses.net},${report.expenses.vat},${report.expenses.gross}`,
+      `"NET_RESULT",${report.netResult},,`,
+      "",
+      "TYPE,CATEGORY,COUNT,NET,VAT,GROSS",
+      ...report.categories.map(c => [
+        c.kind,c.label,c.count,c.net,c.vat,c.gross
+      ].map(v=>`"${String(v ?? "").replace(/"/g,'""')}"`).join(","))
     ];
-    const totalsInc = addVatInfo(data.filter(r => r.type === "income")).totals;
-    const totalsExp = addVatInfo(data.filter(r => r.type === "expense")).totals;
-    csv.push(`"TOTAL_INCOME","","","",${totalsInc.net},${totalsInc.vat},${totalsInc.gross}`);
-    csv.push(`"TOTAL_EXPENSE","","","",${totalsExp.net},${totalsExp.vat},${totalsExp.gross}`);
-    csv.push(`"BALANCE","","","",${totalsInc.net - totalsExp.net},,${totalsInc.gross - totalsExp.gross}`);
-    downloadFile("transactions-report.csv", csv.join("\n"));
+    downloadFile("income-expense-report.csv", csv.join("\n"));
     return;
   }
 
@@ -6321,14 +6261,14 @@ btnReportPdf.onclick = async () => {
       <meta charset="UTF-8">
       <title>${title}</title>
       <style>
-        @page{size:${["customerLedger","trialBalance"].includes(type) ? "A4 landscape" : "A4 portrait"};margin:12mm}
-        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:20px;font-size:13px}
-        h1{margin:0 0 6px;font-size:20px}
-        .meta{color:#555;margin-bottom:14px;line-height:1.6}
-        table{border-collapse:collapse;width:100%;margin-top:12px}
-        th,td{border:1px solid #ccc;padding:7px 9px;text-align:right}
+        @page{size:${type === "customerLedger" ? "A4 landscape" : "A4 portrait"};margin:10mm}
+        body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif;padding:14px;font-size:12px;line-height:1.35}
+        h1{margin:0 0 5px;font-size:18px}
+        .meta{color:#555;margin-bottom:9px;line-height:1.35}
+        table{border-collapse:collapse;width:100%;margin-top:8px}
+        th,td{border:1px solid #ccc;padding:5px 7px;text-align:right;vertical-align:top}
         th{background:#f0f2f7}
-        .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:4px 10px;margin:2px 4px 2px 0}
+        .pill{display:inline-block;border:1px solid #ddd;border-radius:999px;padding:3px 8px;margin:1px 3px 1px 0}
       </style>
     </head>
     <body>
@@ -6336,8 +6276,6 @@ btnReportPdf.onclick = async () => {
       <div class="meta">
         ${bizName ? `<div class="pill"><b>שם העסק:</b> ${escapeHtml(bizName)}</div>` : ""}
         ${bizId ? `<div class="pill"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</div>` : ""}
-        ${display ? `<div class="pill"><b>שם:</b> ${escapeHtml(display)}</div>` : ""}
-        ${email ? `<div class="pill"><b>אימייל:</b> ${escapeHtml(email)}</div>` : ""}
         <div><b>${escapeHtml(rangeText)}</b></div>
         <div>הופק: ${escapeHtml(created)}</div>
       </div>
@@ -6350,44 +6288,7 @@ btnReportPdf.onclick = async () => {
     w.focus();
   };
 
-  if (type === "trialBalance") {
-    const report = buildTrialBalanceReport(from, to);
-    if (!report.rows.length) {
-      alert("אין תנועות למאזן בוחן בטווח שנבחר");
-      return;
-    }
-    const rowsHtml = report.rows.map(a => `
-      <tr>
-        <td>${escapeHtml(a.code)}</td>
-        <td>${escapeHtml(a.name)}</td>
-        <td>${escapeHtml(a.group)}</td>
-        <td>${toMoney(Math.max(a.opening,0))}</td>
-        <td>${toMoney(Math.max(-a.opening,0))}</td>
-        <td>${toMoney(a.debit)}</td>
-        <td>${toMoney(a.credit)}</td>
-        <td>${toMoney(Math.max(a.closing,0))}</td>
-        <td>${toMoney(Math.max(-a.closing,0))}</td>
-      </tr>`).join("");
-    const balanced = Math.abs(report.totals.periodDifference) < 0.01 && Math.abs(report.totals.closingDifference) < 0.01;
-    openReportWindow('מאזן בוחן', `
-      <p style="margin:0 0 10px;color:#555;line-height:1.6">
-        מאזן בוחן שנגזר אוטומטית מתנועות ההכנסה וההוצאה במערכת. חשבון הקופה/בנק משמש כחשבון נגדי לתנועות כאשר לא נשמר חשבון פיננסי מפורט בתנועה.
-      </p>
-      <table>
-        <thead>
-          <tr><th rowspan="2">מס׳ חשבון</th><th rowspan="2">שם חשבון</th><th rowspan="2">קבוצה</th><th colspan="2">יתרת פתיחה</th><th colspan="2">תנועות בתקופה</th><th colspan="2">יתרת סגירה</th></tr>
-          <tr><th>חובה</th><th>זכות</th><th>חובה</th><th>זכות</th><th>חובה</th><th>זכות</th></tr>
-        </thead>
-        <tbody>
-          ${rowsHtml}
-          <tr><td colspan="3"><b>סה״כ</b></td><td><b>${toMoney(report.totals.openingDebit)}</b></td><td><b>${toMoney(report.totals.openingCredit)}</b></td><td><b>${toMoney(report.totals.debit)}</b></td><td><b>${toMoney(report.totals.credit)}</b></td><td><b>${toMoney(report.totals.closingDebit)}</b></td><td><b>${toMoney(report.totals.closingCredit)}</b></td></tr>
-        </tbody>
-      </table>
-      <p style="margin-top:10px;font-weight:700;color:${balanced?'#166534':'#b91c1c'}">${balanced?'✓ המאזן מאוזן: סה״כ חובה שווה לסה״כ זכות.':'⚠ קיימת אי־התאמה בין חובה לזכות ויש לבדוק את התנועות.'}</p>`);
-    return;
-  }
-
-  if (type === "customers") {
+    if (type === "customers") {
     const list = await getCustomersForReports();
     if (!list.length) {
       alert("אין לקוחות להצגה");
@@ -6538,15 +6439,12 @@ btnReportPdf.onclick = async () => {
   }
 
   if (type === "both") {
-    const list = filterByDateRange(from, to);
-    if (!list.length) {
+    const report = buildIncomeExpenseSummary(from, to);
+    if (!report.rows.length) {
       alert("אין נתונים לטווח שנבחר");
       return;
     }
-    const { rows: rowsWithAmounts } = addVatInfo(list);
-    const incTotals = addVatInfo(rowsWithAmounts.filter(r => r.type === "income")).totals;
-    const expTotals = addVatInfo(rowsWithAmounts.filter(r => r.type === "expense")).totals;
-    const bodyRows = rowsWithAmounts.map(r => `
+    const bodyRows = report.rows.map(r => `
       <tr>
         <td>${r.date}</td>
         <td>${r.type === "income" ? "הכנסה" : "הוצאה"}</td>
@@ -6556,17 +6454,38 @@ btnReportPdf.onclick = async () => {
         <td>${toMoney(r.vat)}</td>
         <td>${toMoney(r.gross)}</td>
       </tr>`).join("");
-    openReportWindow('דוח תנועות', `
+    const categoryRows = report.categories.map(c => `
+      <tr>
+        <td>${escapeHtml(c.kind)}</td>
+        <td>${escapeHtml(c.label)}</td>
+        <td>${c.count}</td>
+        <td>${toMoney(c.net)}</td>
+        <td>${toMoney(c.vat)}</td>
+        <td>${toMoney(c.gross)}</td>
+      </tr>`).join("");
+
+    openReportWindow('דוח הכנסות והוצאות', `
+      <table>
+        <thead><tr><th>סיכום</th><th>נטו</th><th>מע״מ</th><th>כולל</th></tr></thead>
+        <tbody>
+          <tr><td><b>הכנסות</b></td><td><b>${toMoney(report.income.net)}</b></td><td>${toMoney(report.income.vat)}</td><td>${toMoney(report.income.gross)}</td></tr>
+          <tr><td><b>הוצאות</b></td><td><b>${toMoney(report.expenses.net)}</b></td><td>${toMoney(report.expenses.vat)}</td><td>${toMoney(report.expenses.gross)}</td></tr>
+          <tr><td><b>הפרש הכנסות פחות הוצאות (נטו)</b></td><td><b>${toMoney(report.netResult)}</b></td><td></td><td></td></tr>
+        </tbody>
+      </table>
+
+      <h2 style="font-size:14px;margin:14px 0 4px">סיכום לפי קטגוריה</h2>
+      <table>
+        <thead><tr><th>סוג</th><th>קטגוריה</th><th>מס׳ תנועות</th><th>נטו</th><th>מע״מ</th><th>כולל</th></tr></thead>
+        <tbody>${categoryRows}</tbody>
+      </table>
+
+      <h2 style="font-size:14px;margin:14px 0 4px">פירוט תנועות</h2>
       <table>
         <thead>
           <tr><th>תאריך</th><th>סוג</th><th>קטגוריה</th><th>תיאור</th><th>נטו</th><th>מע"מ</th><th>כולל</th></tr>
         </thead>
-        <tbody>
-          ${bodyRows}
-          <tr><td colspan="4"><b>סה"כ הכנסות</b></td><td><b>${toMoney(incTotals.net)}</b></td><td><b>${toMoney(incTotals.vat)}</b></td><td><b>${toMoney(incTotals.gross)}</b></td></tr>
-          <tr><td colspan="4"><b>סה"כ הוצאות</b></td><td><b>${toMoney(expTotals.net)}</b></td><td><b>${toMoney(expTotals.vat)}</b></td><td><b>${toMoney(expTotals.gross)}</b></td></tr>
-          <tr><td colspan="4"><b>יתרה</b></td><td><b>${toMoney(incTotals.net - expTotals.net)}</b></td><td></td><td><b>${toMoney(incTotals.gross - expTotals.gross)}</b></td></tr>
-        </tbody>
+        <tbody>${bodyRows}</tbody>
       </table>`);
     return;
   }
