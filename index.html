@@ -6009,22 +6009,154 @@ function build1320Summary(from, to) {
   return { rows:rows1320, total, depreciablePurchases };
 }
 
-function buildPersonalTaxPayments(from, to) {
+async function buildPersonalTaxPayments(from, to) {
   const data = [];
-  filterByDateAndType("expense", from, to).forEach(r => {
+  const today = new Date();
+  const todayIso = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,"0")}-${String(today.getDate()).padStart(2,"0")}`;
+  const effectiveTo = to && to < todayIso ? to : todayIso;
+  const effectiveFrom = from || "0000-01-01";
+
+  const normTaxText = (v="") => String(v || "")
+    .trim().toLowerCase().replace(/["'׳״]/g, "").replace(/\s+/g, " ");
+  const monthKeyForDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  const dateInRange = date => !!date && date >= effectiveFrom && date <= effectiveTo;
+
+  // 1) תשלומים אישיים/סטטוטוריים שנרשמו כתנועה בפועל באינדקס.
+  filterByDateAndType("expense", effectiveFrom, effectiveTo).forEach(r => {
     const meta = getExpenseMeta(r);
     if (!meta?.personalTaxItem) return;
-    const { net, vat, gross } = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
+    // מע"מ שייך לדוח המע"מ, לא לדוח התשלומים האישיים.
+    const label = meta.item || r.category || "";
+    if (normTaxText(label).includes("מעמ") || normTaxText(label).includes("מע מ")) return;
+    const { gross } = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
     data.push({
       date:r.date || "",
-      category:meta.item || r.category || "",
+      category:label,
       desc:r.desc || "",
       gross:Number(gross || r.amount || 0),
-      docNumber:r.docNumber || ""
+      docNumber:r.docNumber || "",
+      source:"ledger"
     });
   });
-  data.sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  return { rows:data, total:data.reduce((s,r)=>s+r.gross,0) };
+
+  // 2) תשלומים קבועים מסוג רשות/חיסכון שנוהלו בעמוד התזרים.
+  //    התזרים נחשב אצלנו לרישום של כסף שיצא בפועל עד מועד הדוח; עתיד לא נכנס.
+  let cashflowConfig = null;
+  try {
+    if (currentUid) {
+      const snap = await getDoc(doc(db, "ledgers", currentUid));
+      if (snap.exists()) cashflowConfig = snap.data()?.cashflowConfigV1 || null;
+    }
+  } catch (err) {
+    console.warn("personal tax report: cashflow config load failed", err);
+  }
+
+  const obligations = Array.isArray(cashflowConfig?.obligations) ? cashflowConfig.obligations : [];
+  const monthlyAdjustments = cashflowConfig?.monthlyAdjustments || {};
+
+  const ensureHistory = ob => {
+    const history = Array.isArray(ob?.amountHistory) && ob.amountHistory.length
+      ? ob.amountHistory
+      : [{ fromMonth:ob?.startMonth || "0000-01", amount:Number(ob?.amount)||0 }];
+    return history.filter(h=>h?.fromMonth).map(h=>({fromMonth:String(h.fromMonth),amount:Number(h.amount)||0}))
+      .sort((a,b)=>a.fromMonth.localeCompare(b.fromMonth));
+  };
+  const obligationOccurs = (ob, d) => {
+    const mk = monthKeyForDate(d);
+    const start = ob?.startMonth || mk;
+    if (mk < start || (ob?.endMonth && mk > ob.endMonth)) return false;
+    const [sy, sm] = String(start).split("-").map(Number);
+    const idx = (d.getFullYear()-sy)*12 + (d.getMonth()+1-sm);
+    if (idx < 0) return false;
+    if (ob?.freq === "once") return idx === 0;
+    const step = {monthly:1,bimonthly:2,quarterly:3,yearly:12}[ob?.freq] || 1;
+    return idx % step === 0;
+  };
+  const obligationAmount = (ob, d) => {
+    const mk = monthKeyForDate(d);
+    const override = monthlyAdjustments?.[mk]?.[ob.id];
+    if (override !== undefined && override !== null && Number.isFinite(Number(override))) return Number(override);
+    let amount = Number(ob?.amount)||0;
+    for (const h of ensureHistory(ob)) {
+      if (h.fromMonth <= mk) amount = Number(h.amount)||0;
+      else break;
+    }
+    return amount;
+  };
+  const isVatName = name => {
+    const n = normTaxText(name).replace(/[^א-תa-z0-9]/g, "");
+    return n.includes("מעמ") || n.includes("vat");
+  };
+
+  const fromDate = effectiveFrom === "0000-01-01" ? new Date(2000,0,1) : new Date(`${effectiveFrom}T00:00:00`);
+  const toDate = new Date(`${effectiveTo}T00:00:00`);
+  const cursor = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
+  const endMonth = new Date(toDate.getFullYear(), toDate.getMonth(), 1);
+
+  const looksDuplicate = (name, amount, date) => {
+    const mk = String(date).slice(0,7);
+    const n = normTaxText(name);
+    return data.some(r => {
+      if (String(r.date||"").slice(0,7) !== mk) return false;
+      if (Math.abs(Number(r.gross||0)-Number(amount||0)) > 0.01) return false;
+      const hay = normTaxText(`${r.category||""} ${r.desc||""}`);
+      return hay.includes(n) || n.includes(hay);
+    });
+  };
+
+  while (cursor <= endMonth) {
+    const mk = monthKeyForDate(cursor);
+    for (const ob of obligations) {
+      if (ob?.active === false || ob?.type !== "authority" || !obligationOccurs(ob, cursor)) continue;
+      if (isVatName(ob.name || "")) continue;
+      const day = Math.max(1, Math.min(31, Number(ob.day)||15));
+      const lastDay = new Date(cursor.getFullYear(), cursor.getMonth()+1, 0).getDate();
+      const date = `${mk}-${String(Math.min(day,lastDay)).padStart(2,"0")}`;
+      if (!dateInRange(date)) continue;
+      const amount = Math.abs(Number(obligationAmount(ob, cursor))||0);
+      if (!amount || looksDuplicate(ob.name||"", amount, date)) continue;
+      data.push({
+        date,
+        category:ob.name || "תשלום אישי/סטטוטורי",
+        desc:"מתזרים העסק",
+        gross:amount,
+        docNumber:"",
+        source:"cashflow"
+      });
+    }
+
+    // מקדמות מס הכנסה מחושבות בתזרים לפי שיעור המקדמות שבפרופיל.
+    // אם קיים שיעור, הן נחשבות אצלנו לתשלום החודשי בתזרים; מע"מ צפוי אינו נכלל כאן.
+    const advanceRate = Math.max(0, Number(userProfile?.advanceTaxRate ?? userProfile?.incomeTaxAdvanceRate ?? 0) || 0);
+    if (advanceRate > 0) {
+      const day = 15;
+      const date = `${mk}-${String(day).padStart(2,"0")}`;
+      if (dateInRange(date)) {
+        const monthStart = `${mk}-01`;
+        const next = new Date(cursor.getFullYear(), cursor.getMonth()+1, 1);
+        const nextIso = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,"0")}-01`;
+        const incomeRows = rows.filter(r => r.type === "income" && String(r.date||"") >= monthStart && String(r.date||"") < nextIso);
+        const rate = getSettings().vatEnabled ? getSettings().vatRate : 0;
+        const incomeNet = incomeRows.reduce((sum,r)=>sum + Number(splitVAT(r.amount, r.incVat, rate).net || 0), 0);
+        const amount = Math.max(0, incomeNet * advanceRate / 100);
+        if (amount > 0 && !looksDuplicate("מקדמות מס הכנסה", amount, date)) {
+          data.push({
+            date,
+            category:"מקדמות מס הכנסה",
+            desc:`לפי שיעור מקדמות בפרופיל: ${advanceRate}%`,
+            gross:amount,
+            docNumber:"",
+            source:"cashflow"
+          });
+        }
+      }
+    }
+
+    cursor.setMonth(cursor.getMonth()+1);
+  }
+
+  data.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category), "he"));
+  return { rows:data, total:data.reduce((s,r)=>s+Number(r.gross||0),0) };
 }
 
 
@@ -6159,7 +6291,7 @@ btnReportCsv.onclick = async () => {
   }
 
   if (type === "personalTax") {
-    const report = buildPersonalTaxPayments(from, to);
+    const report = await buildPersonalTaxPayments(from, to);
     if (!report.rows.length) return alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
     const csv = [
       "date,category,description,document_number,amount",
@@ -6393,7 +6525,7 @@ btnReportPdf.onclick = async () => {
   }
 
   if (type === "personalTax") {
-    const report = buildPersonalTaxPayments(from, to);
+    const report = await buildPersonalTaxPayments(from, to);
     if (!report.rows.length) {
       alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
       return;
@@ -6402,7 +6534,7 @@ btnReportPdf.onclick = async () => {
       <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${toMoney(r.gross)}</td></tr>
     `).join("");
     openReportWindow('תשלומי מס וניכויים אישיים', `
-      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מרכז תשלומים שנרשמו במערכת אך אינם הוצאה עסקית שוטפת בנספח 1320.</p>
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מרכז תשלומי מס וניכויים אישיים שנרשמו באינדקס או בתזרים בטווח שנבחר. מע״מ אינו נכלל בדוח זה.</p>
       <table>
         <thead><tr><th>תאריך</th><th>סוג תשלום</th><th>תיאור</th><th>אסמכתא</th><th>סכום</th></tr></thead>
         <tbody>
