@@ -550,6 +550,22 @@ function formatInvoiceIsraelDate(value){
   });
 }
 
+function formatDocumentDate(value){
+  const raw = String(value || '').trim();
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if(match) return `${match[3]}/${match[2]}/${match[1]}`;
+  const date = new Date(raw);
+  if(Number.isNaN(date.getTime())) return raw;
+  return date.toLocaleDateString('he-IL', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function formatStoredDocumentHtmlDate(html, rawDate){
+  const source = String(html || '');
+  const raw = String(rawDate || '').slice(0,10);
+  if(!raw) return source;
+  return source.split(raw).join(formatDocumentDate(raw));
+}
+
 function isInvoiceIsraelConnectionValid(info = invoiceIsraelConnection()){
   if(info.status !== "connected") return false;
   const validUntilTime = new Date(info.validUntil || "").getTime();
@@ -704,7 +720,7 @@ function renderPreview(){
   $('docPreview').innerHTML=`
   <div class="doc-head">
     <div>${logo ? `<img class="doc-logo" src="${escapeHtml(logo)}" alt="לוגו העסק">` : ``}<div class="doc-meta">${businessBlock()}</div></div>
-    <div class="doc-title"><h2>${escapeHtml(TYPE_LABELS[type])}</h2><div class="doc-meta doc-number">מספר:&nbsp;<b>${bidiValue($('docNumber').value||'')}</b><br>תאריך:&nbsp;${bidiValue($('docDate').value||'')}${allocationLine}</div></div>
+    <div class="doc-title"><h2>${escapeHtml(TYPE_LABELS[type])}</h2><div class="doc-meta doc-number">מספר:&nbsp;<b>${bidiValue($('docNumber').value||'')}</b><br>תאריך:&nbsp;${bidiValue(formatDocumentDate($('docDate').value||''))}${allocationLine}</div></div>
   </div>
   <div class="doc-parties doc-parties-single"><div class="box customer-box"><h3>לכבוד</h3>${customerBlock(c)}</div><div></div></div>
   ${titleHtml}
@@ -743,7 +759,7 @@ function renderDocumentFinder(){
     return;
   }
   tbody.innerHTML=rows.map(d=>`<tr>
-    <td>${escapeHtml(d.date||'')}</td>
+    <td>${escapeHtml(formatDocumentDate(d.date||''))}</td>
     <td>${escapeHtml(TYPE_LABELS[d.type]||d.type||'')}</td>
     <td>${escapeHtml(d.number||'')}</td>
     <td>${escapeHtml(d.customerName||d.customerSnapshot?.name||d.customerSnapshot?.businessName||'')}</td>
@@ -755,7 +771,7 @@ function renderDocumentFinder(){
 function openIssuedDocument(id){
   const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
   if(!d) return;
-  const html=String(d.printHtml||'').trim();
+  const html=formatStoredDocumentHtmlDate(String(d.printHtml||'').trim(), d.date);
   if(!html){
     alert('למסמך הישן הזה לא נשמר עותק HTML להצגה. הנתונים החשבונאיים נשמרו, אך אין תצוגת הדפסה זמינה.');
     return;
@@ -895,7 +911,7 @@ async function logAudit(action, details = {}){
   }
 }
 function draftFromForm(){ const t=totals(); const allocation=allocationCheck(); return { id: crypto.randomUUID(), type:$('docType').value, number:$('docNumber').value, date:$('docDate').value, customerId:$('docCustomer').value, customerName: customerName(getSelectedCustomer()), lines:docLines.map(l=>({...l})), discountPct:Number($('docDiscountPct').value||0), paymentEntries:paymentEntries.map(p=>({...p})), withholdingTaxAmount:Number($('withholdingTaxAmount')?.value||0), vatRate:Number($('docVatRate').value||0), net:t.net, vat:t.vat, gross:t.gross, title:$('docTitle')?.value||'', notes:$('docNotes').value, allocationStatus:allocation.status, allocationRequired:allocation.required, allocationThreshold:allocation.threshold, allocationNumber:'', allocationRequestedAt:'', allocationReceivedAt:'', source:'draft', createdAt:new Date().toISOString() }; }
-function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(d.date||'')} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><div class="draft-actions"><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button><button class="btn danger small" data-delete-draft="${escapeHtml(d.id)}">מחיקה</button></div></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); box.querySelectorAll('[data-delete-draft]').forEach(btn=>btn.onclick=()=>deleteDraft(btn.dataset.deleteDraft)); }
+function renderDrafts(){ const box=$('draftsList'); if(!drafts.length){box.innerHTML='<div class="empty">אין טיוטות שמורות כרגע.</div>'; return;} box.innerHTML=drafts.slice().reverse().map(d=>`<div class="draft-card"><div><b>${escapeHtml(TYPE_LABELS[d.type]||d.type)} ${escapeHtml(d.number||'')}</b><div class="hint">${escapeHtml(formatDocumentDate(d.date||''))} · ${escapeHtml(d.customerName||'')} · ${money(d.gross)}</div></div><div class="draft-actions"><button class="btn secondary small" data-load-draft="${escapeHtml(d.id)}">פתיחה</button><button class="btn danger small" data-delete-draft="${escapeHtml(d.id)}">מחיקה</button></div></div>`).join(''); box.querySelectorAll('[data-load-draft]').forEach(btn=>btn.onclick=()=>loadDraft(btn.dataset.loadDraft)); box.querySelectorAll('[data-delete-draft]').forEach(btn=>btn.onclick=()=>deleteDraft(btn.dataset.deleteDraft)); }
 async function deleteDraft(id){
   const d=drafts.find(x=>String(x.id)===String(id));
   if(!d)return;
@@ -1480,7 +1496,7 @@ async function issueDocument(){
 }
 function getPrintableContent(){
   // אחרי הפקה משתמשים בעותק הסופי שנשמר; לפני הפקה מציגים את התצוגה הנוכחית.
-  if(lastIssuedDocument?.printHtml) return lastIssuedDocument.printHtml;
+  if(lastIssuedDocument?.printHtml) return formatStoredDocumentHtmlDate(lastIssuedDocument.printHtml, lastIssuedDocument.date);
   renderPreview();
   const content=$('docPreview')?.innerHTML || '';
   return content.trim() ? printableDocumentHtml(content) : '';
@@ -1503,19 +1519,31 @@ function printPreviewOnly(){
   }
   setTimeout(()=>URL.revokeObjectURL(url), 60000);
 }
-function downloadCurrentDocument(){
+async function downloadCurrentDocument(){
   const printableHtml = getPrintableContent();
   if(!printableHtml) return setStatus($('draftStatus'),'אין מסמך להורדה','err');
-  const blob = new Blob([printableHtml], {type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = safeFileNameForDocument()+'.html';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 1500);
-  setStatus($('draftStatus'),'המסמך ירד למכשיר ✅','ok');
+  const fileName = safeFileNameForDocument()+'.pdf';
+  try{
+    setStatus($('draftStatus'),'מכין PDF להורדה…','ok');
+    const polishedHtml = polishHebrewPdfHtml(printableHtml);
+    const pdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
+    const binary = atob(pdfBase64);
+    const bytes = new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const blob = new Blob([bytes], {type:'application/pdf'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    setStatus($('draftStatus'),'קובץ ה־PDF ירד למכשיר ✅','ok');
+  }catch(e){
+    console.error(e);
+    setStatus($('draftStatus'),'שגיאה ביצירת קובץ PDF להורדה','err');
+  }
 }
 
 $('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
