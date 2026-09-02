@@ -1162,11 +1162,41 @@ function money(value){
   return Number(value || 0).toLocaleString("he-IL", {style:"currency", currency:"ILS"});
 }
 
+function normalizeCustomerMatchName(value){
+  return String(value || "")
+    .normalize("NFKC")
+    .replace(/[\u200e\u200f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function importedRowBelongsToCustomer(row, customer){
+  if (!row || row.type !== "income" || row.source !== "csvImport") return false;
+
+  const customerId = String(customer?.id || "");
+  const rowCustomerId = String(row.customerId || "");
+  if (rowCustomerId && rowCustomerId === customerId) return true;
+
+  // Safe display fallback for historical imports whose customerId was lost.
+  // We only use the imported clientName when it maps to exactly one existing customer,
+  // and only when the stored customerId is empty or no longer points to an existing customer.
+  const storedIdStillExists = rowCustomerId && customers.some(c => String(c.id || "") === rowCustomerId);
+  if (storedIdStillExists) return false;
+
+  const rowName = normalizeCustomerMatchName(row.clientName);
+  const customerName = normalizeCustomerMatchName(customer?.name);
+  if (!rowName || rowName !== customerName) return false;
+
+  const sameNameCustomers = customers.filter(c => normalizeCustomerMatchName(c?.name) === rowName);
+  return sameNameCustomers.length === 1 && String(sameNameCustomers[0]?.id || "") === customerId;
+}
+
 function docsForCustomer(customer){
   const fullDocs = ledgerDocuments.filter(d => String(d.customerId || "") === String(customer.id || ""));
   const summaryDocs = Array.isArray(customer.documents) ? customer.documents : [];
   const importedIncome = ledgerRows
-    .filter(r => r.type === "income" && r.source === "csvImport" && String(r.customerId || "") === String(customer.id || ""))
+    .filter(r => importedRowBelongsToCustomer(r, customer))
     .map(r => ({
       id: r.id || "",
       date: r.date || "",
