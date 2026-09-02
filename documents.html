@@ -1336,7 +1336,33 @@ async function sendIssuedDocumentEmail(finalDoc, customer){
   return result;
 }
 
+function resetFormAfterSuccessfulIssue(){
+  activeDraftId = null;
+  $('docCustomer').value = '';
+  $('docCustomerSearch').value = '';
+  renderSelectedCustomerHint();
+  hideCustomerSuggestions();
+  docLines = [makeLine({desc:'', qty:1, netPrice:0})];
+  $('docDiscountPct').value = 0;
+  $('docTitle').value = '';
+  $('docNotes').value = '';
+  if($('withholdingTaxAmount')) $('withholdingTaxAmount').value = 0;
+  paymentEntries = [makePaymentEntry({amount:0})];
+  $('docDate').value = todayISO();
+  renderLinesEditor();
+  updatePaymentVisibility();
+  updatePaymentTotalsHint();
+  updateDocNumber();
+}
+
+let issueDocumentInProgress = false;
+
 async function issueDocument(){
+  if(issueDocumentInProgress) return;
+  issueDocumentInProgress = true;
+  const issueButton = $('btnIssueDocument');
+  if(issueButton){ issueButton.disabled = true; issueButton.textContent = 'מפיק מסמך…'; }
+  try{
   const currentType=$('docType').value;
   if(!isDocTypeAllowedForBusiness(currentType)){ setStatus($('draftStatus'),'סוג המסמך הזה אינו זמין לעוסק פטור.','err'); return; }
   const paymentError=validatePaymentEntries();
@@ -1488,10 +1514,14 @@ async function issueDocument(){
       setStatus($('draftStatus'), baseSuccessMessage, 'ok');
     }
 
-    updateDocNumber();
+    resetFormAfterSuccessfulIssue();
   }catch(e){
     console.error(e);
     setStatus($('draftStatus'),'שגיאה בהפקת המסמך. לא נשמר שינוי בנתונים.','err');
+  }
+  } finally {
+    issueDocumentInProgress = false;
+    if(issueButton){ issueButton.disabled = false; issueButton.textContent = 'הפקת מסמך'; }
   }
 }
 function getPrintableContent(){
@@ -1503,8 +1533,14 @@ function getPrintableContent(){
 }
 function safeFileNameForDocument(){
   const typeLabel = lastIssuedDocument?.typeLabel || TYPE_LABELS[$('docType')?.value] || 'מסמך';
-  const number = lastIssuedDocument?.number || $('docNumber')?.textContent || 'טיוטה';
-  return `${typeLabel}-${number}-עצמאי-פלוס`.replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,'-');
+  const number = lastIssuedDocument?.number || $('docNumber')?.value || 'טיוטה';
+  const customer = lastIssuedDocument?.customerName || customerName(getSelectedCustomer()) || '';
+  return [typeLabel, number, customer]
+    .filter(Boolean)
+    .join('_')
+    .replace(/[\/:*?"<>|]+/g,'-')
+    .replace(/\s+/g,' ')
+    .trim();
 }
 function printPreviewOnly(){
   const printableHtml = getPrintableContent();
