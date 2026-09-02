@@ -129,16 +129,25 @@ module.exports = async function handler(req, res) {
 
     const attachmentName =
       sanitizeFileName(fileName) ||
-      `${sanitizeFileName(safeDocumentType)}-${
-        sanitizeFileName(safeDocumentNumber) || "document"
-      }.pdf`;
-
-    const fromAddress =
-      process.env.RESEND_FROM_EMAIL || "documents@azmaiplus.co.il";
+      [safeDocumentType, safeDocumentNumber, safeCustomerName]
+        .map(sanitizeFileName)
+        .filter(Boolean)
+        .join("_") + ".pdf";
 
     const fromName = safeBusinessName
       .replace(/[\r\n<>"]/g, "")
       .trim() || "עצמאי פלוס";
+
+    // RESEND_FROM_EMAIL may be either a bare address
+    // (support@azmaiplus.co.il) or a complete Resend sender
+    // (עצמאי פלוס <support@azmaiplus.co.il>).
+    // Supporting both prevents an invalid nested From header.
+    const configuredFrom = String(process.env.RESEND_FROM_EMAIL || "").trim();
+    const resendFrom = configuredFrom
+      ? (configuredFrom.includes("<")
+          ? configuredFrom
+          : `${fromName} <${configuredFrom}>`)
+      : `${fromName} <documents@azmaiplus.co.il>`;
 
     const inlineLogo = parseImageDataUrl(businessLogoDataUrl);
     const attachments = [
@@ -216,7 +225,7 @@ module.exports = async function handler(req, res) {
   "User-Agent": "AzmaiPlus/1.0",
 },
       body: JSON.stringify({
-        from: `${fromName} <${fromAddress}>`,
+        from: resendFrom,
         to: [recipientEmail],
         subject,
         html: emailHtml,
