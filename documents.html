@@ -227,7 +227,7 @@ const DEFAULT_SETTINGS = { tax_invoice:1, receipt:1, tax_invoice_receipt:1, cred
 const TYPE_LABELS = { tax_invoice:"חשבונית מס", receipt:"קבלה", tax_invoice_receipt:"חשבונית מס/קבלה", credit_note:"חשבונית זיכוי", quote:"הצעת מחיר", deal_invoice:"חשבונית עסקה" };
 const INVOICE_ISRAEL_AUTH_URL = "/api/invoice-israel/auth";
 const INVOICE_ISRAEL_POPUP_NAME = "azmaiPlusInvoiceIsraelAuth";
-let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], issuedDocuments=[], docLines=[], paymentEntries=[], settingsLocked=false, previewFinal=false, lastIssuedDocument=null, activeDraftId=null;
+let uid=null, profile={}, ledger={}, customers=[], settings={...DEFAULT_SETTINGS}, drafts=[], issuedDocuments=[], docLines=[], paymentEntries=[], settingsLocked=false, previewFinal=false, lastIssuedDocument=null, activeDraftId=null, creditSourceDocument=null;
 const $ = id => document.getElementById(id);
 function escapeHtml(s=""){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function money(n){return '₪ ' + (Number(n)||0).toLocaleString('he-IL',{minimumFractionDigits:2,maximumFractionDigits:2});}
@@ -758,15 +758,68 @@ function renderDocumentFinder(){
     tbody.innerHTML='<tr><td colspan="6"><div class="finder-empty">לא נמצאו מסמכים תואמים</div></td></tr>';
     return;
   }
-  tbody.innerHTML=rows.map(d=>`<tr>
+  tbody.innerHTML=rows.map(d=>{
+    const duplicateCount=(issuedDocuments||[]).filter(x=>x.type===d.type && String(x.number||'')===String(d.number||'') && !['cancelled_technical_duplicate'].includes(x.status)).length;
+    const canCredit=['tax_invoice','tax_invoice_receipt'].includes(d.type) && !['credited','cancelled','cancelled_technical_duplicate'].includes(d.status);
+    const statusLabel=d.status==='credited' ? `זוכה${d.creditedByNumber ? ' · זיכוי '+d.creditedByNumber : ''}` : d.status==='cancelled_technical_duplicate' ? 'בוטל · כפילות טכנית' : 'הופק';
+    return `<tr>
     <td>${escapeHtml(formatDocumentDate(d.date||''))}</td>
-    <td>${escapeHtml(TYPE_LABELS[d.type]||d.type||'')}</td>
+    <td>${escapeHtml(TYPE_LABELS[d.type]||d.type||'')}<div class="hint">${escapeHtml(statusLabel)}</div></td>
     <td>${escapeHtml(d.number||'')}</td>
     <td>${escapeHtml(d.customerName||d.customerSnapshot?.name||d.customerSnapshot?.businessName||'')}</td>
     <td>${money(d.gross||0)}</td>
-    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button></div></td>
-  </tr>`).join('');
+    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button>${canCredit?`<button type="button" class="btn secondary small" data-credit-issued="${escapeHtml(d.id||'')}">צור זיכוי</button>`:''}${duplicateCount>1 && d.status!=='cancelled_technical_duplicate'?`<button type="button" class="btn danger small" data-fix-duplicate="${escapeHtml(d.id||'')}">בטל כפילות</button>`:''}</div></td>
+  </tr>`}).join('');
   tbody.querySelectorAll('[data-view-issued]').forEach(btn=>btn.onclick=()=>openIssuedDocument(btn.dataset.viewIssued));
+  tbody.querySelectorAll('[data-credit-issued]').forEach(btn=>btn.onclick=()=>prepareCreditFromIssuedDocument(btn.dataset.creditIssued));
+  tbody.querySelectorAll('[data-fix-duplicate]').forEach(btn=>btn.onclick=()=>cancelTechnicalDuplicate(btn.dataset.fixDuplicate));
+}
+function prepareCreditFromIssuedDocument(id){
+  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
+  if(!d || !['tax_invoice','tax_invoice_receipt'].includes(d.type)) return;
+  if(['credited','cancelled','cancelled_technical_duplicate'].includes(d.status)) return alert('לא ניתן ליצור זיכוי נוסף למסמך שכבר בוטל או זוכה.');
+  creditSourceDocument=d;
+  $('documentFinderDialog')?.close();
+  $('docType').value='credit_note';
+  updateDocNumber();
+  $('docDate').value=todayISO();
+  $('docCustomer').value=d.customerId||'';
+  const c=getSelectedCustomer();
+  $('docCustomerSearch').value=c?customerName(c):(d.customerName||'');
+  renderSelectedCustomerHint();
+  docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:'זיכוי בגין '+(d.typeLabel||TYPE_LABELS[d.type]||'מסמך')+' '+(d.number||''),qty:1,netPrice:Number(d.net||0)})];
+  $('docDiscountPct').value=Number(d.discountPct||0);
+  $('docVatRate').value=Number(d.vatRate||profile.vatRate||18);
+  $('docTitle').value=`זיכוי בגין ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}`;
+  $('docNotes').value=`זיכוי מלא למסמך מקור ${d.typeLabel||TYPE_LABELS[d.type]||''} ${d.number||''} מתאריך ${formatDocumentDate(d.date||'')}`;
+  paymentEntries=[makePaymentEntry({amount:0})];
+  if($('withholdingTaxAmount')) $('withholdingTaxAmount').value=0;
+  previewFinal=false; lastIssuedDocument=null;
+  updatePaymentVisibility(); renderLinesEditor(); renderPreview();
+  setStatus($('draftStatus'),`הוכן זיכוי מלא עבור ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}. יש לבדוק ולהפיק.`,'ok');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+async function cancelTechnicalDuplicate(id){
+  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
+  if(!d) return;
+  const siblings=(issuedDocuments||[]).filter(x=>x.type===d.type && String(x.number||'')===String(d.number||'') && x.status!=='cancelled_technical_duplicate');
+  if(siblings.length<2) return alert('לא נמצאה כרגע כפילות פעילה במספר הזה.');
+  const when=d.issuedAt ? new Date(d.issuedAt).toLocaleString('he-IL') : '';
+  if(!confirm(`זהו תיקון לכפילות טכנית בלבד.\n\nלבטל את הרשומה הזו של ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}${when?' שהופקה ב-'+when:''}?\n\nהמסמך יישמר בהיסטוריה כ״בוטל · כפילות טכנית״, והרישום הכספי שנוצר ממנו יוסר כדי שלא יישאר חיוב כפול.`)) return;
+  try{
+    const rows=Array.isArray(ledger.rows)?ledger.rows:[];
+    const cleanedRows=rows.filter(r=>String(r.documentId||'')!==String(d.id));
+    const updated={...d,status:'cancelled_technical_duplicate',cancelledAt:new Date().toISOString(),cancelReason:'technical_duplicate',cancelNote:'בוטל עקב הפקה כפולה באותו מספר מסמך'};
+    const batch=writeBatch(db);
+    batch.set(doc(db,'ledgers',uid,'documents',String(d.id)),sanitizeIssuedDocumentForStorage(updated),{merge:true});
+    batch.set(doc(db,'ledgers',uid),{rows:cleanedRows,rowsUpdatedAt:new Date().toISOString(),documentsUpdatedAt:new Date().toISOString()},{merge:true});
+    await batch.commit();
+    ledger={...ledger,rows:cleanedRows};
+    issuedDocuments=(issuedDocuments||[]).map(x=>String(x.id)===String(d.id)?updated:x);
+    await logAudit('כפילות טכנית בוטלה',{entityType:'מסמך',entityId:d.id,documentId:d.id,documentType:d.type,documentNumber:d.number,customerId:d.customerId,customerName:d.customerName,amount:d.gross||0,summary:`בוטלה כפילות טכנית של ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}; הרישום הכספי הכפול הוסר`});
+    renderDocumentFinder();
+    setStatus($('draftStatus'),`הכפילות של מסמך ${d.number||''} בוטלה והרישום הכספי הכפול הוסר ✅`,'ok');
+  }catch(e){ console.error(e); alert('לא הצלחתי לבטל את הכפילות. לא בוצע שינוי.'); }
 }
 function openIssuedDocument(id){
   const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
@@ -883,9 +936,19 @@ async function saveIssuedDocumentAndLedger(finalDoc, patch){
     {merge:true}
   );
   batch.set(doc(db, 'ledgers', uid), patch, {merge:true});
+  let creditedOriginal=null;
+  if(finalDoc.type==='credit_note' && finalDoc.creditForDocumentId){
+    const original=(issuedDocuments||[]).find(d=>String(d.id)===String(finalDoc.creditForDocumentId));
+    if(original){
+      creditedOriginal={...original,status:'credited',creditedAt:new Date().toISOString(),creditedByDocumentId:finalDoc.id,creditedByNumber:finalDoc.number};
+      batch.set(doc(db,'ledgers',uid,'documents',String(original.id)),sanitizeIssuedDocumentForStorage(creditedOriginal),{merge:true});
+    }
+  }
   await batch.commit();
   ledger = {...ledger, ...patch};
-  issuedDocuments = [finalDoc, ...(issuedDocuments||[]).filter(d=>String(d.id)!==String(finalDoc.id))];
+  let nextIssued=(issuedDocuments||[]).filter(d=>String(d.id)!==String(finalDoc.id));
+  if(creditedOriginal) nextIssued=nextIssued.map(d=>String(d.id)===String(creditedOriginal.id)?creditedOriginal:d);
+  issuedDocuments = [finalDoc, ...nextIssued];
 }
 async function saveLedgerPatch(patch){ if(!uid)return; await setDoc(doc(db,'ledgers',uid), patch, {merge:true}); ledger={...ledger,...patch}; }
 async function logAudit(action, details = {}){
@@ -1033,6 +1096,7 @@ function buildFinalDocument(){
     net: t.net,
     vat: t.vat,
     gross: t.gross,
+    ...(type==='credit_note' && creditSourceDocument ? {creditForDocumentId:creditSourceDocument.id, creditForType:creditSourceDocument.type, creditForNumber:creditSourceDocument.number, creditForDate:creditSourceDocument.date} : {}),
     source: 'issued',
     status: 'issued',
     issuedAt: new Date().toISOString(),
@@ -1338,6 +1402,7 @@ async function sendIssuedDocumentEmail(finalDoc, customer){
 
 function resetFormAfterSuccessfulIssue(){
   activeDraftId = null;
+  creditSourceDocument = null;
   $('docCustomer').value = '';
   $('docCustomerSearch').value = '';
   renderSelectedCustomerHint();
@@ -1582,7 +1647,7 @@ async function downloadCurrentDocument(){
   }
 }
 
-$('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
+$('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null;creditSourceDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnAddPayment')?.addEventListener('click',()=>{ paymentEntries.push(makePaymentEntry({amount:Math.max(0,round2(totals().gross-paymentEntriesTotal()))})); renderPaymentEntries(); renderPreview(); });
 $('btnPrint').onclick=printPreviewOnly;
 $('btnDownload').onclick=downloadCurrentDocument;
