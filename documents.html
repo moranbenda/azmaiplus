@@ -852,7 +852,9 @@ async function cancelTechnicalDuplicate(id){
   const when=d.issuedAt ? new Date(d.issuedAt).toLocaleString('he-IL') : '';
   if(!confirm(`זהו תיקון לכפילות טכנית בלבד.\n\nלבטל את הרשומה הזו של ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}${when?' שהופקה ב-'+when:''}?\n\nהמסמך יישמר בהיסטוריה כ״בוטל · כפילות טכנית״, והרישום הכספי שנוצר ממנו יוסר כדי שלא יישאר חיוב כפול.`)) return;
   try{
-    const rows=Array.isArray(ledger.rows)?ledger.rows:[];
+    const latestLedgerSnap=await getDoc(doc(db,'ledgers',uid));
+    const latestLedgerData=latestLedgerSnap.exists()?latestLedgerSnap.data():{};
+    const rows=Array.isArray(latestLedgerData.rows)?latestLedgerData.rows:(Array.isArray(ledger.rows)?ledger.rows:[]);
     const cleanedRows=rows.filter(r=>String(r.documentId||'')!==String(d.id));
     const updated={...d,status:'cancelled_technical_duplicate',cancelledAt:new Date().toISOString(),cancelReason:'technical_duplicate',cancelNote:'בוטל עקב הפקה כפולה באותו מספר מסמך'};
     const batch=writeBatch(db);
@@ -1539,7 +1541,10 @@ async function issueDocument(){
   finalDoc.printHtml = printableDocumentHtml(finalDoc.previewHtml);
   finalDoc.printFooter = 'הופק על ידי מערכת עצמאי פלוס';
   finalDoc.customerSearchKey = [finalDoc.customerName, finalDoc.customerSnapshot?.taxId, finalDoc.customerSnapshot?.email, finalDoc.customerSnapshot?.phone].filter(Boolean).join(' ').toLowerCase();
-  const existingRows=Array.isArray(ledger.rows) ? ledger.rows : [];
+  const latestLedgerSnapForRows=await getDoc(doc(db,'ledgers',uid));
+  const latestLedgerDataForRows=latestLedgerSnapForRows.exists()?latestLedgerSnapForRows.data():{};
+  const existingRows=Array.isArray(latestLedgerDataForRows.rows) ? latestLedgerDataForRows.rows : (Array.isArray(ledger.rows) ? ledger.rows : []);
+  ledger={...ledger,rows:existingRows};
   const nextSettings={...settings, [finalDoc.type]: Number(settings[finalDoc.type] || 1) + 1};
   const updatedCustomers=compactCustomersForLedger(customers.map(customer=>{
     if(String(customer.id)!==String(finalDoc.customerId)) return customer;
