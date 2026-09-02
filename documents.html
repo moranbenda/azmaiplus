@@ -877,6 +877,7 @@ async function loadAll(){
 
   const params = new URLSearchParams(location.search);
   const preCustomerId = params.get("customerId");
+  const creditDocumentId = params.get("creditDocumentId");
 
   if(preCustomerId){
     const c = customers.find(
@@ -886,6 +887,17 @@ async function loadAll(){
   }
 
   renderPreview();
+
+  // מאפשר יצירת זיכוי ישירות מכרטיס הלקוח, לאחר שכל המסמכים והלקוחות נטענו.
+  if(creditDocumentId){
+    const original = issuedDocuments.find(d => String(d.id) === String(creditDocumentId));
+    if(original){
+      prepareCreditFromIssuedDocument(creditDocumentId);
+      params.delete("creditDocumentId");
+      const qs = params.toString();
+      history.replaceState({}, "", location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }
 }
 function compactCustomersForLedger(list){
   return (Array.isArray(list) ? list : []).map(customer => {
