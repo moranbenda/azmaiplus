@@ -506,6 +506,29 @@
       accent-color:#15803d;
       box-shadow:none;
     }
+    .payment-status-line{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:nowrap;
+      white-space:nowrap;
+    }
+    .payment-inline-field{
+      display:inline-flex;
+      align-items:center;
+      gap:5px;
+      margin:0;
+      font-size:12px;
+      color:#64748b;
+      white-space:nowrap;
+    }
+    .payment-inline-field input,
+    .payment-inline-field select{
+      width:auto;
+      min-width:0;
+      padding:4px 6px;
+      font-size:12px;
+    }
     .customer-docs-empty{
       border:1px dashed #cbd5e1;
       border-radius:14px;
@@ -2022,7 +2045,7 @@ function renderSelected(){
                 <td data-label="סכום"><strong>${money(documentDisplayTotal(d))}</strong></td>
                 <td data-label="סטטוס תשלום">
                   ${statusText ? `<span class="payment-na">${escapeHtml(statusText)}</span>` : payable ? `
-                    <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
+                    <div class="payment-status-line">
                       <label class="payment-check-label">
                         <input type="checkbox"
                                ${d._importedIncome ? `data-paid-import="${escapeHtml(d.id || "")}"` : `data-paid-doc="${escapeHtml(d.id || "")}"`}
@@ -2031,25 +2054,21 @@ function renderSelected(){
                         <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
                       </label>
                       ${d._importedIncome && paid ? `
-                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                          <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
-                            תאריך תשלום
-                            <input type="date"
-                                   data-paid-date-import="${escapeHtml(d.id || "")}"
-                                   value="${escapeHtml(paymentDate)}"
-                                   style="width:auto;padding:5px 7px;font-size:12px" />
-                          </label>
-                          <label style="font-size:12px;color:#64748b;display:flex;gap:6px;align-items:center">
-                            שולם באמצעות
-                            <select data-paid-method-import="${escapeHtml(d.id || "")}"
-                                    style="width:auto;padding:5px 7px;font-size:12px">
-                              <option value="">לא צוין</option>
-                              ${Object.entries(importedPaymentMethodLabels).map(([value,label]) =>
-                                `<option value="${escapeHtml(value)}" ${String(d.paymentMethod || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`
-                              ).join("")}
-                            </select>
-                          </label>
-                        </div>
+                        <label class="payment-inline-field">
+                          תאריך תשלום
+                          <input type="date"
+                                 data-paid-date-import="${escapeHtml(d.id || "")}"
+                                 value="${escapeHtml(paymentDate)}" />
+                        </label>
+                        <label class="payment-inline-field">
+                          שולם באמצעות
+                          <select data-paid-method-import="${escapeHtml(d.id || "")}">
+                            <option value="">לא צוין</option>
+                            ${Object.entries(importedPaymentMethodLabels).map(([value,label]) =>
+                              `<option value="${escapeHtml(value)}" ${String(d.paymentMethod || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`
+                            ).join("")}
+                          </select>
+                        </label>
                       ` : ""}
                     </div>
                   ` : `<span class="payment-na">—</span>`}
