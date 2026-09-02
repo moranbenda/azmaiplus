@@ -997,6 +997,103 @@ body.account-frozen .readonly-disabled{
   .mobile-menu-btn{align-self:auto!important;margin:12px 0 0 auto!important;}
 }
 
+
+/* ===== v8: תיקון מדויק לכותרת העליונה ===== */
+/* בדסקטופ #appShell כבר מפנה 236px לסיידבר; אין להזיז את ה-header פעם נוספת. */
+@media(min-width:901px){
+  .app-header{
+    right:auto!important;
+    left:auto!important;
+    width:auto!important;
+  }
+  .app-header .header-inner{
+    display:flex!important;
+    flex-direction:row!important;
+    align-items:center!important;
+    justify-content:space-between!important;
+    max-width:none!important;
+    width:100%!important;
+    margin:0!important;
+    padding:14px 28px!important;
+    box-sizing:border-box!important;
+    text-align:right!important;
+  }
+  .app-header .mobile-brand-row{
+    margin:0!important;
+    flex:0 1 auto!important;
+    justify-content:flex-start!important;
+    text-align:right!important;
+  }
+  .app-header .desktop-header-actions{
+    margin:0!important;
+    flex:0 0 auto!important;
+  }
+}
+
+/* במובייל: מותג כיחידה מאוזנת — לוגו מימין, טקסט לצידו, המבורגר בשורה מתחת מימין. */
+@media(max-width:900px){
+  .app-header .header-inner{
+    display:flex!important;
+    flex-direction:column!important;
+    align-items:stretch!important;
+    justify-content:flex-start!important;
+    gap:8px!important;
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:14px 16px 12px!important;
+    box-sizing:border-box!important;
+  }
+  .mobile-brand-row{
+    display:flex!important;
+    flex-direction:row!important;
+    direction:rtl!important;
+    width:100%!important;
+    margin:0!important;
+    padding:0!important;
+    justify-content:flex-start!important;
+    align-items:flex-start!important;
+    gap:12px!important;
+    text-align:right!important;
+  }
+  .mobile-header-logo{
+    display:block!important;
+    width:58px!important;
+    height:58px!important;
+    object-fit:contain!important;
+    flex:0 0 58px!important;
+    margin:0!important;
+    align-self:flex-start!important;
+  }
+  .mobile-brand-row>div{
+    flex:1 1 auto!important;
+    min-width:0!important;
+    margin:0!important;
+    padding:1px 0 0!important;
+    text-align:right!important;
+  }
+  .mobile-brand-row .brand-title{
+    margin:0 0 3px!important;
+    text-align:right!important;
+    line-height:1.2!important;
+  }
+  .mobile-brand-row .hint{
+    margin:0!important;
+    text-align:right!important;
+    line-height:1.35!important;
+  }
+  .mobile-brand-row .account-flags{
+    margin-top:7px!important;
+    justify-content:flex-start!important;
+    text-align:right!important;
+  }
+  .mobile-menu-btn{
+    display:flex!important;
+    align-self:auto!important;
+    margin:8px 0 0 auto!important;
+  }
+}
+
 /* v7: סיכומים וחתכים — קולאפס במובייל, כמו "מה עושים היום?" */
 .summary-collapse-toggle{
   width:100%;border:0;background:transparent;color:var(--text);font:inherit;
