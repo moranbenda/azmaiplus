@@ -803,7 +803,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, runTransaction } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -830,7 +830,6 @@ let userProfile = {};
 let customers = [];
 let ledgerDocuments = [];
 let ledgerRows = [];
-let importedIncomeMeta = new Map();
 let editingId = null;
 let selectedId = null;
 
@@ -1191,61 +1190,8 @@ function importedRowCustomerNameCandidates(row){
   return Array.from(new Set(candidates.map(normalizeCustomerMatchName).filter(Boolean)));
 }
 
-function importedMetaForRow(rowId){
-  return importedIncomeMeta.get(String(rowId || "")) || {};
-}
-
-function effectiveImportedRow(row){
-  if (!row || row.source !== "csvImport" || row.type !== "income") return row;
-  const meta = importedMetaForRow(row.id);
-  return {
-    ...row,
-    ...(meta.customerId ? {customerId: meta.customerId} : {}),
-    ...(Object.prototype.hasOwnProperty.call(meta, "paid") ? {paid: !!meta.paid} : {}),
-    ...(Object.prototype.hasOwnProperty.call(meta, "paidAt") ? {paidAt: meta.paidAt || null} : {}),
-    ...(Object.prototype.hasOwnProperty.call(meta, "paymentMethod") ? {paymentMethod: meta.paymentMethod || ""} : {})
-  };
-}
-
-async function persistImportedIncomeMeta(rowId, patch = {}){
-  if (!currentUser?.uid || !rowId) return;
-  const cleanPatch = {
-    rowId: String(rowId),
-    ...patch,
-    updatedAtIso: new Date().toISOString()
-  };
-  await setDoc(doc(db, "ledgers", currentUser.uid, "importedIncomeMeta", String(rowId)), cleanPatch, {merge:true});
-  importedIncomeMeta.set(String(rowId), {
-    ...importedMetaForRow(rowId),
-    ...cleanPatch
-  });
-}
-
-async function updateImportedIncomeRowSafely(rowId, patch = {}){
-  if (!currentUser?.uid) throw new Error("No current user");
-  const ledgerRef = doc(db, "ledgers", currentUser.uid);
-  const updatedRows = await runTransaction(db, async transaction => {
-    const snap = await transaction.get(ledgerRef);
-    const data = snap.exists() ? snap.data() : {};
-    const freshRows = Array.isArray(data.rows) ? data.rows.map(r => ({...r})) : [];
-    const idx = freshRows.findIndex(r => String(r.id || "") === String(rowId || ""));
-    if (idx < 0 || freshRows[idx]?.source !== "csvImport" || freshRows[idx]?.type !== "income") {
-      throw new Error("Imported income row not found");
-    }
-    freshRows[idx] = {...freshRows[idx], ...patch};
-    transaction.set(ledgerRef, {
-      rows: freshRows,
-      rowsUpdatedAt: new Date().toISOString()
-    }, {merge:true});
-    return freshRows;
-  });
-  ledgerRows = updatedRows;
-  return effectiveImportedRow(ledgerRows.find(r => String(r.id || "") === String(rowId || "")));
-}
-
 function importedRowBelongsToCustomer(row, customer){
   if (!row || row.type !== "income" || row.source !== "csvImport" || !customer) return false;
-  row = effectiveImportedRow(row);
 
   const customerId = String(customer.id || "");
   const rowCustomerId = String(row.customerId || "");
@@ -1271,7 +1217,6 @@ function docsForCustomer(customer){
   const summaryDocs = Array.isArray(customer.documents) ? customer.documents : [];
   const importedIncome = ledgerRows
     .filter(r => importedRowBelongsToCustomer(r, customer))
-    .map(r => effectiveImportedRow(r))
     .map(r => ({
       id: r.id || "",
       date: r.date || "",
@@ -1423,97 +1368,946 @@ function openInvoiceSummary(docs){
 }
 
 async function setImportedIncomePaidStatus(rowId, paid, paymentDate){
-  const currentRow = effectiveImportedRow(ledgerRows.find(r => String(r.id || "") === String(rowId || "")));
-  if (!currentRow || currentRow.source !== "csvImport" || currentRow.type !== "income") {
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
     showToast("לא ניתן לעדכן את התשלום בהכנסה המיובאת הזו.", true);
     return;
   }
 
+  const previousPaid = !!ledgerRows[idx].paid;
+  const previousPaidAt = ledgerRows[idx].paidAt || null;
+
   let paidAt = null;
   if (paid) {
-    const chosen = String(paymentDate || "").trim() || String(currentRow.date || "").slice(0,10);
+    const chosen = String(paymentDate || "").trim() || String(ledgerRows[idx].date || "").slice(0,10);
     paidAt = chosen ? `${chosen}T12:00:00.000Z` : new Date().toISOString();
   }
 
+  ledgerRows[idx] = {
+    ...ledgerRows[idx],
+    paid: !!paid,
+    paidAt
+  };
+
   try {
-    await updateImportedIncomeRowSafely(rowId, {paid: !!paid, paidAt});
-    await persistImportedIncomeMeta(rowId, {
-      customerId: selectedId || currentRow.customerId || "",
-      paid: !!paid,
-      paidAt
-    });
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
+
     await writeAuditLog(paid ? "הכנסה מיובאת סומנה כשולמה" : "הכנסה מיובאת נפתחה מחדש לתשלום", {
       entityType: "הכנסה מיובאת",
       entityId: rowId,
       paid: !!paid,
       paidAt
     });
+
     renderSelected();
     showToast(paid ? "ההכנסה סומנה כשולמה." : "ההכנסה סומנה כפתוחה לתשלום.");
   } catch (err) {
     console.error("Imported income payment update failed:", err);
+    ledgerRows[idx] = {
+      ...ledgerRows[idx],
+      paid: previousPaid,
+      paidAt: previousPaidAt
+    };
     showToast("שמירת סטטוס התשלום נכשלה.", true);
     renderSelected();
   }
 }
 
 async function setImportedIncomePaymentMethod(rowId, paymentMethod){
-  const currentRow = effectiveImportedRow(ledgerRows.find(r => String(r.id || "") === String(rowId || "")));
-  if (!currentRow || currentRow.source !== "csvImport" || currentRow.type !== "income") {
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
     showToast("לא ניתן לעדכן את אמצעי התשלום.", true);
     return;
   }
-  const value = String(paymentMethod || "");
+
+  const previous = ledgerRows[idx].paymentMethod || "";
+  ledgerRows[idx] = {...ledgerRows[idx], paymentMethod: String(paymentMethod || "")};
+
   try {
-    await updateImportedIncomeRowSafely(rowId, {paymentMethod: value});
-    await persistImportedIncomeMeta(rowId, {
-      customerId: selectedId || currentRow.customerId || "",
-      paymentMethod: value
-    });
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
     await writeAuditLog("אמצעי תשלום להכנסה מיובאת עודכן", {
       entityType: "הכנסה מיובאת",
       entityId: rowId,
-      paymentMethod: value,
+      paymentMethod: ledgerRows[idx].paymentMethod || "",
       summary: `עודכן אמצעי תשלום להכנסה מיובאת ${rowId}`
     });
     renderSelected();
     showToast("אמצעי התשלום עודכן.");
   } catch (err) {
     console.error("Imported income payment method update failed:", err);
+    ledgerRows[idx] = {...ledgerRows[idx], paymentMethod: previous};
     showToast("שמירת אמצעי התשלום נכשלה.", true);
     renderSelected();
   }
 }
 
 async function setImportedIncomePaymentDate(rowId, paymentDate){
-  const currentRow = effectiveImportedRow(ledgerRows.find(r => String(r.id || "") === String(rowId || "")));
-  if (!currentRow || currentRow.source !== "csvImport" || currentRow.type !== "income") {
+  const idx = ledgerRows.findIndex(r => String(r.id || "") === String(rowId || ""));
+  if (idx < 0 || ledgerRows[idx]?.source !== "csvImport" || ledgerRows[idx]?.type !== "income") {
     showToast("לא ניתן לעדכן את תאריך התשלום.", true);
     return;
   }
-  if (!currentRow.paid) return;
+  if (!ledgerRows[idx].paid) return;
+
+  const previousPaidAt = ledgerRows[idx].paidAt || null;
   const chosen = String(paymentDate || "").trim();
-  const paidAt = chosen ? `${chosen}T12:00:00.000Z` : (currentRow.paidAt || null);
+  ledgerRows[idx] = {
+    ...ledgerRows[idx],
+    paidAt: chosen ? `${chosen}T12:00:00.000Z` : previousPaidAt
+  };
+
   try {
-    await updateImportedIncomeRowSafely(rowId, {paidAt});
-    await persistImportedIncomeMeta(rowId, {
-      customerId: selectedId || currentRow.customerId || "",
-      paid: true,
-      paidAt
-    });
+    await setDoc(doc(db, "ledgers", currentUser.uid), {
+      rows: ledgerRows,
+      rowsUpdatedAt: new Date().toISOString()
+    }, { merge: true });
     await writeAuditLog("תאריך תשלום להכנסה מיובאת עודכן", {
       entityType: "הכנסה מיובאת",
       entityId: rowId,
-      paidAt,
+      paidAt: ledgerRows[idx].paidAt || null,
       summary: `עודכן תאריך תשלום להכנסה מיובאת ${rowId}`
     });
     renderSelected();
     showToast("תאריך התשלום עודכן.");
   } catch (err) {
     console.error("Imported income payment date update failed:", err);
+    ledgerRows[idx] = {...ledgerRows[idx], paidAt: previousPaidAt};
     showToast("שמירת תאריך התשלום נכשלה.", true);
     renderSelected();
   }
+}
+
+async function setDocumentPaidStatus(docId, paid){
+  const idx = ledgerDocuments.findIndex(d => String(d.id || "") === String(docId || ""));
+  if (idx < 0) {
+    showToast("לא ניתן לעדכן את סטטוס התשלום במסמך הזה.", true);
+    return;
+  }
+
+  const previous = !!ledgerDocuments[idx].paid;
+  const previousPaidAt = ledgerDocuments[idx].paidAt || null;
+  ledgerDocuments[idx] = {
+    ...ledgerDocuments[idx],
+    paid: !!paid,
+    paidAt: paid ? new Date().toISOString() : null
+  };
+
+  try {
+    if (ledgerDocuments[idx]._storage === "subcollection") {
+      await setDoc(
+        doc(db, "ledgers", currentUser.uid, "documents", String(docId)),
+        { paid: !!paid, paidAt: ledgerDocuments[idx].paidAt },
+        { merge: true }
+      );
+    } else {
+      const legacyDocuments = ledgerDocuments
+        .filter(item => item._storage !== "subcollection")
+        .map(({_storage, ...item}) => item);
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        documents: legacyDocuments,
+        documentsUpdatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    await writeAuditLog(paid ? "חשבונית סומנה כשולמה" : "חשבונית נפתחה מחדש לתשלום", {
+      entityType: "מסמך",
+      entityId: docId,
+      documentId: docId,
+      documentNumber: ledgerDocuments[idx].number || "",
+      customerId: ledgerDocuments[idx].customerId || selectedId || "",
+      summary: `${paid ? "סומנה כשולמה" : "סומנה כפתוחה לתשלום"}: ${documentDisplayType(ledgerDocuments[idx])} ${ledgerDocuments[idx].number || ""}`
+    });
+
+    renderSelected();
+    showToast(paid ? "החשבונית סומנה כשולמה ✅" : "החשבונית סומנה כפתוחה לתשלום");
+  } catch (error) {
+    console.error("Payment status update failed", error);
+    ledgerDocuments[idx] = {...ledgerDocuments[idx], paid: previous, paidAt: previousPaidAt};
+    showToast("לא הצלחנו לשמור את סטטוס התשלום.", true);
+    renderSelected();
+  }
+}
+
+function documentHtmlForView(d){
+  if (d.previewHtml) return d.previewHtml;
+  return `
+    <div class="doc-head">
+      <div></div>
+      <div class="doc-title">
+        <h2>${escapeHtml(documentDisplayType(d))}</h2>
+        <div class="doc-meta doc-number">מספר: <b>${escapeHtml(d.number || "")}</b><br>תאריך: ${escapeHtml(d.date || "")}</div>
+      </div>
+    </div>
+    <div class="doc-parties doc-parties-single"><div class="box customer-box"><h3>לכבוד</h3><b>${escapeHtml(d.customerName || "")}</b></div></div>
+    <div class="totals"><div><span>סה״כ</span><span>${money(documentDisplayTotal(d))}</span></div></div>
+  `;
+}
+
+
+function formatDisplayDate(value){
+  if (!value) return "—";
+  const str = String(value).trim();
+  const iso = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[3]}/${iso[2]}/${iso[1]}`;
+  const d = new Date(str);
+  if (!Number.isNaN(d.getTime())) {
+    return d.toLocaleDateString("he-IL", { year:"numeric", month:"2-digit", day:"2-digit" });
+  }
+  return str;
+}
+
+function showStoredDocumentModal(html, title){
+  const modal = $("docViewModal");
+  const frame = $("docViewFrame");
+  const titleEl = $("docViewTitle");
+  if (!modal || !frame) return false;
+  titleEl.textContent = title || "צפייה במסמך";
+  frame.srcdoc = html;
+  modal.classList.add("show");
+  modal.setAttribute("aria-hidden", "false");
+  return true;
+}
+
+function closeStoredDocumentModal(){
+  const modal = $("docViewModal");
+  const frame = $("docViewFrame");
+  if (!modal || !frame) return;
+  modal.classList.remove("show");
+  modal.setAttribute("aria-hidden", "true");
+  frame.srcdoc = "";
+}
+
+
+
+function polishHebrewPdfHtml(html){
+  let out = String(html || "");
+
+  const replacements = [
+    ["הצעת מחיר", "הצעת&nbsp;מחיר"],
+    ["חשבונית מס/קבלה", "חשבונית&nbsp;מס/קבלה"],
+    ["חשבונית מס", "חשבונית&nbsp;מס"],
+    ["חשבונית זיכוי", "חשבונית&nbsp;זיכוי"],
+    ["חשבונית עסקה", "חשבונית&nbsp;עסקה"],
+    ["מספר עוסק/ח.פ:", "מספר&nbsp;עוסק/ח.פ:"],
+    ["מספר מזהה:", "מספר&nbsp;מזהה:"],
+    ["איש קשר:", "איש&nbsp;קשר:"],
+    ["מחיר לפני מע״מ", "מחיר&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לפני מע״מ", "סה״כ&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לאחר הנחה לפני מע״מ", "סה״כ&nbsp;לאחר&nbsp;הנחה&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לתשלום", "סה״כ&nbsp;לתשלום"]
+  ];
+
+  replacements.forEach(([from, to]) => {
+    out = out.split(from).join(to);
+  });
+
+  const pdfTextFix = `
+    <style id="azmai-pdf-hebrew-text-fix">
+      h2,h3,th,td,.doc-meta,.customer-box,.totals span{
+        word-spacing:.12em;
+      }
+      h2,h3,.azmai-nowrap{
+        white-space:nowrap;
+      }
+      .doc-meta,.customer-box{
+        unicode-bidi:embed;
+        direction:rtl;
+      }
+    </style>`;
+
+  if (out.includes("</head>")) {
+    out = out.replace("</head>", `${pdfTextFix}</head>`);
+  } else {
+    out = pdfTextFix + out;
+  }
+
+  return out;
+}
+
+function normalizeStoredDocumentHtml(html, d){
+  const title = `${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}`.trim();
+  const customerRightFix = `
+    <style id="azmai-customer-right-fix">
+      html,body{direction:rtl!important;text-align:right!important;}
+      .doc-parties{display:block!important;direction:rtl!important;text-align:right!important;margin-bottom:18px!important;}
+      .doc-parties .box,.doc-parties .customer-box,.customer-box{
+        display:block!important;
+        float:right!important;
+        clear:both!important;
+        width:46%!important;
+        min-width:240px!important;
+        margin:0!important;
+        text-align:right!important;
+        direction:rtl!important;
+      }
+      .doc-parties:after{content:"";display:block;clear:both;}
+      .customer-box *{text-align:right!important;direction:rtl!important;}
+      .doc-date-ltr{direction:ltr!important;unicode-bidi:isolate!important;display:inline-block!important;}
+    </style>`;
+
+  let out = String(html || "");
+  if (!out.trim().toLowerCase().startsWith("<!doctype") && !out.trim().toLowerCase().startsWith("<html")) {
+    out = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${title}</title></head><body>${out}</body></html>`;
+  }
+  if (out.includes('</head>')) out = out.replace('</head>', `${customerRightFix}</head>`);
+  else out = customerRightFix + out;
+  out = polishHebrewPdfHtml(out);
+  return out;
+}
+
+function openStoredDocument(docId, shouldPrint=false){
+  const d = ledgerDocuments.find(x => String(x.id) === String(docId));
+  if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
+
+  const baseHtml = d.printHtml || d.previewHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+  <style>
+    body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
+    .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}.doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}.doc-meta{font-size:12px;color:#334155;line-height:1.7}.box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}.doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}.customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}.doc-parties:after{content:"";display:block;clear:both}.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}th{background:#f1f5f9}.totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}.totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}@page{size:A4 landscape;margin:12mm}
+  </style></head><body>${documentHtmlForView(d)}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
+
+  const html = normalizeStoredDocumentHtml(baseHtml, d);
+  const title = `${documentDisplayType(d)} ${d.number || ""}`.trim();
+
+  if (!shouldPrint) {
+    return showStoredDocumentModal(html, title);
+  }
+
+  const w = window.open("", "_blank");
+  if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
+  const printHtml = html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
+  w.document.open();
+  w.document.write(printHtml);
+  w.document.close();
+}
+
+async function waitForFrameImages(frameDocument){
+  const images = Array.from(frameDocument?.images || []);
+  await Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener("load", resolve, {once:true});
+      img.addEventListener("error", resolve, {once:true});
+    });
+  }));
+}
+
+async function documentHtmlToPdfBase64(documentHtml, fileName){
+  const iframe = document.createElement("iframe");
+  iframe.setAttribute("aria-hidden", "true");
+  iframe.style.position = "fixed";
+  iframe.style.left = "0";
+  iframe.style.top = "0";
+  iframe.style.width = "794px";
+  iframe.style.height = "1123px";
+  iframe.style.opacity = "1";
+  iframe.style.visibility = "visible";
+  iframe.style.zIndex = "2147483647";
+  iframe.style.background = "#ffffff";
+  iframe.style.border = "0";
+  iframe.style.pointerEvents = "none";
+  iframe.srcdoc = documentHtml;
+  document.body.appendChild(iframe);
+
+  try {
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(
+        () => reject(new Error("טעינת המסמך ל־PDF נמשכה זמן רב מדי.")),
+        15000
+      );
+
+      iframe.addEventListener("load", () => {
+        clearTimeout(timeout);
+        resolve();
+      }, {once:true});
+    });
+
+    const frameDocument = iframe.contentDocument;
+    const frameWindow = iframe.contentWindow;
+
+    if (!frameDocument?.body || !frameWindow) {
+      throw new Error("לא ניתן היה להכין את המסמך ל־PDF.");
+    }
+
+    await waitForFrameImages(frameDocument);
+
+    // Preserve the customer block exactly as in the last good version.
+    frameDocument.querySelectorAll(".customer-box").forEach(container => {
+      const walker = frameDocument.createTreeWalker(
+        container,
+        frameWindow.NodeFilter.SHOW_TEXT
+      );
+
+      const textNodes = [];
+      while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+      textNodes.forEach(node => {
+        node.nodeValue = String(node.nodeValue || "")
+          .replace(/ /g, "\u00A0")
+          .replace(/:/g, ":\u200F");
+      });
+    });
+
+    // Fix only the business email line. Mixed Hebrew + an LTR email address
+    // otherwise causes the label and colon to jump to the wrong side.
+    const businessMeta = frameDocument.querySelector(
+      ".doc-head > div:first-child .doc-meta"
+    );
+
+    if (businessMeta) {
+      const parts = businessMeta.innerHTML
+        .split(/<br\s*\/?\s*>/i)
+        .map(part => part.trim())
+        .filter(Boolean);
+
+      businessMeta.innerHTML = parts.map(part => {
+        const holder = frameDocument.createElement("div");
+        holder.innerHTML = part;
+        const plain = String(holder.textContent || "").trim();
+
+        if (/^מייל\s*:/.test(plain)) {
+          const email = plain.replace(/^מייל\s*:\s*/, "").trim();
+          return `<span dir="rtl" style="white-space:nowrap">
+            מייל:&nbsp;<span dir="ltr"
+              style="display:inline-block;unicode-bidi:isolate">${escapeHtml(email)}</span>
+          </span>`;
+        }
+
+        // Keep the original markup and only protect intended spaces.
+        return part.replace(/ /g, "&nbsp;");
+      }).join("<br>");
+    }
+
+    // Preserve spaces only in the description column, without touching
+    // quantities, prices or totals.
+    frameDocument
+      .querySelectorAll(".items tbody tr td:first-child")
+      .forEach(cell => {
+        const walker = frameDocument.createTreeWalker(
+          cell,
+          frameWindow.NodeFilter.SHOW_TEXT
+        );
+
+        const textNodes = [];
+        while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+        textNodes.forEach(node => {
+          node.nodeValue = String(node.nodeValue || "").replace(/ /g, "\u00A0");
+        });
+      });
+
+    // Load html2pdf inside the iframe itself. Rendering a document from the
+    // parent window can produce a blank PDF on mobile browsers.
+    if (!frameWindow.html2pdf) {
+      await new Promise((resolve, reject) => {
+        const script = frameDocument.createElement("script");
+        script.src = "https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js";
+        script.onload = resolve;
+        script.onerror = () => reject(
+          new Error("רכיב יצירת ה־PDF לא נטען בתוך המסמך.")
+        );
+        frameDocument.head.appendChild(script);
+      });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 350));
+
+    const dataUri = await frameWindow.html2pdf()
+      .set({
+        margin: 8,
+        filename: fileName,
+        image: {type: "jpeg", quality: 0.98},
+        html2canvas: {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: 794,
+          windowHeight: Math.max(
+            1123,
+            frameDocument.documentElement.scrollHeight || 1123
+          )
+        },
+        jsPDF: {
+          unit: "mm",
+          format: "a4",
+          orientation: "portrait"
+        },
+        pagebreak: {
+          mode: ["css", "legacy"],
+          avoid: ["tr", ".box", ".totals"]
+        }
+      })
+      .from(frameDocument.body)
+      .outputPdf("datauristring");
+
+    const base64 = String(dataUri || "").split(",")[1];
+
+    if (!base64) {
+      throw new Error("יצירת קובץ ה־PDF נכשלה.");
+    }
+
+    return base64;
+  } finally {
+    iframe.remove();
+  }
+}
+
+function businessNameForEmail(){
+  return clean(
+    userProfile.businessName ||
+    userProfile.business ||
+    userProfile.companyName ||
+    userProfile.fullName ||
+    currentUser?.displayName ||
+    "עצמאי פלוס"
+  );
+}
+
+function businessLogoForEmail(){
+  return clean(
+    userProfile.businessLogoDataUrl ||
+    userProfile.businessLogo ||
+    userProfile.logoDataUrl ||
+    ""
+  );
+}
+
+async function resendStoredDocument(docId){
+  const d = ledgerDocuments.find(x => String(x.id) === String(docId));
+
+  if (!d) {
+    return showToast("לא נמצא מסמך לשליחה.", true);
+  }
+
+  if (!currentUser) {
+    return showToast("יש להתחבר מחדש למערכת.", true);
+  }
+
+  const customer =
+    customers.find(c => String(c.id) === String(selectedId || "")) ||
+    customers.find(c => String(c.id) === String(d.customerId || ""));
+
+  const recipientEmail = clean(customer?.email || d.customerEmail || "");
+
+  if (!recipientEmail) {
+    return showToast("ללקוח לא מוגדרת כתובת מייל.", true);
+  }
+
+  const baseHtml =
+    d.printHtml ||
+    `<!doctype html>
+    <html lang="he" dir="rtl">
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>${escapeHtml(documentDisplayType(d))} ${escapeHtml(d.number || "")}</title>
+        <style>
+          body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:#fff}
+          .print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
+          .doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:18px}
+          .doc-title{text-align:left}.doc-number{font-size:16px;line-height:1.8}.doc-number b{font-size:22px}
+          h2{margin:0 0 8px;font-size:30px}h3{margin:0 0 8px;font-size:14px}
+          .doc-meta{font-size:12px;color:#334155;line-height:1.7}
+          .box{border:1px solid #dbe3ef;border-radius:14px;padding:14px;min-height:70px}
+          .doc-parties{display:block;direction:rtl;text-align:right;margin-bottom:18px}
+          .customer-box{display:block;float:right;width:46%;min-width:240px;margin:0;text-align:right;direction:rtl}
+          .doc-parties:after{content:"";display:block;clear:both}
+          .items{width:100%;border-collapse:collapse;margin-top:14px}
+          th,td{border-bottom:1px solid #e5edf7;padding:10px;text-align:right}
+          th{background:#f1f5f9}
+          .totals{margin-top:16px;margin-right:auto;width:280px;border:1px solid #dbe3ef;border-radius:14px;overflow:hidden}
+          .totals div{display:flex;justify-content:space-between;padding:10px 12px;border-bottom:1px solid #e5edf7}
+          .totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}
+          @page{size:A4 landscape;margin:12mm}
+        </style>
+      </head>
+      <body>
+        ${documentHtmlForView(d)}
+        <div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div>
+      </body>
+    </html>`;
+
+  const documentHtml = normalizeStoredDocumentHtml(baseHtml, d);
+  const safeType = documentDisplayType(d);
+  const pdfFileName = `${safeType}-${d.number || "document"}.pdf`;
+
+  try {
+    showToast("מכין PDF ושולח את המסמך במייל…");
+
+    const [idToken, pdfBase64] = await Promise.all([
+      currentUser.getIdToken(),
+      documentHtmlToPdfBase64(documentHtml, pdfFileName)
+    ]);
+
+    const response = await fetch("/api/send-document-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
+      },
+      body: JSON.stringify({
+        to: recipientEmail,
+        customerName: customer?.name || d.customerName || "לקוח/ה",
+        documentType: safeType,
+        documentNumber: d.number || "",
+        attachmentBase64: pdfBase64,
+        attachmentMimeType: "application/pdf",
+        fileName: pdfFileName,
+        businessName: businessNameForEmail(),
+        businessLogoDataUrl: businessLogoForEmail()
+      })
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result.ok) {
+      throw new Error(result.error || "שליחת המייל נכשלה.");
+    }
+
+    showToast(`המסמך נשלח בהצלחה ל־${recipientEmail} כ־PDF ✅`);
+  } catch (error) {
+    console.error("Document email error:", error);
+    showToast(error?.message || "אירעה שגיאה בשליחת המסמך.", true);
+  }
+}
+
+function closeCustomerSwitcher(){
+  const results = $("customerSwitcherResults");
+  if (results) {
+    results.classList.remove("open");
+    results.innerHTML = "";
+  }
+}
+
+function renderCustomerSwitcherResults(){
+  const input = $("customerSwitcherInput");
+  const results = $("customerSwitcherResults");
+  if (!input || !results || !selectedId) return;
+
+  const q = String(input.value || "").trim();
+  if (!q) {
+    closeCustomerSwitcher();
+    return;
+  }
+
+  const matches = customers
+    .filter(c => c.id !== selectedId && customerMatches(c, q))
+    .sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""), "he"))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    results.innerHTML = `<div class="customer-switcher-empty">לא נמצאו לקוחות מתאימים.</div>`;
+    results.classList.add("open");
+    return;
+  }
+
+  results.innerHTML = matches.map(c => {
+    const secondary = [c.taxId, c.email, c.phone].filter(Boolean).join(" · ");
+    return `<button type="button" class="customer-switcher-item" data-customer-switch-id="${escapeHtml(c.id)}" role="option"><strong>${escapeHtml(c.name || "—")}</strong>${secondary ? `<span>${escapeHtml(secondary)}</span>` : ""}</button>`;
+  }).join("");
+  results.classList.add("open");
+}
+
+function switchDirectlyToCustomer(id){
+  if (!id || id === selectedId || !customers.some(c => c.id === id)) return;
+  closeCustomerSwitcher();
+  const input = $("customerSwitcherInput");
+  if (input) input.value = "";
+  selectCustomer(id);
+}
+
+function renderSelected(){
+  const c = customers.find(x => x.id === selectedId);
+  const status = $("selectedStatus");
+  const body = $("selectedBody");
+
+  if (!c) {
+    $("selectedCard").style.display = "none";
+    status.textContent = "בחרו לקוח מהרשימה";
+    body.innerHTML = `<div class="empty">לא נבחר לקוח. לחיצה על שם לקוח ברשימה תפתח את הכרטיס שלו.</div>`;
+    return;
+  }
+
+  $("selectedCard").style.display = "";
+  status.textContent = c.name;
+  const switcherInput = $("customerSwitcherInput");
+  if (switcherInput) switcherInput.value = "";
+  closeCustomerSwitcher();
+
+  const docs = docsForCustomer(c);
+  const revenueTotal = customerRevenueTotal(docs);
+  const openInvoices = openInvoiceSummary(docs);
+  const address = [c.address, c.city, c.zip].filter(Boolean).join(", ") || "—";
+
+  const docsHtml = docs.length ? `
+    <div class="customer-doc-summary">
+      <span><strong>${docs.length}</strong> מסמכים</span>
+      <span class="summary-divider"></span>
+      <span>סה״כ הכנסות מהלקוח: <strong>${money(revenueTotal)}</strong></span>
+      <span class="summary-divider"></span>
+      <span class="${openInvoices.count ? "open-payment-summary" : ""}">
+        חשבוניות פתוחות: <strong>${openInvoices.count}</strong>${openInvoices.count ? ` · ${money(openInvoices.total)}` : ""}
+      </span>
+    </div>
+
+    <div class="docs-history-table-wrap">
+      <table class="docs-history-table customer-docs-table">
+        <thead>
+          <tr>
+            <th>תאריך</th>
+            <th>מספר</th>
+            <th>סוג מסמך</th>
+            <th>סכום</th>
+            <th>סטטוס תשלום</th>
+            <th>פעולות</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${docs.map(d => {
+            const payable = isPayableInvoice(d);
+            const paid = !!d.paid;
+            const lifecycleStatus = documentLifecycleStatus(d);
+            const statusText = lifecycleStatus === "cancelled_technical_duplicate"
+              ? "בוטל · כפילות טכנית"
+              : lifecycleStatus === "cancelled"
+                ? "בוטל"
+                : lifecycleStatus === "credited"
+                  ? `זוכה${d.creditedByNumber ? ` · זיכוי ${d.creditedByNumber}` : ""}`
+                  : "";
+            const canCreateCredit = !d._importedIncome && ["חשבונית מס", "חשבונית מס/קבלה"].includes(documentDisplayType(d)) && !statusText && !!d.id;
+            const importedPayable = payable && !!d._importedIncome && !!d.id;
+            const issuedPayable = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
+            const canPersistPaid = importedPayable || issuedPayable;
+            const paymentDate = d.paidAt ? String(d.paidAt).slice(0,10) : String(d.date || "").slice(0,10);
+
+            return `
+              <tr class="${payable && !paid ? "open-payment-row" : ""}">
+                <td data-label="תאריך"><span class="doc-date-ltr">${escapeHtml(formatDisplayDate(d.date || ""))}</span></td>
+                <td data-label="מספר"><strong>${escapeHtml(d.number || "—")}</strong></td>
+                <td data-label="סוג מסמך">${escapeHtml(documentDisplayType(d))}</td>
+                <td data-label="סכום"><strong>${money(documentDisplayTotal(d))}</strong></td>
+                <td data-label="סטטוס תשלום">
+                  ${statusText ? `<span class="payment-na">${escapeHtml(statusText)}</span>` : payable ? `
+                    <div class="payment-status-line">
+                      <label class="payment-check-label">
+                        <input type="checkbox"
+                               ${d._importedIncome ? `data-paid-import="${escapeHtml(d.id || "")}"` : `data-paid-doc="${escapeHtml(d.id || "")}"`}
+                               ${paid ? "checked" : ""}
+                               ${canPersistPaid ? "" : "disabled"} />
+                        <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
+                      </label>
+                      ${d._importedIncome && paid ? `
+                        <label class="payment-inline-field">
+                          תאריך תשלום
+                          <input type="date"
+                                 data-paid-date-import="${escapeHtml(d.id || "")}"
+                                 value="${escapeHtml(paymentDate)}" />
+                        </label>
+                        <label class="payment-inline-field">
+                          שולם באמצעות
+                          <select data-paid-method-import="${escapeHtml(d.id || "")}">
+                            <option value="">לא צוין</option>
+                            ${Object.entries(importedPaymentMethodLabels).map(([value,label]) =>
+                              `<option value="${escapeHtml(value)}" ${String(d.paymentMethod || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`
+                            ).join("")}
+                          </select>
+                        </label>
+                      ` : ""}
+                    </div>
+                  ` : `<span class="payment-na">—</span>`}
+                </td>
+                <td data-label="פעולות">
+                  <div class="docs-actions">
+                    ${d._importedIncome
+                      ? `<span class="payment-na">היסטוריה מיובאת</span>`
+                      : `<button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
+                         <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
+                         <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
+                         ${canCreateCredit ? `<button class="btn secondary small" type="button" data-credit-doc="${escapeHtml(d.id || "")}">צור זיכוי</button>` : ""}`}
+                  </div>
+                </td>
+              </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  ` : `<div class="empty customer-docs-empty">עדיין אין מסמכים ללקוח.</div>`;
+
+  body.innerHTML = `
+    <section class="customer-details-section">
+      <div class="section-title-row">
+        <div>
+          <h4>פרטי לקוח</h4>
+          <div class="customer-detail-name">${escapeHtml(c.name)}</div>
+        </div>
+      </div>
+
+      <div class="customer-details-table-wrap">
+        <table class="customer-details-table">
+          <tbody>
+            <tr>
+              <th>סוג לקוח</th>
+              <td>${escapeHtml(customerTypeLabels[c.type] || "אחר")}</td>
+              <th>ח.פ / ע.מ / ת.ז</th>
+              <td><span class="customer-id-ltr">${escapeHtml(c.taxId || "—")}</span></td>
+            </tr>
+            <tr>
+              <th>איש קשר</th>
+              <td>${escapeHtml(c.contact || "—")}</td>
+              <th>טלפון</th>
+              <td>${escapeHtml(c.phone || "—")}</td>
+            </tr>
+            <tr>
+              <th>מייל</th>
+              <td>${escapeHtml(c.email || "—")}</td>
+              <th>כתובת</th>
+              <td>${escapeHtml(address)}</td>
+            </tr>
+            <tr>
+              <th>תנאי תשלום</th>
+              <td>${escapeHtml(termsLabels[c.paymentTerms] || "—")}</td>
+              <th>תשלום מועדף</th>
+              <td>${escapeHtml(paymentLabels[c.paymentMethod] || "—")}</td>
+            </tr>
+            <tr>
+              <th>שליחת מסמכים אוטומטית</th>
+              <td>${c.autoSendDocuments ? "פעילה" : "לא פעילה"}</td>
+              <th>הערות</th>
+              <td>${escapeHtml(c.notes || "—")}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="customer-documents-section">
+      <div class="section-title-row">
+        <div>
+          <h4>מסמכים והיסטוריית לקוח</h4>
+          <div class="hint">מסמכים שהופקו במערכת, ובנפרד גם הכנסות היסטוריות שיובאו ושויכו ללקוח. הכנסה מיובאת אינה מוצגת כאילו הופקה בעצמאי פלוס.</div>
+        </div>
+      </div>
+      ${docsHtml}
+    </section>
+
+    <div class="selected-actions">
+      <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
+      <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
+      <button class="btn secondary" type="button" id="btnEditSelected">עריכת לקוח</button>
+      <button class="btn danger" type="button" id="btnDeleteSelected">מחיקת לקוח</button>
+    </div>
+  `;
+
+  $("btnCreateDocSelected").addEventListener("click", () => {
+    location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}`;
+  });
+
+  $("btnPrintLedgerSelected").addEventListener("click", () => printCustomerLedger(c.id));
+  $("btnEditSelected").addEventListener("click", () => openForm(c));
+  $("btnDeleteSelected").addEventListener("click", () => deleteCustomer(c.id));
+
+  body.querySelectorAll("[data-view-doc]").forEach(btn =>
+    btn.addEventListener("click", () => openStoredDocument(btn.dataset.viewDoc, false))
+  );
+
+  body.querySelectorAll("[data-print-doc]").forEach(btn =>
+    btn.addEventListener("click", () => openStoredDocument(btn.dataset.printDoc, true))
+  );
+
+  body.querySelectorAll("[data-send-doc]").forEach(btn =>
+    btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc))
+  );
+
+  body.querySelectorAll("[data-credit-doc]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const docId = btn.dataset.creditDoc || "";
+      if (!docId) return;
+      location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}&creditDocumentId=${encodeURIComponent(docId)}`;
+    })
+  );
+
+  body.querySelectorAll("[data-paid-doc]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      await setDocumentPaidStatus(input.dataset.paidDoc, input.checked);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-import]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      const rowId = input.dataset.paidImport;
+      const d = docs.find(x => String(x.id || "") === String(rowId || "") && x._importedIncome);
+      const defaultDate = String(d?.paidAt || d?.date || "").slice(0,10);
+      await setImportedIncomePaidStatus(rowId, input.checked, defaultDate);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-date-import]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      await setImportedIncomePaymentDate(input.dataset.paidDateImport, input.value);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-method-import]").forEach(select => {
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      await setImportedIncomePaymentMethod(select.dataset.paidMethodImport, select.value);
+    });
+  });
+}
+
+function addDaysToIso(dateStr, days){
+  const d = new Date(String(dateStr || "") + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return dateStr || "";
+  d.setDate(d.getDate() + Number(days || 0));
+  return d.toISOString().slice(0,10);
+}
+function monthEndPlus(dateStr, days){
+  const d = new Date(String(dateStr || "") + "T12:00:00");
+  if (Number.isNaN(d.getTime())) return dateStr || "";
+  const eom = new Date(d.getFullYear(), d.getMonth()+1, 0, 12, 0, 0);
+  eom.setDate(eom.getDate() + Number(days || 0));
+  return eom.toISOString().slice(0,10);
+}
+function ledgerValueDate(d, customer){
+  if (d.valueDate || d.dueDate) return d.valueDate || d.dueDate;
+  const type = normalizedDocumentType(d);
+  const docDate = d.date || "";
+  if (type.includes("קבלה") || type.includes("זיכוי")) return docDate;
+  const terms = customer?.paymentTerms || "immediate";
+  if (terms === "net15") return monthEndPlus(docDate, 15);
+  if (terms === "net30") return monthEndPlus(docDate, 30);
+  if (terms === "net60") return monthEndPlus(docDate, 60);
+  return docDate;
+}
+function ledgerDebitCredit(d){
+  let debit = Number(d.debit || 0);
+  let credit = Number(d.credit || 0);
+  if (debit || credit) return {debit, credit};
+
+  const type = normalizedDocumentType(d);
+  const total = Math.abs(documentDisplayTotal(d));
+  if (type.includes("חשבונית מס/קבלה") || type.includes("חשבונית קבלה")) {
+    debit = total; credit = total;
+  } else if (type.includes("זיכוי")) {
+    credit = total;
+  } else if (type.includes("קבלה")) {
+    credit = total;
+  } else if (type.includes("חשבונית")) {
+    debit = total;
+  } else if (d._importedIncome) {
+    debit = total;
+  }
+  return {debit, credit};
 }
 
 function printCustomerLedger(id){
@@ -1740,75 +2534,56 @@ function printCustomersList(){
 }
 
 async function recoverImportedPaymentStatusFromAudit(){
-  if (!currentUser?.uid || !Array.isArray(ledgerRows) || !ledgerRows.length) return 0;
+  if (!currentUser?.uid || !Array.isArray(ledgerRows) || !ledgerRows.length) return false;
+
+  const candidates = ledgerRows.filter(r =>
+    r?.source === "csvImport" &&
+    r?.type === "income" &&
+    !Object.prototype.hasOwnProperty.call(r, "paid")
+  );
+  if (!candidates.length) return false;
 
   try {
     const auditSnap = await getDocs(collection(db, "ledgers", currentUser.uid, "auditLogs"));
     const latestByRow = new Map();
 
-    const ensureState = rowId => {
-      if (!latestByRow.has(rowId)) latestByRow.set(rowId, {});
-      return latestByRow.get(rowId);
-    };
-    const isLater = (stamp, previous) => !previous || String(stamp || "") > String(previous.stamp || "");
-
     auditSnap.docs.forEach(snap => {
       const a = snap.data() || {};
       const action = String(a.action || "");
+      if (action !== "הכנסה מיובאת סומנה כשולמה" && action !== "הכנסה מיובאת נפתחה מחדש לתשלום") return;
       const details = a.details || {};
       const rowId = String(a.entityId || details.entityId || "");
       if (!rowId) return;
       const stamp = String(a.createdAtIso || details.createdAtIso || "");
-      const state = ensureState(rowId);
-
-      if (action === "הכנסה מיובאת סומנה כשולמה" || action === "הכנסה מיובאת נפתחה מחדש לתשלום") {
-        if (isLater(stamp, state.paymentStatus)) {
-          state.paymentStatus = {
-            stamp,
-            paid: action === "הכנסה מיובאת סומנה כשולמה",
-            paidAt: action === "הכנסה מיובאת סומנה כשולמה" ? (details.paidAt || null) : null
-          };
-        }
-      } else if (action === "אמצעי תשלום להכנסה מיובאת עודכן") {
-        if (isLater(stamp, state.paymentMethod)) {
-          state.paymentMethod = {stamp, value: details.paymentMethod || ""};
-        }
-      } else if (action === "תאריך תשלום להכנסה מיובאת עודכן") {
-        if (isLater(stamp, state.paymentDate)) {
-          state.paymentDate = {stamp, value: details.paidAt || null};
-        }
+      const prev = latestByRow.get(rowId);
+      if (!prev || stamp > prev.stamp) {
+        latestByRow.set(rowId, {
+          stamp,
+          paid: action === "הכנסה מיובאת סומנה כשולמה" ? !!details.paid || true : false,
+          paidAt: action === "הכנסה מיובאת סומנה כשולמה" ? (details.paidAt || null) : null
+        });
       }
     });
 
-    let recoveredCount = 0;
-    for (const row of ledgerRows) {
-      if (row?.source !== "csvImport" || row?.type !== "income" || !row?.id) continue;
-      const state = latestByRow.get(String(row.id));
-      if (!state) continue;
+    let changed = false;
+    ledgerRows = ledgerRows.map(r => {
+      if (r?.source !== "csvImport" || r?.type !== "income" || Object.prototype.hasOwnProperty.call(r, "paid")) return r;
+      const recovered = latestByRow.get(String(r.id || ""));
+      if (!recovered) return r;
+      changed = true;
+      return {...r, paid: !!recovered.paid, paidAt: recovered.paidAt || null};
+    });
 
-      const patch = {};
-      if (state.paymentStatus) {
-        patch.paid = !!state.paymentStatus.paid;
-        patch.paidAt = state.paymentStatus.paidAt || null;
-      }
-      if (state.paymentDate && (!state.paymentStatus || state.paymentDate.stamp >= state.paymentStatus.stamp)) {
-        patch.paid = true;
-        patch.paidAt = state.paymentDate.value || patch.paidAt || null;
-      }
-      if (state.paymentMethod) patch.paymentMethod = state.paymentMethod.value || "";
-
-      const customerMatch = customers.find(c => importedRowBelongsToCustomer(row, c));
-      if (customerMatch?.id) patch.customerId = customerMatch.id;
-
-      if (!Object.keys(patch).length) continue;
-      await persistImportedIncomeMeta(row.id, patch);
-      recoveredCount++;
+    if (changed) {
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        rows: ledgerRows,
+        rowsUpdatedAt: new Date().toISOString()
+      }, {merge:true});
     }
-
-    return recoveredCount;
+    return changed;
   } catch (err) {
     console.warn("Imported payment audit recovery failed", err);
-    return 0;
+    return false;
   }
 }
 
@@ -1821,15 +2596,13 @@ async function loadData(){
     const userSnap = await getDoc(doc(db, "users", currentUser.uid));
     userProfile = userSnap.exists() ? userSnap.data() : {};
 
-    const [ledgerSnap, documentsSnap, importedMetaSnap] = await Promise.all([
+    const [ledgerSnap, documentsSnap] = await Promise.all([
       getDoc(doc(db, "ledgers", currentUser.uid)),
-      getDocs(collection(db, "ledgers", currentUser.uid, "documents")),
-      getDocs(collection(db, "ledgers", currentUser.uid, "importedIncomeMeta"))
+      getDocs(collection(db, "ledgers", currentUser.uid, "documents"))
     ]);
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
     ledgerRows = Array.isArray(data.rows) ? data.rows : [];
-    importedIncomeMeta = new Map(importedMetaSnap.docs.map(snap => [String(snap.id), snap.data() || {}]));
     const recoveredImportedPayments = await recoverImportedPaymentStatusFromAudit();
 
     const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
@@ -1843,7 +2616,7 @@ async function loadData(){
     subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
     ledgerDocuments = Array.from(byId.values());
 
-    saveStatus.textContent = recoveredImportedPayments ? `נטענו ${customers.length} לקוחות · שוחזרו ${recoveredImportedPayments} רשומות תשלום מיובאות` : `נטענו ${customers.length} לקוחות`;
+    saveStatus.textContent = recoveredImportedPayments ? `נטענו ${customers.length} לקוחות · שוחזרו סטטוסי תשלום מיובאים` : `נטענו ${customers.length} לקוחות`;
     render();
   } catch (err) {
     console.error(err);
