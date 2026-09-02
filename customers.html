@@ -1358,6 +1358,12 @@ async function setImportedIncomePaymentMethod(rowId, paymentMethod){
       rows: ledgerRows,
       rowsUpdatedAt: new Date().toISOString()
     }, { merge: true });
+    await writeAuditLog("אמצעי תשלום להכנסה מיובאת עודכן", {
+      entityType: "הכנסה מיובאת",
+      entityId: rowId,
+      paymentMethod: ledgerRows[idx].paymentMethod || "",
+      summary: `עודכן אמצעי תשלום להכנסה מיובאת ${rowId}`
+    });
     renderSelected();
     showToast("אמצעי התשלום עודכן.");
   } catch (err) {
@@ -1388,6 +1394,12 @@ async function setImportedIncomePaymentDate(rowId, paymentDate){
       rows: ledgerRows,
       rowsUpdatedAt: new Date().toISOString()
     }, { merge: true });
+    await writeAuditLog("תאריך תשלום להכנסה מיובאת עודכן", {
+      entityType: "הכנסה מיובאת",
+      entityId: rowId,
+      paidAt: ledgerRows[idx].paidAt || null,
+      summary: `עודכן תאריך תשלום להכנסה מיובאת ${rowId}`
+    });
     renderSelected();
     showToast("תאריך התשלום עודכן.");
   } catch (err) {
@@ -2452,6 +2464,60 @@ function printCustomersList(){
   w.document.close();
 }
 
+async function recoverImportedPaymentStatusFromAudit(){
+  if (!currentUser?.uid || !Array.isArray(ledgerRows) || !ledgerRows.length) return false;
+
+  const candidates = ledgerRows.filter(r =>
+    r?.source === "csvImport" &&
+    r?.type === "income" &&
+    !Object.prototype.hasOwnProperty.call(r, "paid")
+  );
+  if (!candidates.length) return false;
+
+  try {
+    const auditSnap = await getDocs(collection(db, "ledgers", currentUser.uid, "auditLogs"));
+    const latestByRow = new Map();
+
+    auditSnap.docs.forEach(snap => {
+      const a = snap.data() || {};
+      const action = String(a.action || "");
+      if (action !== "הכנסה מיובאת סומנה כשולמה" && action !== "הכנסה מיובאת נפתחה מחדש לתשלום") return;
+      const details = a.details || {};
+      const rowId = String(a.entityId || details.entityId || "");
+      if (!rowId) return;
+      const stamp = String(a.createdAtIso || details.createdAtIso || "");
+      const prev = latestByRow.get(rowId);
+      if (!prev || stamp > prev.stamp) {
+        latestByRow.set(rowId, {
+          stamp,
+          paid: action === "הכנסה מיובאת סומנה כשולמה" ? !!details.paid || true : false,
+          paidAt: action === "הכנסה מיובאת סומנה כשולמה" ? (details.paidAt || null) : null
+        });
+      }
+    });
+
+    let changed = false;
+    ledgerRows = ledgerRows.map(r => {
+      if (r?.source !== "csvImport" || r?.type !== "income" || Object.prototype.hasOwnProperty.call(r, "paid")) return r;
+      const recovered = latestByRow.get(String(r.id || ""));
+      if (!recovered) return r;
+      changed = true;
+      return {...r, paid: !!recovered.paid, paidAt: recovered.paidAt || null};
+    });
+
+    if (changed) {
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        rows: ledgerRows,
+        rowsUpdatedAt: new Date().toISOString()
+      }, {merge:true});
+    }
+    return changed;
+  } catch (err) {
+    console.warn("Imported payment audit recovery failed", err);
+    return false;
+  }
+}
+
 async function loadData(){
   if (!currentUser) return;
   saveStatus.textContent = "טוען…";
@@ -2468,6 +2534,7 @@ async function loadData(){
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
     ledgerRows = Array.isArray(data.rows) ? data.rows : [];
+    const recoveredImportedPayments = await recoverImportedPaymentStatusFromAudit();
 
     const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
     const subcollectionDocuments = documentsSnap.docs.map(snapshot => ({
@@ -2480,7 +2547,7 @@ async function loadData(){
     subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
     ledgerDocuments = Array.from(byId.values());
 
-    saveStatus.textContent = `נטענו ${customers.length} לקוחות`;
+    saveStatus.textContent = recoveredImportedPayments ? `נטענו ${customers.length} לקוחות · שוחזרו סטטוסי תשלום מיובאים` : `נטענו ${customers.length} לקוחות`;
     render();
   } catch (err) {
     console.error(err);
