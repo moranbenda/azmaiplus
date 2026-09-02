@@ -961,16 +961,27 @@ body.account-frozen .readonly-disabled{
   body.mobile-nav-open .app-sidebar{transform:translateX(0);}
   body.mobile-nav-open .mobile-nav-overlay{display:block;}
   body.mobile-nav-open{overflow:hidden;}
-  .mobile-menu-btn{display:flex;order:2;margin:12px 0 0 auto;align-self:flex-end;}
+  .mobile-menu-btn{display:flex;order:2;margin:12px 0 0 0;align-self:flex-end;}
   .desktop-header-actions{display:none;}
   .mobile-header-logo{display:block;}
   .app-header .header-inner{display:flex!important;flex-direction:column!important;flex-wrap:nowrap!important;align-items:stretch!important;justify-content:flex-start!important;padding-top:14px!important;padding-bottom:14px!important;text-align:right!important;}
-  .mobile-brand-row{order:1;width:100%;justify-content:flex-start!important;align-items:center;gap:12px;text-align:right!important;direction:rtl;}
-  .mobile-brand-row>div{min-width:0;text-align:right!important;flex:1;}
+  .mobile-brand-row{order:1;width:100%;justify-content:flex-start!important;align-items:center;gap:12px;text-align:right!important;direction:rtl;margin-left:auto;margin-right:0;}
+  .mobile-brand-row>div{min-width:0;text-align:right!important;flex:0 1 auto;}
+  .app-header .header-inner{padding-right:16px!important;padding-left:16px!important;}
+  .mobile-brand-row .mobile-header-logo{order:0;}
+  .mobile-brand-row>div{order:1;}
+  .mobile-brand-row .account-flags{justify-content:flex-start!important;}
   .brand-title{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0 0 3px;text-align:right!important;}
   .mobile-brand-row .hint{font-size:12px;line-height:1.35;text-align:right!important;}
   .mobile-brand-row .account-flags{margin-top:7px;justify-content:flex-start!important;}
   .nav-compat-hidden{display:none!important;}
+}
+
+/* v6: יישור פס הכותרת לימין — הלוגו/כותרת מתחילים מימין, פעולות דסקטופ נשארות בצד הנגדי */
+@media(min-width:901px){
+  .app-header .header-inner{justify-content:flex-start!important;text-align:right!important;}
+  .app-header .mobile-brand-row{margin-left:0;margin-right:0;}
+  .app-header .desktop-header-actions{margin-inline-start:auto;}
 }
 </style>
 </head>
@@ -2928,9 +2939,10 @@ if (btnDataManageClose) btnDataManageClose.onclick = () => dataManageDialog?.clo
 // (removed stray text)
 /* לשנות למייל האמיתי של התמיכה */
 const SUPPORT_EMAIL = "azmaiplusapp@gmail.com";
+const SUPPORT_API = "/api/support";
 
 function fillSupportForm() {
-  const name  = userProfile?.displayName || "";
+  const name  = userProfile?.displayName || userProfile?.fullName || userProfile?.name || "";
   const phone = userProfile?.phone || "";
   const email = userProfile?.email || auth.currentUser?.email || "";
 
@@ -2950,76 +2962,54 @@ btnSupportOpen && (btnSupportOpen.onclick = () => {
 btnSupportSend && (btnSupportSend.onclick = async () => {
   const msg = (sMsg?.value || "").trim();
   if (!msg) { alert("נא לכתוב את תוכן הפנייה"); return; }
+  if (!auth.currentUser) { alert("יש להתחבר מחדש לפני שליחת פנייה"); return; }
 
-  // נשלח מייל אוטומטי דרך Firebase Extension: Trigger Email (firestore-send-email)
-  // התוסף מאזין לקולקשן בשם "mail" (ברירת מחדל) ושולח את המייל.
+  const fromName  = (sName?.value || userProfile?.fullName || userProfile?.name || "").trim();
+  const fromEmail = (sEmail?.value || userProfile?.email || auth.currentUser?.email || "").trim();
+  const fromPhone = (sPhone?.value || userProfile?.phone || "").trim();
+  const bizName   = (userProfile?.businessName || "").trim();
+  const bizId     = String(userProfile?.businessId || userProfile?.vatId || userProfile?.taxId || "").trim();
+
+  const originalText = btnSupportSend.textContent;
+  btnSupportSend.disabled = true;
+  btnSupportSend.textContent = "שולח...";
+  if (supportStatus) supportStatus.textContent = "שולח את הפנייה...";
+
   try {
-    const fromName  = (sName?.value || userProfile?.fullName || userProfile?.name || "").trim();
-    const fromEmail = (sEmail?.value || userProfile?.email || auth.currentUser?.email || "").trim();
-    const fromPhone = (sPhone?.value || userProfile?.phone || "").trim();
-    const bizName   = userProfile?.businessName || "";
-    const bizId     = userProfile?.businessId || userProfile?.vatId || userProfile?.taxId || "";
-
-    const subject = `פנייה למפתח – ${bizName || fromName || fromEmail || "משתמש"}${bizId ? " ("+bizId+")" : ""}`;
-
-    const textBody =
-`פנייה למפתח
-================
-שם: ${fromName}
-אימייל: ${fromEmail}
-טלפון: ${fromPhone}
-עסק: ${bizName}
-מספר עוסק/ח.פ: ${bizId}
-
-הודעה:
-${msg}
-`;
-
-    const htmlBody =
-      `<div dir="rtl" style="font-family:system-ui,-apple-system,Segoe UI,Roboto,Heebo,sans-serif">
-        <h2 style="margin:0 0 10px">פנייה למפתח</h2>
-        <p style="margin:0 0 6px"><b>שם:</b> ${escapeHtml(fromName)}</p>
-        <p style="margin:0 0 6px"><b>אימייל:</b> ${escapeHtml(fromEmail)}</p>
-        <p style="margin:0 0 6px"><b>טלפון:</b> ${escapeHtml(fromPhone)}</p>
-        <p style="margin:0 0 6px"><b>עסק:</b> ${escapeHtml(bizName)}</p>
-        <p style="margin:0 0 14px"><b>מספר עוסק/ח.פ:</b> ${escapeHtml(bizId)}</p>
-        <pre style="white-space:pre-wrap;background:#f6f7fb;border:1px solid #e6e8ef;border-radius:12px;padding:12px;margin:0">${escapeHtml(msg)}</pre>
-      </div>`;
-
-    await addDoc(collection(db, "mail"), {
-      to: [SUPPORT_EMAIL],               // Firebase Trigger Email: מערך נמענים
-      replyTo: fromEmail || undefined,   // כדי שתוכלי להשיב ישירות לפונה
-      createdAt: serverTimestamp(),
-      meta: {
-        uid: currentUid || null,
-        fromName, fromEmail, fromPhone,
-        businessName: bizName,
-        businessId: bizId
+    const idToken = await auth.currentUser.getIdToken();
+    const response = await fetch(SUPPORT_API, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
       },
-      message: {
-        subject,
-        text: textBody,
-        html: htmlBody
-      }
+      body: JSON.stringify({
+        name: fromName,
+        email: fromEmail,
+        phone: fromPhone,
+        businessName: bizName,
+        businessId: bizId,
+        message: msg
+      })
     });
 
-    sMsg.value = "";
-    alert("הפנייה נשלחה. נחזור אליך בהקדם 🙏");
-    supportModal?.classList.remove("open");
+    let result = {};
+    try { result = await response.json(); } catch {}
+    if (!response.ok || result?.ok !== true) {
+      throw new Error(result?.error || `HTTP ${response.status}`);
+    }
+
+    if (sMsg) sMsg.value = "";
+    if (supportStatus) supportStatus.textContent = "הפנייה נשלחה בהצלחה ✓";
+    alert("הפנייה נשלחה בהצלחה. נחזור אליך בהקדם 🙏");
+    supportDialog?.close();
   } catch (err) {
     console.error("Support send failed:", err);
-    const fromName  = (sName?.value || userProfile?.fullName || userProfile?.name || "").trim();
-    const fromEmail = (sEmail?.value || userProfile?.email || auth.currentUser?.email || "").trim();
-    const fromPhone = (sPhone?.value || userProfile?.phone || "").trim();
-    const subject = `פנייה לעצמאי פלוס – ${fromName || fromEmail || "משתמש"}`;
-    const body = `שם: ${fromName}\nאימייל: ${fromEmail}\nטלפון: ${fromPhone}\n\nהודעה:\n${msg}`;
-    const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(SUPPORT_EMAIL)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    const opened = window.open(gmailUrl, "_blank", "noopener,noreferrer");
-    if (opened) {
-      alert("השליחה האוטומטית עדיין לא זמינה בשרת, לכן פתחנו הודעת Gmail מוכנה ל־azmaiplusapp@gmail.com. נשאר רק ללחוץ שליחה.");
-    } else {
-      alert("השליחה האוטומטית עדיין לא זמינה בשרת. כתובת התמיכה: azmaiplusapp@gmail.com");
-    }
+    if (supportStatus) supportStatus.textContent = "השליחה נכשלה. נסי שוב בעוד רגע.";
+    alert("לא הצלחנו לשלוח את הפנייה כרגע. נסי שוב בעוד רגע.");
+  } finally {
+    btnSupportSend.disabled = false;
+    btnSupportSend.textContent = originalText;
   }
 });
 /* ----------------------------------------------------------
