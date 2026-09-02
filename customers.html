@@ -1164,32 +1164,52 @@ function money(value){
 
 function normalizeCustomerMatchName(value){
   return String(value || "")
-    .normalize("NFKC")
-    .replace(/[\u200e\u200f]/g, "")
+    .replace(/[\u200e\u200f\u202a-\u202e]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
 }
 
+function importedRowCustomerNameCandidates(row){
+  const candidates = [
+    row?.clientName,
+    row?.customerName,
+    row?.businessName,
+    row?.partyName,
+    row?.client
+  ];
+
+  // Historical CSV imports store the description as: "<document type/number> - <customer name>".
+  // Some old/stale row versions may have lost customerId/clientName while the description survived.
+  const desc = String(row?.desc || "").replace(/\s+/g, " ").trim();
+  if (desc.includes(" - ")) {
+    const suffix = desc.split(" - ").slice(1).join(" - ").trim();
+    if (suffix) candidates.push(suffix);
+  }
+
+  return Array.from(new Set(candidates.map(normalizeCustomerMatchName).filter(Boolean)));
+}
+
 function importedRowBelongsToCustomer(row, customer){
-  if (!row || row.type !== "income" || row.source !== "csvImport") return false;
+  if (!row || row.type !== "income" || row.source !== "csvImport" || !customer) return false;
 
-  const customerId = String(customer?.id || "");
+  const customerId = String(customer.id || "");
   const rowCustomerId = String(row.customerId || "");
-  if (rowCustomerId && rowCustomerId === customerId) return true;
+  if (customerId && rowCustomerId === customerId) return true;
 
-  // Safe display fallback for historical imports whose customerId was lost.
-  // We only use the imported clientName when it maps to exactly one existing customer,
-  // and only when the stored customerId is empty or no longer points to an existing customer.
-  const storedIdStillExists = rowCustomerId && customers.some(c => String(c.id || "") === rowCustomerId);
-  if (storedIdStillExists) return false;
+  // If the saved ID is missing/stale, use the surviving imported customer name only when
+  // that name identifies exactly one existing customer. This is display-only; no Firestore write.
+  const candidates = importedRowCustomerNameCandidates(row);
+  if (!candidates.length) return false;
 
-  const rowName = normalizeCustomerMatchName(row.clientName);
-  const customerName = normalizeCustomerMatchName(customer?.name);
-  if (!rowName || rowName !== customerName) return false;
+  const currentName = normalizeCustomerMatchName(customer.name || customer.businessName || customer.customerName);
+  if (!currentName || !candidates.includes(currentName)) return false;
 
-  const sameNameCustomers = customers.filter(c => normalizeCustomerMatchName(c?.name) === rowName);
-  return sameNameCustomers.length === 1 && String(sameNameCustomers[0]?.id || "") === customerId;
+  const matchingCustomers = customers.filter(c => {
+    const name = normalizeCustomerMatchName(c?.name || c?.businessName || c?.customerName);
+    return name && candidates.includes(name);
+  });
+  return matchingCustomers.length === 1 && String(matchingCustomers[0]?.id || "") === customerId;
 }
 
 function docsForCustomer(customer){
