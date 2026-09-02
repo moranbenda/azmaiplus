@@ -2199,6 +2199,7 @@ function renderSelected(){
 
     <div class="selected-actions">
       <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
+      <button class="btn secondary" type="button" id="btnSaveVerifyImported">שמור ואמת תשלומים</button>
       <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
       <button class="btn secondary" type="button" id="btnEditSelected">עריכת לקוח</button>
       <button class="btn danger" type="button" id="btnDeleteSelected">מחיקת לקוח</button>
@@ -2209,6 +2210,7 @@ function renderSelected(){
     location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}`;
   });
 
+  $("btnSaveVerifyImported").addEventListener("click", () => saveAndVerifyImportedPayments());
   $("btnPrintLedgerSelected").addEventListener("click", () => printCustomerLedger(c.id));
   $("btnEditSelected").addEventListener("click", () => openForm(c));
   $("btnDeleteSelected").addEventListener("click", () => deleteCustomer(c.id));
@@ -2536,54 +2538,141 @@ function printCustomersList(){
 async function recoverImportedPaymentStatusFromAudit(){
   if (!currentUser?.uid || !Array.isArray(ledgerRows) || !ledgerRows.length) return false;
 
-  const candidates = ledgerRows.filter(r =>
-    r?.source === "csvImport" &&
-    r?.type === "income" &&
-    !Object.prototype.hasOwnProperty.call(r, "paid")
-  );
-  if (!candidates.length) return false;
-
   try {
     const auditSnap = await getDocs(collection(db, "ledgers", currentUser.uid, "auditLogs"));
-    const latestByRow = new Map();
+    const recoveredByRow = new Map();
+
+    const ensureRow = (rowId) => {
+      if (!recoveredByRow.has(rowId)) recoveredByRow.set(rowId, {
+        paidStamp: "", paid: undefined, paidAtFromPaid: undefined,
+        dateStamp: "", paidAt: undefined,
+        methodStamp: "", paymentMethod: undefined
+      });
+      return recoveredByRow.get(rowId);
+    };
 
     auditSnap.docs.forEach(snap => {
       const a = snap.data() || {};
       const action = String(a.action || "");
-      if (action !== "הכנסה מיובאת סומנה כשולמה" && action !== "הכנסה מיובאת נפתחה מחדש לתשלום") return;
       const details = a.details || {};
       const rowId = String(a.entityId || details.entityId || "");
       if (!rowId) return;
-      const stamp = String(a.createdAtIso || details.createdAtIso || "");
-      const prev = latestByRow.get(rowId);
-      if (!prev || stamp > prev.stamp) {
-        latestByRow.set(rowId, {
-          stamp,
-          paid: action === "הכנסה מיובאת סומנה כשולמה" ? !!details.paid || true : false,
-          paidAt: action === "הכנסה מיובאת סומנה כשולמה" ? (details.paidAt || null) : null
-        });
+      const stamp = String(a.createdAtIso || details.createdAtIso || a.createdAtClient || details.createdAtClient || "");
+      const rec = ensureRow(rowId);
+
+      if (action === "הכנסה מיובאת סומנה כשולמה" || action === "הכנסה מיובאת נפתחה מחדש לתשלום") {
+        if (!rec.paidStamp || stamp >= rec.paidStamp) {
+          rec.paidStamp = stamp;
+          rec.paid = action === "הכנסה מיובאת סומנה כשולמה";
+          rec.paidAtFromPaid = rec.paid ? (details.paidAt || null) : null;
+        }
+      } else if (action === "תאריך תשלום להכנסה מיובאת עודכן") {
+        if (!rec.dateStamp || stamp >= rec.dateStamp) {
+          rec.dateStamp = stamp;
+          rec.paidAt = details.paidAt || null;
+        }
+      } else if (action === "אמצעי תשלום להכנסה מיובאת עודכן") {
+        if (!rec.methodStamp || stamp >= rec.methodStamp) {
+          rec.methodStamp = stamp;
+          rec.paymentMethod = String(details.paymentMethod || "");
+        }
       }
     });
 
-    let changed = false;
-    ledgerRows = ledgerRows.map(r => {
-      if (r?.source !== "csvImport" || r?.type !== "income" || Object.prototype.hasOwnProperty.call(r, "paid")) return r;
-      const recovered = latestByRow.get(String(r.id || ""));
-      if (!recovered) return r;
-      changed = true;
-      return {...r, paid: !!recovered.paid, paidAt: recovered.paidAt || null};
+    const applyRecoveredMeta = (row) => {
+      if (row?.source !== "csvImport" || row?.type !== "income") return row;
+      const rec = recoveredByRow.get(String(row.id || ""));
+      if (!rec) return row;
+      const next = {...row};
+      if (typeof rec.paid === "boolean") next.paid = rec.paid;
+      if (rec.dateStamp) next.paidAt = rec.paidAt || null;
+      else if (rec.paidStamp && rec.paidAtFromPaid !== undefined) next.paidAt = rec.paidAtFromPaid || null;
+      if (rec.methodStamp) next.paymentMethod = rec.paymentMethod || "";
+      return next;
+    };
+
+    const locallyRecovered = ledgerRows.map(applyRecoveredMeta);
+    const changed = locallyRecovered.some((r, i) =>
+      !!r !== !!ledgerRows[i] ||
+      r?.paid !== ledgerRows[i]?.paid ||
+      (r?.paidAt || null) !== (ledgerRows[i]?.paidAt || null) ||
+      String(r?.paymentMethod || "") !== String(ledgerRows[i]?.paymentMethod || "")
+    );
+    if (!changed) return false;
+
+    // Read the freshest server rows immediately before writing, then merge ONLY recovered payment fields.
+    const ledgerRef = doc(db, "ledgers", currentUser.uid);
+    const freshSnap = await getDoc(ledgerRef);
+    const freshData = freshSnap.exists() ? freshSnap.data() : {};
+    const freshRows = Array.isArray(freshData.rows) ? freshData.rows : [];
+    const localById = new Map(locallyRecovered.map(r => [String(r?.id || ""), r]));
+    const mergedRows = freshRows.map(serverRow => {
+      const local = localById.get(String(serverRow?.id || ""));
+      if (!local || serverRow?.source !== "csvImport" || serverRow?.type !== "income") return serverRow;
+      return {
+        ...serverRow,
+        ...(Object.prototype.hasOwnProperty.call(local, "paid") ? {paid: !!local.paid} : {}),
+        ...(Object.prototype.hasOwnProperty.call(local, "paidAt") ? {paidAt: local.paidAt || null} : {}),
+        ...(Object.prototype.hasOwnProperty.call(local, "paymentMethod") ? {paymentMethod: local.paymentMethod || ""} : {})
+      };
     });
 
-    if (changed) {
-      await setDoc(doc(db, "ledgers", currentUser.uid), {
-        rows: ledgerRows,
-        rowsUpdatedAt: new Date().toISOString()
-      }, {merge:true});
-    }
-    return changed;
+    await setDoc(ledgerRef, {rows: mergedRows, rowsUpdatedAt: new Date().toISOString()}, {merge:true});
+    ledgerRows = mergedRows;
+    return true;
   } catch (err) {
     console.warn("Imported payment audit recovery failed", err);
     return false;
+  }
+}
+
+async function saveAndVerifyImportedPayments(){
+  if (!currentUser?.uid) return;
+  const button = document.getElementById("btnSaveVerifyImported");
+  const oldText = button?.textContent || "שמור ואמת";
+  if (button) { button.disabled = true; button.textContent = "שומר ומאמת…"; }
+  try {
+    const ledgerRef = doc(db, "ledgers", currentUser.uid);
+    const freshSnap = await getDoc(ledgerRef);
+    const freshData = freshSnap.exists() ? freshSnap.data() : {};
+    const freshRows = Array.isArray(freshData.rows) ? freshData.rows : [];
+    const localById = new Map(ledgerRows.filter(r => r?.source === "csvImport" && r?.type === "income").map(r => [String(r.id || ""), r]));
+
+    const mergedRows = freshRows.map(serverRow => {
+      const local = localById.get(String(serverRow?.id || ""));
+      if (!local || serverRow?.source !== "csvImport" || serverRow?.type !== "income") return serverRow;
+      return {
+        ...serverRow,
+        ...(Object.prototype.hasOwnProperty.call(local, "paid") ? {paid: !!local.paid} : {}),
+        ...(Object.prototype.hasOwnProperty.call(local, "paidAt") ? {paidAt: local.paidAt || null} : {}),
+        ...(Object.prototype.hasOwnProperty.call(local, "paymentMethod") ? {paymentMethod: local.paymentMethod || ""} : {})
+      };
+    });
+
+    await setDoc(ledgerRef, {rows: mergedRows, rowsUpdatedAt: new Date().toISOString()}, {merge:true});
+
+    const verifySnap = await getDoc(ledgerRef);
+    const verifyRows = Array.isArray(verifySnap.data()?.rows) ? verifySnap.data().rows : [];
+    const verifyById = new Map(verifyRows.map(r => [String(r?.id || ""), r]));
+    let mismatch = 0;
+    for (const [id, local] of localById) {
+      const saved = verifyById.get(id);
+      if (!saved) { mismatch++; continue; }
+      if (Object.prototype.hasOwnProperty.call(local, "paid") && !!saved.paid !== !!local.paid) mismatch++;
+      if ((local.paidAt || null) !== (saved.paidAt || null)) mismatch++;
+      if (String(local.paymentMethod || "") !== String(saved.paymentMethod || "")) mismatch++;
+    }
+    if (mismatch) throw new Error(`verification mismatch: ${mismatch}`);
+
+    ledgerRows = verifyRows;
+    renderSelected();
+    showToast("השינויים נשמרו ואומתו מול השרת.");
+  } catch (err) {
+    console.error("Save and verify imported payments failed", err);
+    showToast("לא ניתן היה לאמת את השמירה. לא לעדכן עוד נתונים לפני בדיקה.", true);
+  } finally {
+    const btn = document.getElementById("btnSaveVerifyImported");
+    if (btn) { btn.disabled = false; btn.textContent = oldText; }
   }
 }
 
