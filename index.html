@@ -903,6 +903,61 @@ body.account-frozen .readonly-disabled{
   #profileDialog .grid2{grid-template-columns:1fr;}
 }
 
+
+
+/* ===== ניווט ראשי 2026-09-02: Sidebar בדסקטופ / Hamburger במובייל ===== */
+#appShell{padding-right:236px;}
+.app-sidebar{
+  position:fixed;right:0;top:0;bottom:0;width:236px;z-index:40;
+  background:#fff;border-left:1px solid var(--line);
+  display:flex;flex-direction:column;padding:22px 14px 16px;
+  box-shadow:-8px 0 28px rgba(15,23,42,.035);
+}
+.sidebar-brand{padding:2px 10px 18px;border-bottom:1px solid var(--line);margin-bottom:12px;}
+.sidebar-brand-name{font-size:18px;font-weight:800;letter-spacing:-.2px;color:var(--text);}
+.sidebar-brand-sub{font-size:11px;color:var(--text-dim);margin-top:3px;}
+.sidebar-nav{display:flex;flex-direction:column;gap:3px;overflow-y:auto;padding:2px 0 10px;}
+.sidebar-section{font-size:10px;font-weight:700;color:#94a3b8;padding:13px 10px 5px;text-transform:uppercase;letter-spacing:.04em;}
+.sidebar-item{
+  width:100%;border:0;background:transparent;color:#334155;text-decoration:none;
+  padding:9px 11px;border-radius:10px;text-align:right;font:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;
+  transition:background .15s ease,color .15s ease;
+}
+.sidebar-item:hover{background:#f8fafc;color:var(--accent);}
+.sidebar-item:focus-visible{outline:2px solid rgba(37,99,235,.22);outline-offset:1px;}
+.sidebar-item.disabled{opacity:.48;cursor:default;pointer-events:none;}
+.sidebar-soon{font-size:9px;font-weight:700;color:#94a3b8;border:1px solid #e2e8f0;border-radius:999px;padding:2px 6px;}
+.sidebar-bottom{margin-top:auto;border-top:1px solid var(--line);padding-top:10px;display:flex;flex-direction:column;gap:3px;}
+.sidebar-user{font-size:11px;color:var(--text-dim);padding:4px 10px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sidebar-logout{color:#64748b;}
+.app-header{right:236px;}
+.app-header .top-right{display:none;}
+.mobile-menu-btn{
+  display:none;width:42px;height:42px;border:1px solid var(--line);border-radius:11px;background:#fff;
+  align-items:center;justify-content:center;cursor:pointer;padding:0;flex:0 0 auto;
+}
+.mobile-menu-lines,.mobile-menu-lines::before,.mobile-menu-lines::after{
+  display:block;width:19px;height:2px;background:#334155;border-radius:2px;content:"";position:relative;
+}
+.mobile-menu-lines::before{position:absolute;top:-6px;right:0;}
+.mobile-menu-lines::after{position:absolute;top:6px;right:0;}
+.mobile-nav-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.32);z-index:35;backdrop-filter:blur(2px);}
+/* כרטיסי הפעולות הישנים הוחלפו בניווט הראשי */
+.home-actions{display:none!important;}
+
+@media(max-width:900px){
+  #appShell{padding-right:0;}
+  .app-header{right:0;}
+  .app-sidebar{transform:translateX(105%);transition:transform .22s ease;width:min(82vw,300px);box-shadow:-18px 0 40px rgba(15,23,42,.14);}
+  body.mobile-nav-open .app-sidebar{transform:translateX(0);}
+  body.mobile-nav-open .mobile-nav-overlay{display:block;}
+  body.mobile-nav-open{overflow:hidden;}
+  .mobile-menu-btn{display:flex;}
+  .app-header .header-inner{display:flex!important;align-items:center!important;}
+  .app-header .header-inner>div:first-child{min-width:0;flex:1;}
+  .brand-title{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+}
 </style>
 </head>
 <body>
@@ -965,30 +1020,61 @@ body.account-frozen .readonly-disabled{
 
 <!-- האפליקציה עצמה (רק אחרי התחברות) -->
 <div id="appShell">
+  <div class="mobile-nav-overlay" id="mobileNavOverlay" aria-hidden="true"></div>
+
+  <aside class="app-sidebar" id="appSidebar" aria-label="ניווט ראשי">
+    <div class="sidebar-brand">
+      <div class="sidebar-brand-name">עצמאי פלוס</div>
+      <div class="sidebar-brand-sub">הנהלת חשבונות עצמאית</div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <button class="sidebar-item" id="btnHomeOpen" type="button">בית</button>
+
+      <div class="sidebar-section">ניהול שוטף</div>
+      <a class="sidebar-item" id="homeGoDocs" href="/documents.html">מסמכים</a>
+      <a class="sidebar-item" id="homeGoCustomers" href="/customers.html">לקוחות</a>
+      <button class="sidebar-item" id="homeGoLedger" type="button">הכנסות והוצאות</button>
+      <a class="sidebar-item" id="homeGoCashflow" href="/cashflow.html">תזרים ותכנון פיננסי</a>
+
+      <div class="sidebar-section">דוחות ומסים</div>
+      <button class="sidebar-item" id="homeGoReports" type="button">דוחות</button>
+      <button class="sidebar-item disabled" id="homeGoVat" type="button" disabled aria-disabled="true">דיווח מע״מ <span class="sidebar-soon">בקרוב</span></button>
+      <a class="sidebar-item" id="btnVatLink" href="/open-format.html">ממשק פתוח</a>
+      <a class="sidebar-item" id="homeGoYearEnd" href="/year-end.html">סגירת שנה</a>
+
+      <div class="sidebar-section">מערכת</div>
+      <button class="sidebar-item" id="homeGoProfile" type="button">פרופיל עסק</button>
+      <button class="sidebar-item" id="homeGoCategories" type="button">טבלת קטגוריות</button>
+      <button class="sidebar-item" id="homeGoImport" type="button">ייבוא נתונים</button>
+      <button class="sidebar-item" id="btnDataManageOpen" type="button">ייבוא וניהול נתונים</button>
+      <button class="sidebar-item" id="btnSupportOpen" type="button">תמיכה</button>
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="sidebar-user" id="userEmailTag">מחובר/ת</div>
+      <button class="sidebar-item sidebar-logout" id="btnLogout" type="button">התנתקות</button>
+    </div>
+  </aside>
+
   <header class="app-header">
     <div class="wrap header-inner" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <div>
-        <h2 class="brand-title">עצמאי פלוס - הנהלת חשבונות עצמאית — מעקב הכנסות/הוצאות לעצמאיים</h2>
+        <h2 class="brand-title">עצמאי פלוס</h2>
         <div class="hint" id="businessHint"></div>
         <div class="account-flags" id="accountFlags"></div>
       </div>
-      <div class="top-right">
-        <span class="tag" id="userEmailTag">מחובר/ת</span>
-        <button class="btn secondary small" id="btnHomeOpen">בית</button>
-                <a class="btn secondary small" id="btnVatLink" href="/open-format.html">ממשק פתוח</a>
-        <span class="nav-compat-hidden" style="display:none!important">
-          <button class="btn secondary small" id="btnCategoriesOpen" type="button">טבלת קטגוריות</button>
-          <button class="btn secondary small" id="btnReportsOpen" type="button">דוחות</button>
-          <a class="btn secondary small" id="btnYearEndLink" href="/year-end.html">סגירת שנה</a>
-          <a class="btn secondary small" id="btnCustomersLink" href="/customers.html">לקוחות</a>
-          <a class="btn secondary small" id="btnDocumentsLink" href="/documents.html">מסמכים</a>
-        </span>
-        
-<button class="btn secondary small" id="btnProfileOpen">פרופיל משתמש</button>
-        <button class="btn secondary small" id="btnDataManageOpen">ייבוא וניהול נתונים</button>
-        <button class="btn secondary small" id="btnSupportOpen">תמיכה</button>
-        <button class="btn small" id="btnLogout">התנתקות</button>
-      </div>
+      <button class="mobile-menu-btn" id="mobileMenuBtn" type="button" aria-label="פתיחת תפריט" aria-expanded="false" aria-controls="appSidebar">
+        <span class="mobile-menu-lines" aria-hidden="true"></span>
+      </button>
+      <span class="nav-compat-hidden" style="display:none!important">
+        <button id="btnCategoriesOpen" type="button">טבלת קטגוריות</button>
+        <button id="btnReportsOpen" type="button">דוחות</button>
+        <a id="btnYearEndLink" href="/year-end.html">סגירת שנה</a>
+        <a id="btnCustomersLink" href="/customers.html">לקוחות</a>
+        <a id="btnDocumentsLink" href="/documents.html">מסמכים</a>
+        <button id="btnProfileOpen" type="button">פרופיל משתמש</button>
+      </span>
     </div>
   </header>
 
@@ -1059,59 +1145,7 @@ body.account-frozen .readonly-disabled{
         </div>
       </div>
 
-      <div class="home-actions">
-        <button type="button" class="home-card" id="homeGoProfile">
-          <div class="ico">⚙️</div>
-          <div class="title">פרופיל עסק</div>
-          <div class="desc">פרטי העסק, סוג עוסק ואחוז מע״מ.</div>
-        </button>
-        <a class="home-card" id="homeGoDocs" href="/documents.html">
-          <div class="ico">📄</div>
-          <div class="title">מסמכים</div>
-          <div class="desc">טיוטות מסמכים, ספרור, לקוחות ותצוגת מסמך.</div>
-        </a>
-        <a class="home-card" id="homeGoCustomers" href="/customers.html">
-          <div class="ico">👥</div>
-          <div class="title">לקוחות</div>
-          <div class="desc">כרטיסי לקוח, פרטי התקשרות והכנה למסמכים וכרטסת.</div>
-        </a>
-        <button type="button" class="home-card" id="homeGoLedger">
-          <div class="ico">💰</div>
-          <div class="title">הכנסות והוצאות</div>
-          <div class="desc">הזנה ידנית של הוצאות וצפייה בתנועות.</div>
-        </button>
-        <a class="home-card" id="homeGoCashflow" href="/cashflow.html">
-          <div class="ico">📈</div>
-          <div class="title">תזרים ותכנון פיננסי</div>
-          <div class="desc">תמונה חודשית, התחייבויות, תשלומים לרשויות ותכנון תזרים.</div>
-        </a>
-        <button type="button" class="home-card" id="homeGoImport">
-          <div class="ico">📥</div>
-          <div class="title">ייבוא נתונים</div>
-          <div class="desc">קליטת נתונים מתוכנה קודמת מקובץ Excel או CSV.</div>
-        </button>
-        <button type="button" class="home-card" id="homeGoReports">
-          <div class="ico">📊</div>
-          <div class="title">דוחות</div>
-          <div class="desc">דוחות הכנסות, הוצאות, תנועות, לקוחות ומע״מ.</div>
-        </button>
-        <button type="button" class="home-card disabled" id="homeGoVat" disabled aria-disabled="true" title="דיווח ישיר למע״מ ייפתח בקרוב">
-          <div class="ico">🧾</div>
-          <div class="title">דיווח מע״מ</div>
-          <div class="desc">חישוב והכנת נתוני מע״מ. הדיווח הישיר מרשות המסים ייפתח בקרוב.</div>
-          <span class="soon">בקרוב</span>
-        </button>
-        <button type="button" class="home-card" id="homeGoCategories">
-          <div class="ico">🏷️</div>
-          <div class="title">טבלת קטגוריות</div>
-          <div class="desc">בדיקת הכרה למס והאם הוצאה מוכרת למע״מ.</div>
-        </button>
-        <a class="home-card" id="homeGoYearEnd" href="/year-end.html">
-          <div class="ico">📉</div>
-          <div class="title">סגירת שנה</div>
-          <div class="desc">דוח רווח והפסד, קבוצות הוצאה, פחת והכנה לדוח שנתי.</div>
-        </a>
-      </div>
+
     </section>
 
     <div class="grid-main">
@@ -2708,6 +2742,19 @@ const importIncomePreviewBody = document.getElementById("importIncomePreviewBody
 
 const homeDashboard = document.getElementById("homeDashboard");
 const btnHomeOpen = document.getElementById("btnHomeOpen");
+const mobileMenuBtn = document.getElementById("mobileMenuBtn");
+const mobileNavOverlay = document.getElementById("mobileNavOverlay");
+const appSidebar = document.getElementById("appSidebar");
+function setMobileNav(open){
+  document.body.classList.toggle("mobile-nav-open", !!open);
+  if (mobileMenuBtn) mobileMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+if (mobileMenuBtn) mobileMenuBtn.addEventListener("click", () => setMobileNav(!document.body.classList.contains("mobile-nav-open")));
+if (mobileNavOverlay) mobileNavOverlay.addEventListener("click", () => setMobileNav(false));
+if (appSidebar) appSidebar.addEventListener("click", (event) => {
+  if (window.matchMedia("(max-width: 900px)").matches && event.target.closest("a,button")) setMobileNav(false);
+});
+window.addEventListener("resize", () => { if (window.innerWidth > 900) setMobileNav(false); });
 const homeGoLedger = document.getElementById("homeGoLedger");
 const homeGoImport = document.getElementById("homeGoImport");
 const homeGoReports = document.getElementById("homeGoReports");
