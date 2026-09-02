@@ -977,11 +977,42 @@ body.account-frozen .readonly-disabled{
   .nav-compat-hidden{display:none!important;}
 }
 
-/* v6: יישור פס הכותרת לימין — הלוגו/כותרת מתחילים מימין, פעולות דסקטופ נשארות בצד הנגדי */
+/* v7: פס הכותרת נמתח לכל רוחב אזור העבודה ומיושר לימין */
 @media(min-width:901px){
-  .app-header .header-inner{justify-content:flex-start!important;text-align:right!important;}
-  .app-header .mobile-brand-row{margin-left:0;margin-right:0;}
+  .app-header .header-inner{
+    max-width:none!important;
+    width:100%!important;
+    margin:0!important;
+    padding:14px 28px!important;
+    box-sizing:border-box!important;
+    justify-content:flex-start!important;
+    text-align:right!important;
+  }
+  .app-header .mobile-brand-row{margin:0!important;}
   .app-header .desktop-header-actions{margin-inline-start:auto;}
+}
+
+/* v7: כפתור ההמבורגר נשאר פיזית בצד ימין במובייל */
+@media(max-width:900px){
+  .mobile-menu-btn{align-self:auto!important;margin:12px 0 0 auto!important;}
+}
+
+/* v7: סיכומים וחתכים — קולאפס במובייל, כמו "מה עושים היום?" */
+.summary-collapse-toggle{
+  width:100%;border:0;background:transparent;color:var(--text);font:inherit;
+  font-size:15px;font-weight:800;text-align:right;display:flex;align-items:center;
+  justify-content:space-between;padding:14px 16px 8px;cursor:default;
+}
+.summary-collapse-chevron{display:none;font-size:24px;line-height:1;transition:transform .2s ease;}
+.summary-collapse-content{display:block;}
+@media(max-width:560px){
+  #summaryCutsCard{overflow:hidden;}
+  .summary-collapse-toggle{padding:16px 18px;font-size:20px;cursor:pointer;}
+  .summary-collapse-chevron{display:inline-block;}
+  .summary-collapse-content{display:none;border-top:1px solid var(--line);}
+  #summaryCutsCard.is-open .summary-collapse-content{display:block;}
+  #summaryCutsCard.is-open .summary-collapse-chevron{transform:rotate(180deg);}
+  #summaryCutsCard .hd{padding-top:10px;}
 }
 </style>
 </head>
@@ -1183,10 +1214,10 @@ body.account-frozen .readonly-disabled{
     </section>
 
     <div class="grid-main">
-      <!-- צד ימין: תנועות חדשות -->
+      <!-- צד ימין: רישום הכנסה / הוצאה -->
       <section class="card">
         <div class="hd">
-          <h3 style="margin:0;font-size:15px">תנועות חדשות</h3>
+          <h3 style="margin:0;font-size:15px">רישום הכנסה / הוצאה</h3>
           <button class="btn small" id="btnQuickToday">היום</button>
         </div>
         <div class="bd">
@@ -1261,16 +1292,20 @@ body.account-frozen .readonly-disabled{
       </section>
 
       <!-- צד שמאל: סיכומים וסינון -->
-      <section class="card">
-        <div class="hd">
-          <h3 style="margin:0;font-size:15px">סיכומים וחתכים</h3>
-          <div class="row">
-            <button class="btn secondary small" id="btnPrev">◀ קודם</button>
-            <div class="pill" id="periodLabel">חודש:</div>
-            <button class="btn secondary small" id="btnNext">הבא ▶</button>
+      <section class="card" id="summaryCutsCard">
+        <button type="button" class="summary-collapse-toggle" id="summaryCollapseToggle" aria-expanded="false" aria-controls="summaryCollapseContent">
+          <span>סיכומים וחתכים</span>
+          <span class="summary-collapse-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="summary-collapse-content" id="summaryCollapseContent">
+          <div class="hd">
+            <div class="row">
+              <button class="btn secondary small" id="btnPrev">◀ קודם</button>
+              <div class="pill" id="periodLabel">חודש:</div>
+              <button class="btn secondary small" id="btnNext">הבא ▶</button>
+            </div>
           </div>
-        </div>
-        <div class="bd">
+          <div class="bd">
           <div class="summary-filter-grid">
             <label>חיפוש<br><input id="qText" placeholder="קטגוריה / תיאור" /></label>
             <label>סוג<br><select id="qType">
@@ -1302,6 +1337,7 @@ body.account-frozen .readonly-disabled{
               <button class="btn ghost small" id="btnExportPDF">הדפסה / PDF</button>
             </div>
             <button class="btn warn small" id="btnClear">איפוס כל הנתונים</button>
+          </div>
           </div>
         </div>
       </section>
@@ -7479,5 +7515,33 @@ function showToast(msg, isErr=false){
 })();
 </script>
 
+
+<script>
+(() => {
+  const card = document.getElementById("summaryCutsCard");
+  const toggle = document.getElementById("summaryCollapseToggle");
+  if (!card || !toggle) return;
+
+  const mobileQuery = window.matchMedia("(max-width: 560px)");
+  const sync = () => {
+    if (mobileQuery.matches) {
+      toggle.setAttribute("aria-expanded", String(card.classList.contains("is-open")));
+    } else {
+      card.classList.remove("is-open");
+      toggle.setAttribute("aria-expanded", "true");
+    }
+  };
+
+  toggle.addEventListener("click", () => {
+    if (!mobileQuery.matches) return;
+    card.classList.toggle("is-open");
+    toggle.setAttribute("aria-expanded", String(card.classList.contains("is-open")));
+  });
+
+  if (typeof mobileQuery.addEventListener === "function") mobileQuery.addEventListener("change", sync);
+  else if (typeof mobileQuery.addListener === "function") mobileQuery.addListener(sync);
+  sync();
+})();
+</script>
 </body>
 </html>
