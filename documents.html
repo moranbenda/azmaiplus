@@ -774,6 +774,46 @@ function renderDocumentFinder(){
   tbody.querySelectorAll('[data-credit-issued]').forEach(btn=>btn.onclick=()=>prepareCreditFromIssuedDocument(btn.dataset.creditIssued));
   tbody.querySelectorAll('[data-fix-duplicate]').forEach(btn=>btn.onclick=()=>cancelTechnicalDuplicate(btn.dataset.fixDuplicate));
 }
+function creditSourceLines(d){
+  const candidates = [d?.lines, d?.items, d?.documentLines, d?.lineItems].find(arr => Array.isArray(arr) && arr.length) || [];
+  const normalized = candidates.map((line, index) => {
+    const qty = Number(line?.qty ?? line?.quantity ?? line?.units ?? 1) || 1;
+    let netPrice = Number(line?.netPrice ?? line?.price ?? line?.unitPrice ?? line?.priceBeforeVat ?? line?.netUnitPrice ?? 0);
+    const grossPrice = Number(line?.grossPrice ?? line?.priceIncludingVat ?? line?.unitPriceIncludingVat ?? 0);
+    if (!(netPrice > 0) && grossPrice > 0) netPrice = round2(grossPrice / rateFactor());
+    return makeLine({
+      desc: line?.desc ?? line?.description ?? line?.itemDesc ?? line?.name ?? line?.title ?? `שורה ${index+1}`,
+      transactionType: line?.transactionType || 'service',
+      unit: line?.unit || 'יחידה',
+      qty,
+      netPrice,
+      lineDiscount: Number(line?.lineDiscount ?? line?.discount ?? 0)
+    });
+  }).filter(line => String(line.desc || '').trim() || Number(line.netPrice || 0) > 0);
+  if(normalized.length) return normalized;
+
+  const gross = Number(d?.gross ?? d?.total ?? d?.amount ?? 0);
+  const vat = Number(d?.vat ?? d?.vatAmount ?? 0);
+  const rate = Number(d?.vatRate ?? profile.vatRate ?? 18);
+  let net = Number(d?.net ?? d?.subtotal ?? d?.amountBeforeVat ?? 0);
+  if(!(net > 0) && gross > 0 && vat >= 0 && gross > vat) net = round2(gross - vat);
+  if(!(net > 0) && gross > 0) net = round2(gross / (1 + rate / 100));
+  return [makeLine({
+    desc: d?.title || d?.documentTitle || `זיכוי בגין ${d?.typeLabel || TYPE_LABELS[d?.type] || 'מסמך'} ${d?.number || ''}`,
+    qty: 1,
+    netPrice: Math.max(0, net)
+  })];
+}
+function resolveCreditCustomer(d){
+  let c = customers.find(x => String(x.id || '') === String(d?.customerId || ''));
+  if(c) return c;
+  const sourceTaxId = String(d?.customerSnapshot?.taxId || d?.customerSnapshot?.idNumber || d?.customerTaxId || '').trim();
+  if(sourceTaxId) c = customers.find(x => String(x.taxId || x.idNumber || '').trim() === sourceTaxId);
+  if(c) return c;
+  const sourceName = String(d?.customerName || d?.customerSnapshot?.name || d?.customerSnapshot?.businessName || '').trim().toLowerCase();
+  if(sourceName) c = customers.find(x => customerName(x).trim().toLowerCase() === sourceName);
+  return c || null;
+}
 function prepareCreditFromIssuedDocument(id){
   const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
   if(!d || !['tax_invoice','tax_invoice_receipt'].includes(d.type)) return;
@@ -783,13 +823,17 @@ function prepareCreditFromIssuedDocument(id){
   $('docType').value='credit_note';
   updateDocNumber();
   $('docDate').value=todayISO();
-  $('docCustomer').value=d.customerId||'';
-  const c=getSelectedCustomer();
-  $('docCustomerSearch').value=c?customerName(c):(d.customerName||'');
+
+  const c=resolveCreditCustomer(d);
+  $('docCustomer').value=c?.id || d.customerId || '';
+  $('docCustomerSearch').value=c ? customerName(c) : (d.customerName || d.customerSnapshot?.name || d.customerSnapshot?.businessName || '');
   renderSelectedCustomerHint();
-  docLines=(Array.isArray(d.lines)&&d.lines.length)?d.lines.map(makeLine):[makeLine({desc:'זיכוי בגין '+(d.typeLabel||TYPE_LABELS[d.type]||'מסמך')+' '+(d.number||''),qty:1,netPrice:Number(d.net||0)})];
-  $('docDiscountPct').value=Number(d.discountPct||0);
-  $('docVatRate').value=Number(d.vatRate||profile.vatRate||18);
+
+  // מסמכים ישנים נשמרו בכמה סכמות שונות. מנרמלים את השורות ולא משאירים זיכוי ריק.
+  docLines=creditSourceLines(d);
+  $('docDiscountPct').value=Number(d.discountPct ?? d.discountPercent ?? 0);
+  $('docVatRate').value=Number(d.vatRate ?? profile.vatRate ?? 18);
+  syncGrossFromNet();
   $('docTitle').value=`זיכוי בגין ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}`;
   $('docNotes').value=`זיכוי מלא למסמך מקור ${d.typeLabel||TYPE_LABELS[d.type]||''} ${d.number||''} מתאריך ${formatDocumentDate(d.date||'')}`;
   paymentEntries=[makePaymentEntry({amount:0})];
