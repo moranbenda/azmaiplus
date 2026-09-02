@@ -822,17 +822,18 @@ function prepareCreditFromIssuedDocument(id){
   $('documentFinderDialog')?.close();
   $('docType').value='credit_note';
   updateDocNumber();
-  $('docDate').value=todayISO();
+  $('docDate').value=today();
 
   const c=resolveCreditCustomer(d);
   $('docCustomer').value=c?.id || d.customerId || '';
   $('docCustomerSearch').value=c ? customerName(c) : (d.customerName || d.customerSnapshot?.name || d.customerSnapshot?.businessName || '');
   renderSelectedCustomerHint();
 
-  // מסמכים ישנים נשמרו בכמה סכמות שונות. מנרמלים את השורות ולא משאירים זיכוי ריק.
+  // קודם משחזרים את שיעור המע״מ של מסמך המקור, ורק אחר כך מנרמלים את השורות.
+  // כך גם מסמכים ישנים ששמרו מחיר כולל מע״מ משוחזרים לפי השיעור המקורי.
+  $('docVatRate').value=Number(d.vatRate ?? profile.vatRate ?? 18);
   docLines=creditSourceLines(d);
   $('docDiscountPct').value=Number(d.discountPct ?? d.discountPercent ?? 0);
-  $('docVatRate').value=Number(d.vatRate ?? profile.vatRate ?? 18);
   syncGrossFromNet();
   $('docTitle').value=`זיכוי בגין ${d.typeLabel||TYPE_LABELS[d.type]||'מסמך'} ${d.number||''}`;
   $('docNotes').value=`זיכוי מלא למסמך מקור ${d.typeLabel||TYPE_LABELS[d.type]||''} ${d.number||''} מתאריך ${formatDocumentDate(d.date||'')}`;
@@ -1469,7 +1470,7 @@ function resetFormAfterSuccessfulIssue(){
   $('docNotes').value = '';
   if($('withholdingTaxAmount')) $('withholdingTaxAmount').value = 0;
   paymentEntries = [makePaymentEntry({amount:0})];
-  $('docDate').value = todayISO();
+  $('docDate').value = today();
   renderLinesEditor();
   updatePaymentVisibility();
   updatePaymentTotalsHint();
