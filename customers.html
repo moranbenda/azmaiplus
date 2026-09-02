@@ -1223,7 +1223,20 @@ function isTransactionInvoiceDocument(d){
   return type.includes("חשבונית עסקה") && !type.includes("זיכוי");
 }
 
+function documentLifecycleStatus(d){
+  return String(d?.status || "").trim().toLowerCase();
+}
+
+function isCancelledIssuedDocument(d){
+  return ["cancelled", "cancelled_technical_duplicate"].includes(documentLifecycleStatus(d));
+}
+
+function isCreditedIssuedDocument(d){
+  return documentLifecycleStatus(d) === "credited";
+}
+
 function isPayableInvoice(d){
+  if (isCancelledIssuedDocument(d) || isCreditedIssuedDocument(d)) return false;
   const type = normalizedDocumentType(d);
   // Imported historical income can arrive with the generic document type "חשבונית".
   // Treat that generic imported invoice as payable too, while still excluding
@@ -1252,7 +1265,7 @@ function customerRevenueTotal(docs){
   // Imported income linked to the customer is part of the customer's revenue history,
   // but remains explicitly marked as imported and is not treated as a document issued here.
   const importedIncome = docs.filter(d => d._importedIncome);
-  const issuedDocs = docs.filter(d => !d._importedIncome);
+  const issuedDocs = docs.filter(d => !d._importedIncome && !isCancelledIssuedDocument(d));
 
   const taxInvoices = issuedDocs.filter(d => isTaxInvoiceDocument(d));
   const receipts = issuedDocs.filter(d => isReceiptDocument(d) && !normalizedDocumentType(d).includes("חשבונית"));
@@ -1975,6 +1988,15 @@ function renderSelected(){
           ${docs.map(d => {
             const payable = isPayableInvoice(d);
             const paid = !!d.paid;
+            const lifecycleStatus = documentLifecycleStatus(d);
+            const statusText = lifecycleStatus === "cancelled_technical_duplicate"
+              ? "בוטל · כפילות טכנית"
+              : lifecycleStatus === "cancelled"
+                ? "בוטל"
+                : lifecycleStatus === "credited"
+                  ? `זוכה${d.creditedByNumber ? ` · זיכוי ${d.creditedByNumber}` : ""}`
+                  : "";
+            const canCreateCredit = !d._importedIncome && ["חשבונית מס", "חשבונית מס/קבלה"].includes(documentDisplayType(d)) && !statusText && !!d.id;
             const importedPayable = payable && !!d._importedIncome && !!d.id;
             const issuedPayable = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
             const canPersistPaid = importedPayable || issuedPayable;
@@ -1987,7 +2009,7 @@ function renderSelected(){
                 <td data-label="סוג מסמך">${escapeHtml(documentDisplayType(d))}</td>
                 <td data-label="סכום"><strong>${money(documentDisplayTotal(d))}</strong></td>
                 <td data-label="סטטוס תשלום">
-                  ${payable ? `
+                  ${statusText ? `<span class="payment-na">${escapeHtml(statusText)}</span>` : payable ? `
                     <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">
                       <label class="payment-check-label">
                         <input type="checkbox"
@@ -2026,7 +2048,8 @@ function renderSelected(){
                       ? `<span class="payment-na">היסטוריה מיובאת</span>`
                       : `<button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
                          <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
-                         <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>`}
+                         <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
+                         ${canCreateCredit ? `<button class="btn secondary small" type="button" data-credit-doc="${escapeHtml(d.id || "")}">צור זיכוי</button>` : ""}`}
                   </div>
                 </td>
               </tr>`;
@@ -2121,6 +2144,14 @@ function renderSelected(){
     btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc))
   );
 
+  body.querySelectorAll("[data-credit-doc]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const docId = btn.dataset.creditDoc || "";
+      if (!docId) return;
+      location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}&creditDocumentId=${encodeURIComponent(docId)}`;
+    })
+  );
+
   body.querySelectorAll("[data-paid-doc]").forEach(input => {
     input.addEventListener("change", async () => {
       input.disabled = true;
@@ -2204,6 +2235,7 @@ function printCustomerLedger(id){
   const docs = docsForCustomer(c).slice().sort((a,b) => String(a.date || "").localeCompare(String(b.date || "")));
   const movements = [];
   docs.forEach(d => {
+    if (isCancelledIssuedDocument(d)) return;
     const {debit, credit} = ledgerDebitCredit(d);
     const detailsBase = d.documentTitle || d.title || d.desc || documentDisplayType(d);
     const details = `${detailsBase || documentDisplayType(d)}`;
