@@ -50,9 +50,9 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 401, { ok: false, error: "Unauthorized" });
     }
 
-    const resendApiKey = process.env.RESEND_API_KEY;
+    const resendApiKey = process.env.RESEND_SUPPORT_API_KEY;
     if (!resendApiKey) {
-      console.error("RESEND_API_KEY is missing");
+      console.error("RESEND_SUPPORT_API_KEY is missing");
       return sendJson(res, 500, { ok: false, error: "Support email service is not configured" });
     }
 
