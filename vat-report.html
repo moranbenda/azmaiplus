@@ -293,4 +293,5 @@ document.getElementById('apiSubmit').addEventListener('click',submitVatReport);
 ['endMonth','cycle','exemptIncome'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 onAuthStateChanged(auth,u=>{if(!u){location.href='/';return}load(u).catch(e=>{console.error(e);document.getElementById('status').innerHTML='<span class="bad">שגיאה בטעינה</span>'})});
 </script>
+<script src="/app-nav.js"></script>
 </body></html>
