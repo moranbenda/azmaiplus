@@ -26,6 +26,7 @@
     { section: 'דוחות ומסים', label: 'דוחות', href: '/#reportsSection' },
     { section: 'דוחות ומסים', label: 'דיווח מע״מ', href: '/vat-report.html', soon: true },
     { section: 'דוחות ומסים', label: 'ממשק פתוח', href: '/open-format.html' },
+    { section: 'דוחות ומסים', label: 'רכוש קבוע ופחת', href: '/fixed-assets.html' },
     { section: 'דוחות ומסים', label: 'סגירת שנה', href: '/year-end.html' },
     { section: 'מערכת', label: 'פרופיל עסק', href: '/#profileSection' },
     { section: 'מערכת', label: 'טבלת קטגוריות', href: '/#categoriesSection' },
