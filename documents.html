@@ -1766,5 +1766,6 @@ $('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 $('btnReconnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
 </script>
+  <script src="/app-nav.js"></script>
 </body>
 </html>
