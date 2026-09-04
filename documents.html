@@ -1204,7 +1204,19 @@ function polishHebrewPdfHtml(html){
         unicode-bidi:embed;
         direction:rtl;
       }
-    </style>`;
+    
+    /* Compact document center — visual only */
+    .grid4{gap:10px}
+    .metric{padding:9px 12px;border-radius:14px}
+    .metric .k{font-size:12px}
+    .metric .v{font-size:21px;margin-top:2px;line-height:1.15}
+    .invoice-israel-strip{margin-top:10px;padding:10px 14px}
+    @media(max-width:900px){
+      .grid4{grid-template-columns:repeat(2,1fr);gap:8px}
+      .metric{padding:9px 10px}
+      .metric .v{font-size:20px}
+    }
+</style>`;
 
   if (out.includes("</head>")) {
     out = out.replace("</head>", `${pdfTextFix}</head>`);
