@@ -23,23 +23,23 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
 
   const cookies = parseCookies(req.headers.cookie || "");
-  const connectionId = String(cookies.ita_connection_id || "").trim();
+  const connectionId = String(cookies.ita_vat_sandbox_connection_id || "").trim();
 
   if (!connectionId) {
     return res.status(401).json({
       ok: false,
       submitted: false,
       reconnect: true,
-      error: "לא נמצא חיבור פעיל לרשות המסים. יש להתחבר מחדש לפני שליחת דוח המע״מ."
+      error: "לא נמצא חיבור פעיל לסביבת ה־Sandbox של המע״מ. יש להתחבר תחילה ל־Sandbox."
     });
   }
 
   const gatewaySecret = String(process.env.ITA_GATEWAY_SECRET || "").trim();
-  const clientId = String(process.env.ITA_CLIENT_ID || "").trim();
-  const clientSecret = String(process.env.ITA_CLIENT_SECRET || "").trim();
+  const clientId = String(process.env.ITA_VAT_SANDBOX_CLIENT_ID || "").trim();
+  const clientSecret = String(process.env.ITA_VAT_SANDBOX_CLIENT_SECRET || "").trim();
 
   if (!gatewaySecret || !clientId || !clientSecret) {
-    console.error("Missing VAT submission environment variables");
+    console.error("Missing VAT sandbox submission environment variables");
     return res.status(500).json({
       ok: false,
       submitted: false,

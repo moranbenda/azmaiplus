@@ -52,13 +52,13 @@
   </div></section>
 
   <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">איך תרצו לדווח?</h2></div><div class="bd choice-grid">
-    <div class="choice"><h3>דיווח ישירות מעצמאי פלוס</h3><p><b>שלב 1:</b> בדיקת מוכנות בטוחה שאינה שולחת דבר. לאחר שהבדיקה עוברת בהצלחה ניתן לעבור לשלב 2 ולשלוח את הדוח בפועל.</p><button id="apiSend" class="btn" disabled>בדיקת מוכנות ל־API — ללא שליחה</button><button id="apiSubmit" class="btn" style="display:none;margin-inline-start:8px;background:#b42318;border-color:#b42318" disabled>שליחת דוח לרשות המסים</button></div>
+    <div class="choice"><h3>בדיקת VATReportV3Api — Sandbox</h3><p><b>שלב 0:</b> מתחברים לסביבת הבדיקות הנפרדת של רשות המסים. <b>שלב 1:</b> בדיקת מוכנות בטוחה שאינה שולחת דבר. רק לאחר שהבדיקה עוברת ניתן לבצע שליחת ניסיון ל־Sandbox.</p><button id="vatSandboxConnect" class="btn secondary" type="button">חיבור ל־Sandbox של רשות המסים</button><button id="apiSend" class="btn" style="margin-inline-start:8px" disabled>בדיקת מוכנות — ללא שליחה</button><button id="apiSubmit" class="btn" style="display:none;margin-inline-start:8px;background:#b42318;border-color:#b42318" disabled>שליחת ניסיון ל־Sandbox</button><div id="vatSandboxNotice" class="status" style="margin-top:10px"></div></div>
     <div class="choice"><h3>דיווח באתר רשות המסים</h3><p>אפשר להמשיך לדווח בדרך הרגילה. הנתונים בטבלה למעלה הם הנתונים שצריך להעתיק לשדות המקבילים באתר.</p><a class="btn secondary" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a></div>
   </div></section>
 
   <section id="apiValidationCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת בדיקת המוכנות</h2><span class="status">בדיקה בלבד · ללא שליחה</span></div><div class="bd"><div id="apiValidationResult" class="validation-box warn">טרם בוצעה בדיקה.</div></div></section>
 
-  <section id="apiSubmitCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת השליחה לרשות המסים</h2><span class="status">שליחה אמיתית</span></div><div class="bd"><div id="apiSubmitResult" class="validation-box warn">טרם נשלח דוח.</div></div></section>
+  <section id="apiSubmitCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת שליחת הניסיון ל־Sandbox</h2><span class="status">Sandbox בלבד</span></div><div class="bd"><div id="apiSubmitResult" class="validation-box warn">טרם נשלח דוח.</div></div></section>
 
   <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תצוגה מקדימה ל־API</h2><span class="status">הנתונים שיועברו לאחר אישור מפורש</span></div><div class="bd"><pre id="payloadPreview">{}</pre></div></section>
 </main>
@@ -214,22 +214,22 @@ async function validateApiReadiness(){
 function renderSubmitResult(data,httpOk){
  const card=document.getElementById('apiSubmitCard'),box=document.getElementById('apiSubmitResult');card.style.display='block';box.innerHTML='';
  const title=document.createElement('b');
- if(data?.submitted===true&&Number(data?.code)===1){box.className='validation-box good';title.textContent='✓ דוח המע״מ נקלט בהצלחה ברשות המסים.'}
- else if(data?.paymentCapturedReportFailed===true||Number(data?.code)===2){box.className='validation-box badbox';title.textContent='⚠ התשלום נקלט אך הדוח לא נקלט.'}
+ if(data?.submitted===true&&Number(data?.code)===1){box.className='validation-box good';title.textContent='✓ דוח הניסיון נקלט בהצלחה בסביבת ה־Sandbox.'}
+ else if(data?.paymentCapturedReportFailed===true||Number(data?.code)===2){box.className='validation-box badbox';title.textContent='⚠ ה־Sandbox החזיר מצב שבו התשלום נקלט אך הדוח לא נקלט.'}
  else if(data?.alreadySubmitted===true){box.className='validation-box warn';title.textContent='השליחה החוזרת נחסמה.'}
- else{box.className='validation-box badbox';title.textContent='דוח המע״מ לא נקלט.'}
+ else{box.className='validation-box badbox';title.textContent='דוח הניסיון לא נקלט ב־Sandbox.'}
  box.appendChild(title);
 
- const message=document.createElement('div');message.style.marginTop='8px';message.textContent=data?.message||data?.error||'לא התקבלה תשובת הצלחה מרשות המסים.';box.appendChild(message);
+ const message=document.createElement('div');message.style.marginTop='8px';message.textContent=data?.message||data?.error||'לא התקבלה תשובת הצלחה מסביבת ה־Sandbox.';box.appendChild(message);
 
  if(Number(data?.reference||0)>0){
   const ref=document.createElement('div');ref.style.marginTop='10px';ref.innerHTML='<b>מספר אסמכתה:</b> '+String(data.reference);box.appendChild(ref);
  }
  if(data?.totalPayment!==undefined&&data?.totalPayment!==null){
-  const pay=document.createElement('div');pay.style.marginTop='6px';pay.innerHTML='<b>סכום תשלום כולל לפי רשות המסים:</b> '+money(Number(data.totalPayment)||0);box.appendChild(pay);
+  const pay=document.createElement('div');pay.style.marginTop='6px';pay.innerHTML='<b>סכום תשלום לפי תשובת ה־Sandbox:</b> '+money(Number(data.totalPayment)||0);box.appendChild(pay);
  }
  if(Number(data?.code)===2){
-  const critical=document.createElement('div');critical.style.marginTop='10px';critical.innerHTML='<b>חשוב:</b> אין ללחוץ שוב על שליחה. יש לבדוק את מצב הדוח והתשלום מול רשות המסים.';box.appendChild(critical);
+  const critical=document.createElement('div');critical.style.marginTop='10px';critical.innerHTML='<b>חשוב:</b> אין ללחוץ שוב על שליחה לפני שבודקים את תשובת ה־Sandbox.';box.appendChild(critical);
  }
  if(data?.alreadySubmitted===true&&data?.previousSubmission?.reference){
   const previous=document.createElement('div');previous.style.marginTop='10px';previous.textContent='אסמכתה קודמת: '+String(data.previousSubmission.reference);box.appendChild(previous);
@@ -247,20 +247,20 @@ async function submitVatReport(){
  const amountLabel=money(Number(lastPayload.TotalVAT)||0);
 
  const approved=confirm(
-`שליחה אמיתית לרשות המסים
+`שליחת ניסיון ל־Sandbox של רשות המסים
 
 תקופת דיווח: ${periodLabel}
 סוג הדוח: ${reportTypeLabel}
 סכום: ${amountLabel}
 
-לחיצה על אישור תשלח את הדוח בפועל לרשות המסים.
-לאחר קליטת הדוח לא ניתן לבטל את הפעולה מתוך עצמאי פלוס.
+הפעולה תשלח נתוני ניסיון לסביבת ה־Sandbox בלבד.
+היא אינה שולחת דוח מע״מ ל־Production.
 
-האם לשלוח את הדוח?`
+האם לבצע את שליחת הניסיון?`
  );
  if(!approved)return;
 
- btn.disabled=true;const old=btn.textContent;btn.textContent='שולח לרשות המסים…';
+ btn.disabled=true;const old=btn.textContent;btn.textContent='שולח ל־Sandbox…';
  try{
   const response=await fetch('/api/vat-report/submit',{
    method:'POST',
@@ -286,6 +286,12 @@ async function submitVatReport(){
   if(apiReady)btn.disabled=false;
  }
 }
+
+document.getElementById('vatSandboxConnect').addEventListener('click',()=>{location.href='/api/vat-report/auth'});
+const vatSandboxParams=new URLSearchParams(location.search);
+const vatSandboxNotice=document.getElementById('vatSandboxNotice');
+if(vatSandboxParams.get('vatSandbox')==='connected'){vatSandboxNotice.textContent='✓ חיבור ה־Sandbox הושלם. אפשר לבצע בדיקת מוכנות.';vatSandboxNotice.className='status ok'}
+else if(vatSandboxParams.get('vatSandbox')==='error'){vatSandboxNotice.textContent='חיבור ה־Sandbox נכשל: '+(vatSandboxParams.get('message')||'יש לנסות שוב.');vatSandboxNotice.className='status bad'}
 
 document.getElementById('apiSend').addEventListener('click',validateApiReadiness);
 document.getElementById('apiSubmit').addEventListener('click',submitVatReport);
