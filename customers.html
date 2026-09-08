@@ -626,10 +626,79 @@
       }
       .summary-divider{display:none}
 
+      /* Mobile only: keep each customer document compact instead of turning every cell into a card row. */
+      .customer-docs-table{
+        display:table;
+        width:100%;
+        min-width:0;
+        border-collapse:collapse;
+        border-spacing:0;
+        table-layout:fixed;
+      }
+      .customer-docs-table thead{display:none}
+      .customer-docs-table tbody{display:table-row-group;width:auto}
+      .customer-docs-table tr{
+        display:grid;
+        grid-template-columns:72px minmax(72px,.8fr) minmax(78px,1fr) 72px;
+        align-items:center;
+        width:100%;
+        padding:0;
+        border:0;
+        border-bottom:1px solid #dbe3ef;
+        border-radius:0;
+        box-shadow:none;
+        background:#fff;
+      }
+      .customer-docs-table tr:last-child{border-bottom:0}
+      .customer-docs-table td{
+        display:block;
+        width:auto;
+        min-width:0;
+        padding:9px 5px;
+        border:0;
+        background:transparent !important;
+        text-align:right;
+        font-size:11px;
+        line-height:1.35;
+        overflow-wrap:anywhere;
+      }
+      .customer-docs-table td::before{display:none}
+      .customer-docs-table td:nth-child(1),
+      .customer-docs-table td:nth-child(2),
+      .customer-docs-table td:nth-child(4){white-space:nowrap}
+      .customer-docs-table td:nth-child(5){
+        grid-column:1 / -1;
+        padding:5px 5px 7px;
+        border-top:1px solid #f1f5f9;
+      }
+      .customer-docs-table td:nth-child(6){
+        grid-column:1 / -1;
+        padding:0 5px 9px;
+      }
       .customer-docs-table tr.open-payment-row{
         border-color:#f3d29a;
+        background:#fffdf8;
       }
-      .payment-check-label{justify-content:flex-end}
+      .customer-docs-table .payment-status-line{
+        white-space:normal;
+        flex-wrap:wrap;
+        gap:6px 10px;
+      }
+      .customer-docs-table .payment-check-label{justify-content:flex-start}
+      .customer-docs-table .docs-actions{
+        min-width:0;
+        width:100%;
+        display:flex;
+        flex-wrap:wrap;
+        gap:5px;
+        justify-content:flex-start;
+      }
+      .customer-docs-table .docs-actions .btn{
+        width:auto;
+        flex:1 1 auto;
+        padding:6px 7px;
+        font-size:11px;
+      }
     }
 </style>
 </head>
