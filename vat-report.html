@@ -391,10 +391,13 @@ async function markCurrentVatPaid(){
  if(currentReport.balance<0){alert("הדוח הנוכחי מציג סכום להחזר ולכן אין תשלום לסמן.");return}
  const existing=currentVatPayment();
  if(existing?.status==="paid"){renderVatPaidStatus();return}
- const today=new Date().toISOString().slice(0,10);
- const entered=prompt("תאריך התשלום בפועל (YYYY-MM-DD)",today);
- if(entered===null)return;
- if(!/^\d{4}-\d{2}-\d{2}$/.test(entered)){alert("יש להזין תאריך בפורמט YYYY-MM-DD.");return}
+ const now=new Date();
+ const todayDisplay=`${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()}`;
+ const enteredDisplay=prompt("תאריך התשלום בפועל (DD/MM/YYYY)",todayDisplay);
+ if(enteredDisplay===null)return;
+ const dm=enteredDisplay.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+ if(!dm){alert("יש להזין תאריך בפורמט DD/MM/YYYY.");return}
+ const entered=`${dm[3]}-${dm[2]}-${dm[1]}`;
  const btn=document.getElementById('markVatPaid');
  if(btn){btn.disabled=true;btn.textContent="שומר..."}
  try{
