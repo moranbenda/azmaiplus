@@ -42,6 +42,9 @@
   .tax-pay-row .tax-label{font-weight:800}
   .tax-pay-row .tax-value{font-size:20px;border-color:#c59c23;background:#fffdf7}
   .guide-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid #e5e7eb}
+  .vat-paid-box{margin-top:12px;padding:12px 14px;border:1px solid #b8dec4;background:#f0faf3;border-radius:9px;color:#24633a;font-weight:700;line-height:1.55}
+  .vat-paid-box[hidden]{display:none}
+  .btn-success{background:#2f7d4a!important;border-color:#2f7d4a!important;color:#fff!important}
   .guide-note{margin-top:14px;padding:12px 14px;border-radius:9px;background:#f1f7fc;border:1px solid #cbdfea;line-height:1.55;color:#29485e}
   .control-box{margin-top:18px;padding:14px 16px;border-radius:10px;font-weight:700;line-height:1.6}
   .control-box.ok{background:#edf9f1;border:1px solid #a8d7b7;color:#1f6a3c}
@@ -169,7 +172,9 @@
 
       <div class="guide-actions">
         <a class="btn" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a>
+        <button class="btn btn-success" type="button" id="markVatPaid">הדיווח הוגש והתשלום בוצע</button>
       </div>
+      <div id="vatPaidStatus" class="vat-paid-box" hidden></div>
     </div>
   </section>
 </main>
@@ -177,10 +182,10 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 const firebaseConfig={apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",authDomain:"freelance-accounting-6c3bb.firebaseapp.com",projectId:"freelance-accounting-6c3bb",storageBucket:"freelance-accounting-6c3bb.firebasestorage.app",messagingSenderId:"196974556694",appId:"1:196974556694:web:60ba710567f2a7c67c6737"};
 const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
-const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={},lastPayload=null,apiReady=false;
+const DEFAULT_VAT=18; let rows=[],settings={vatEnabled:true,vatRate:18},profile={},lastPayload=null,apiReady=false,currentReport=null,currentUser=null,currentLedger={};
 const EXPENSE_ITEMS = [
   // רכב — שורת 7 בנספח 1320. האחוז כאן הוא ברירת מחדל תפעולית בלבד וניתן לשינוי בתנועה.
   { item: "דלק", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
@@ -311,6 +316,15 @@ function calculate(){
  const roundedExpenseVat=Math.round(expenseVat);
  const roundedInputVat=roundedAssetVat+roundedExpenseVat;
  const reportBalance=roundedIncomeVat-roundedInputVat;
+ currentReport={
+  periodKey:`${rg.from}_${rg.to}`,
+  from:rg.from,to:rg.to,reportPeriod:rg.reportPeriod,label:rg.label,
+  cycle:Number(document.getElementById('cycle').value)||1,
+  amount:Math.max(0,Math.abs(reportBalance)),
+  balance:reportBalance,
+  outputVat:roundedIncomeVat,inputVat:roundedInputVat
+ };
+ renderVatPaidStatus();
 
  const is17=Math.round(rate)===17;
  const taxable18=is17?0:roundedIncome;
@@ -352,10 +366,63 @@ function calculate(){
    : 'נמצאה אי־התאמה בחישוב. אין להגיש את הדוח לפני בדיקה.';
  }
 }
+
+function vatPaymentsMap(){return (currentLedger&&typeof currentLedger.vatPayments==="object"&&currentLedger.vatPayments)||{}}
+function currentVatPayment(){return currentReport?vatPaymentsMap()[currentReport.periodKey]||null:null}
+function renderVatPaidStatus(){
+ const box=document.getElementById('vatPaidStatus'),btn=document.getElementById('markVatPaid');
+ if(!box||!btn||!currentReport)return;
+ const paid=currentVatPayment();
+ if(paid?.status==="paid"){
+  const date=String(paid.paidAt||"").slice(0,10);
+  const shown=date?new Date(date+"T12:00:00").toLocaleDateString("he-IL"):"";
+  box.hidden=false;
+  box.textContent=`הדיווח הוגש והתשלום בוצע${shown?` בתאריך ${shown}`:""}. סכום ששולם: ${Number(paid.amount||0).toLocaleString("he-IL")} ₪`;
+  btn.textContent="הדיווח הוגש והתשלום בוצע ✓";
+  btn.disabled=true;
+ }else{
+  box.hidden=true; box.textContent="";
+  btn.textContent="הדיווח הוגש והתשלום בוצע";
+  btn.disabled=false;
+ }
+}
+async function markCurrentVatPaid(){
+ if(!currentUser||!currentReport)return;
+ if(currentReport.balance<0){alert("הדוח הנוכחי מציג סכום להחזר ולכן אין תשלום לסמן.");return}
+ const existing=currentVatPayment();
+ if(existing?.status==="paid"){renderVatPaidStatus();return}
+ const today=new Date().toISOString().slice(0,10);
+ const entered=prompt("תאריך התשלום בפועל (YYYY-MM-DD)",today);
+ if(entered===null)return;
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(entered)){alert("יש להזין תאריך בפורמט YYYY-MM-DD.");return}
+ const btn=document.getElementById('markVatPaid');
+ if(btn){btn.disabled=true;btn.textContent="שומר..."}
+ try{
+  const payment={
+   periodKey:currentReport.periodKey,
+   from:currentReport.from,to:currentReport.to,reportPeriod:currentReport.reportPeriod,
+   label:currentReport.label,cycle:currentReport.cycle,
+   amount:Number(currentReport.amount)||0,
+   outputVat:Number(currentReport.outputVat)||0,inputVat:Number(currentReport.inputVat)||0,
+   status:"paid",filed:true,paid:true,paidAt:entered,
+   recordedAt:new Date().toISOString(),source:"vat-report"
+  };
+  await setDoc(doc(db,'ledgers',currentUser.uid),{vatPayments:{[currentReport.periodKey]:payment}},{merge:true});
+  currentLedger.vatPayments={...(currentLedger.vatPayments||{}),[currentReport.periodKey]:payment};
+  renderVatPaidStatus();
+ }catch(err){
+  console.error(err);
+  alert("שמירת סטטוס התשלום נכשלה. לא בוצע שינוי.");
+  renderVatPaidStatus();
+ }
+}
+
 async function load(user){
+ currentUser=user;
  const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);
  profile=us.exists()?us.data():{email:user.email};
  const ledger=ls.exists()?ls.data():{};
+ currentLedger=ledger;
  rows=Array.isArray(ledger.rows)?ledger.rows:[];
  settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};
  document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';
@@ -488,6 +555,7 @@ document.querySelectorAll('[data-copy-id]').forEach(btn=>{
  });
 });
 
+document.getElementById('markVatPaid')?.addEventListener('click',markCurrentVatPaid);
 ['endMonth','cycle','exemptIncome'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 onAuthStateChanged(auth,u=>{if(!u){location.href='/';return}load(u).catch(e=>{console.error(e);document.getElementById('status').innerHTML='<span class="bad">שגיאה בטעינה</span>'})});
 </script>
