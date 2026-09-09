@@ -13,7 +13,7 @@ const TAX_TOKEN_URL =
 
 const TAX_ALLOCATION_URL =
   process.env.ITA_ALLOCATION_URL ||
-  "https://ita-api.taxes.gov.il/shaam/production/Invoices/v2/Approval";
+  "https://t-ita-api.taxes.gov.il/shaam/production/Invoices/v2/Approval";
 
 const TOKEN_STORE_FILE =
   process.env.ITA_TOKEN_STORE_FILE ||
