@@ -80,6 +80,9 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
   /* ניווט תקופה — חצים קרובים יותר לכותרת */
   .period-nav,.month-nav,.date-nav{max-width:760px;margin-inline:auto}
   .month-header,.period-header{max-width:760px;margin-inline:auto}
+  @media(max-width:800px){
+    #biMonthlyPanel > div:last-child{grid-template-columns:1fr!important}
+  }
 </style>
 </head>
 <body>
@@ -106,7 +109,9 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <button class="month-arrow" id="prevMonth" title="החודש הקודם">›</button>
   </div>
 
-  <div class="dashboard">
+  <section id="biMonthlyPanel" hidden style="margin:16px 0"></section>
+
+  <div class="dashboard" id="monthlyDashboard">
     <div class="kpi good"><div class="label">הכנסות בפועל</div><div class="value" id="kIncome">₪0</div><div class="sub">מתקבולים בפועל כולל מע״מ</div></div>
     <div class="kpi bad"><div class="label">הוצאות בפועל</div><div class="value" id="kExpenses">₪0</div><div class="sub">הוצאות עסקיות + תשלומים אישיים שנרשמו</div></div>
     <div class="kpi warn"><div class="label">התחייבויות החודש</div><div class="value" id="kCommitments">₪0</div><div class="sub">תשלומים קבועים המתוכננים לחודש</div></div>
@@ -119,7 +124,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
 
-  <div class="grid">
+  <div class="grid" id="monthlyGrid">
     <div>
       <section class="card">
         <div class="card-hd"><h2>תמונת מצב חודשית</h2><span class="tiny muted" id="chartCaption"></span></div>
@@ -522,26 +527,107 @@ function calcMonth(d=selected){
 
 
 let biMonthlyMode=false;
-function renderBiMonthly(){
- const host=document.getElementById("biMonthlyPanel");
- if(!host)return;
- if(!biMonthlyMode){host.hidden=true;return}
- host.hidden=false;
- const cur=new Date(selected.getFullYear(),selected.getMonth(),1);
- const prev=new Date(selected.getFullYear(),selected.getMonth()-1,1);
- const months=[prev,cur];
- const fmt=d=>d.toLocaleDateString("he-IL",{month:"long",year:"numeric"});
- host.innerHTML=`<div class="card"><h2 style="margin-top:0">תצוגה דו־חודשית</h2>
- <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
- ${months.map(d=>{const c=calcMonth(d);return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px">
- <b>${fmt(d)}</b>
- <div style="margin-top:10px;line-height:1.9">הכנסות בפועל: <b>${money(c.incomeGross||0)}</b><br>
- הוצאות בפועל: <b>${money(c.actualOut||0)}</b><br>
- התחייבויות: <b>${money(c.commitments||0)}</b><br>
- הפרשות לרשויות: <b>${money(c.authorityReserve||0)}</b><br>
- יתרה: <b>${money(c.balance||0)}</b></div></div>`}).join("")}
- </div></div>`;
+
+function twoMonthData(){
+  const current=new Date(selected.getFullYear(),selected.getMonth(),1);
+  const previous=new Date(selected.getFullYear(),selected.getMonth()-1,1);
+  const months=[previous,current];
+  const data=months.map(d=>({date:d,calc:calcMonth(d)}));
+  const total=data.reduce((a,x)=>{
+    a.incomeGross+=x.calc.incomeGross||0;
+    a.actualOut+=x.calc.actualOut||0;
+    a.commitments+=x.calc.commitments||0;
+    a.authorityReserve+=x.calc.authorityReserve||0;
+    a.balance+=x.calc.balance||0;
+    return a;
+  },{incomeGross:0,actualOut:0,commitments:0,authorityReserve:0,balance:0});
+  return{months:data,total};
 }
+
+function renderBiMonthly(){
+  const host=document.getElementById("biMonthlyPanel");
+  const monthlyDashboard=document.getElementById("monthlyDashboard");
+  const monthlyGrid=document.getElementById("monthlyGrid");
+  if(!host)return;
+
+  monthlyDashboard.hidden=biMonthlyMode;
+  monthlyGrid.hidden=biMonthlyMode;
+  annualView.hidden=biMonthlyMode;
+
+  if(!biMonthlyMode){
+    host.hidden=true;
+    host.innerHTML="";
+    annualView.hidden=false;
+    return;
+  }
+
+  host.hidden=false;
+  const {months,total}=twoMonthData();
+  const fmt=d=>new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(d);
+  const first=months[0].date, last=months[1].date;
+  document.getElementById("monthLabel").textContent=
+    `${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(first)}–${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(last)}`;
+  document.getElementById("monthMeta").textContent="תצוגה דו־חודשית";
+
+  const rowsForMonth=(d,c)=>{
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    const paid=paidVatRecordsForMonth(d);
+    const extraPaid=paid.filter(rec=>{
+      const amount=Math.max(0,Number(rec.amount)||0);
+      return !c.list.some(r=>isVatPaymentRow(r)&&String(r.date||"").slice(0,10)===String(rec.paidAt||"")&&Math.abs(Math.abs(Number(r.amount)||0)-amount)<0.01);
+    }).map(rec=>({
+      date:String(rec.paidAt||""),
+      type:"expense",
+      desc:`תשלום מע״מ${rec.label?` – ${rec.label}`:""}`,
+      category:"רשות המסים · שולם בפועל",
+      amount:Number(rec.amount)||0
+    }));
+    return [...c.list,...extraPaid].sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+  };
+
+  host.innerHTML=`
+    <div class="dashboard" style="margin-bottom:16px">
+      <div class="kpi good"><div class="label">הכנסות בפועל · חודשיים</div><div class="value">${money(total.incomeGross)}</div></div>
+      <div class="kpi bad"><div class="label">הוצאות בפועל · חודשיים</div><div class="value">${money(total.actualOut)}</div></div>
+      <div class="kpi warn"><div class="label">התחייבויות · חודשיים</div><div class="value">${money(total.commitments)}</div></div>
+      <div class="kpi warn"><div class="label">הפרשות לרשויות · חודשיים</div><div class="value">${money(total.authorityReserve)}</div></div>
+      <div class="kpi ${total.balance>=0?"good":"bad"}"><div class="label">יתרה לאחר התחייבויות והפרשות</div><div class="value">${money(total.balance)}</div></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+      ${months.map(({date,calc})=>`
+        <section class="card">
+          <div class="card-hd"><h2>${fmt(date)}</h2><span class="tiny muted">פירוט חודשי</span></div>
+          <div class="card-bd">
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px">
+              <div class="authority"><div class="desc">הכנסות בפועל</div><div class="amount">${money(calc.incomeGross)}</div></div>
+              <div class="authority"><div class="desc">הוצאות בפועל</div><div class="amount">${money(calc.actualOut)}</div></div>
+              <div class="authority"><div class="desc">התחייבויות</div><div class="amount">${money(calc.commitments)}</div></div>
+              <div class="authority"><div class="desc">רשויות</div><div class="amount">${money(calc.authorityReserve)}</div></div>
+            </div>
+            <div class="table-wrap" style="max-height:340px">
+              <table>
+                <thead><tr><th>תאריך</th><th>סוג</th><th>תיאור</th><th>סכום</th></tr></thead>
+                <tbody>
+                  ${(()=>{
+                    const rr=rowsForMonth(date,calc);
+                    return rr.length?rr.map(r=>`<tr>
+                      <td>${esc(r.date||"")}</td>
+                      <td>${r.type==="income"?"הכנסה":"הוצאה"}</td>
+                      <td>${esc(r.desc||"")}</td>
+                      <td>${money(r.amount)}</td>
+                    </tr>`).join(""):'<tr><td colspan="4" class="empty">אין תנועות בחודש זה.</td></tr>';
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      `).join("")}
+    </div>
+  `;
+}
+
 function render(){
   const c=calcMonth();
   const label=new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected);
@@ -556,6 +642,7 @@ function render(){
   renderDonut(c);renderObligations(c);renderRows(c);
   chartCaption.textContent="מבוסס על נתונים בפועל והתחייבויות שהוגדרו";
   if(annualView.classList.contains("open"))renderAnnual();
+  if(biMonthlyMode)renderBiMonthly();
 }
 
 function renderDonut(c){
@@ -831,7 +918,12 @@ document.getElementById("biMonthlyViewBtn")?.addEventListener("click",()=>{
  biMonthlyMode=!biMonthlyMode;
  const b=document.getElementById("biMonthlyViewBtn");
  if(b)b.textContent=biMonthlyMode?"חזרה לתצוגה חודשית":"תצוגה דו־חודשית";
- renderBiMonthly();
+ if(biMonthlyMode && annualView.classList.contains("open")){
+   annualView.classList.remove("open");
+   btnAnnual.textContent="תצוגה שנתית";
+ }
+ if(biMonthlyMode) renderBiMonthly();
+ else { render(); renderBiMonthly(); }
 });
 
 onAuthStateChanged(auth,user=>{if(!user){location.href="/";return}loadData(user).catch(err=>{console.error(err);alert("לא הצלחנו לטעון את נתוני התזרים. נסי לרענן את העמוד.")})});
