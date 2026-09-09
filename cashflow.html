@@ -120,7 +120,12 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
   </div>
 
   <section class="card annual-view" id="annualView">
-    <div class="card-hd"><h2 id="annualTitle">תמונה שנתית</h2><span class="tiny muted">12 חודשים במקום אחד</span></div>
+    <div class="card-hd"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+<h2 id="annualTitle" style="margin:0">תמונה שנתית</h2>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<button class="btn secondary" id="annualExcelBtn" type="button">הורדה לאקסל</button>
+<button class="btn secondary" id="annualPrintBtn" type="button">הדפסה / PDF</button>
+</div></div><span class="tiny muted">12 חודשים במקום אחד</span></div>
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>מע״מ ששולם בפועל</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
 
@@ -905,22 +910,49 @@ async function saveYearReview(keepAll=false){
 confirmYearReview.onclick=()=>saveYearReview(false);
 keepYearReview.onclick=()=>saveYearReview(true);
 
+
+function exportAnnualCashflowExcel(){
+  if(typeof XLSX==="undefined"){alert("רכיב הייצוא לאקסל אינו זמין כרגע.");return;}
+  const year=selected.getFullYear();
+  const rows=Array.from({length:12},(_,m)=>{
+    const d=new Date(year,m,1),x=calcMonthForExport(d);
+    return {"חודש":new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d),"הכנסות":Number(x.incomeGross||0),
+      "הוצאות בפועל":Number(x.actualOut||0),"התחייבויות":Number(x.commitments||0),"מקדמות מס":Number(x.advanceReserve||0),
+      "מע״מ צפוי":Number(x.vatReserve||0),"מע״מ ששולם בפועל":Number(actualVatPaidForMonth(d)||0),
+      "יתרה לאחר התחייבויות והפרשות":Number(x.balance||0)};
+  });
+  const total=rows.reduce((a,r)=>{for(const k of Object.keys(r))if(k!=="חודש")a[k]=(a[k]||0)+Number(r[k]||0);return a;},{"חודש":"סה״כ"});
+  rows.push(total);
+  const ws=XLSX.utils.json_to_sheet(rows); ws["!cols"]=[{wch:14},{wch:15},{wch:17},{wch:15},{wch:14},{wch:14},{wch:19},{wch:30}];
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,`תזרים ${year}`); XLSX.writeFile(wb,`תזרים_שנתי_${year}.xlsx`);
+}
+function printAnnualCashflow(){
+  const year=selected.getFullYear(),table=document.querySelector(".annual-table"); if(!table)return;
+  const w=window.open("","_blank"); if(!w){alert("יש לאפשר חלונות קופצים לצורך הדפסה.");return;}
+  w.document.write(`<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8"><title>תזרים שנתי ${year}</title>
+  <style>body{font-family:Arial,sans-serif;direction:rtl;margin:24px;color:#172033}h1{text-align:center;font-size:22px;margin:0 0 18px}
+  table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #d9e0ea;padding:7px;text-align:right;white-space:nowrap}
+  th{background:#f3f6fa;font-weight:700}tbody tr:last-child{font-weight:800;background:#f6f8fc;border-top:2px solid #aeb9c8}@page{size:landscape;margin:12mm}</style>
+  </head><body><h1>תזרים העסק – תמונה שנתית ${year}</h1>${table.outerHTML}<script>window.onload=()=>setTimeout(()=>window.print(),250);<\/script></body></html>`);
+  w.document.close();
+}
 function renderAnnual(){
   const year=selected.getFullYear(); annualTitle.textContent=`תמונה שנתית · ${year}`;
-  annualTbody.innerHTML=Array.from({length:12},(_,m)=>{
+  const annualRows=Array.from({length:12},(_,m)=>{
     const d=new Date(year,m,1),x=calcMonthForExport(d),label=new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d);
-    const actualVat=actualVatPaidForMonth(d);
-    return `<tr>
-      <td><b>${label}</b></td>
-      <td>${money(x.incomeGross)}</td>
-      <td>${money(x.actualOut)}</td>
-      <td>${money(x.commitments)}</td>
-      <td>${money(x.advanceReserve)}</td>
-      <td>${money(x.vatReserve)}</td>
-      <td>${actualVat>0?money(actualVat):"—"}</td>
-      <td><b>${money(x.balance)}</b></td>
-    </tr>`;
-  }).join("");
+    return {d,x,label,actualVat:actualVatPaidForMonth(d)};
+  });
+  const totals=annualRows.reduce((a,r)=>{
+    a.income+=r.x.incomeGross||0; a.expenses+=r.x.actualOut||0; a.commitments+=r.x.commitments||0;
+    a.advance+=r.x.advanceReserve||0; a.vatExpected+=r.x.vatReserve||0; a.vatPaid+=r.actualVat||0; a.balance+=r.x.balance||0; return a;
+  },{income:0,expenses:0,commitments:0,advance:0,vatExpected:0,vatPaid:0,balance:0});
+  annualTbody.innerHTML=annualRows.map(({x,label,actualVat})=>`<tr>
+    <td><b>${label}</b></td><td>${money(x.incomeGross)}</td><td>${money(x.actualOut)}</td><td>${money(x.commitments)}</td>
+    <td>${money(x.advanceReserve)}</td><td>${money(x.vatReserve)}</td><td>${actualVat>0?money(actualVat):"—"}</td><td><b>${money(x.balance)}</b></td>
+  </tr>`).join("")+`<tr style="font-weight:800;background:#f6f8fc;border-top:2px solid #dbe3f0">
+    <td>סה״כ</td><td>${money(totals.income)}</td><td>${money(totals.expenses)}</td><td>${money(totals.commitments)}</td>
+    <td>${money(totals.advance)}</td><td>${money(totals.vatExpected)}</td><td>${money(totals.vatPaid)}</td><td>${money(totals.balance)}</td>
+  </tr>`;
 }
 btnAnnual.onclick=()=>{annualView.classList.toggle("open");btnAnnual.textContent=annualView.classList.contains("open")?"סגירת תצוגה שנתית":"תצוגה שנתית";if(annualView.classList.contains("open"))renderAnnual()};
 btnBack.onclick=()=>location.href="/";
@@ -974,6 +1006,10 @@ document.getElementById("biMonthlyViewBtn")?.addEventListener("click",()=>{
 onAuthStateChanged(auth,user=>{if(!user){location.href="/";return}loadData(user).catch(err=>{console.error(err);alert("לא הצלחנו לטעון את נתוני התזרים. נסי לרענן את העמוד.")})});
 
 </script>
-<script src="/app-nav.js"></script>
+<script src="/app-nav.js">
+
+document.getElementById("annualExcelBtn")?.addEventListener("click",exportAnnualCashflowExcel);
+document.getElementById("annualPrintBtn")?.addEventListener("click",printAnnualCashflow);
+</script>
 </body>
 </html>
