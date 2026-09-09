@@ -123,8 +123,8 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <div class="card-hd"><div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
 <h2 id="annualTitle" style="margin:0">תמונה שנתית</h2>
 <div style="display:flex;gap:8px;flex-wrap:wrap">
-<button class="btn secondary" id="annualExcelBtn" type="button">הורדה לאקסל</button>
-<button class="btn secondary" id="annualPrintBtn" type="button">הדפסה / PDF</button>
+<button class="btn secondary small" id="annualExcelBtn" type="button">הורדה לאקסל</button>
+<button class="btn secondary small" id="annualPrintBtn" type="button">הדפסה / PDF</button>
 </div></div><span class="tiny muted">12 חודשים במקום אחד</span></div>
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>מע״מ ששולם בפועל</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
@@ -1003,13 +1003,12 @@ document.getElementById("biMonthlyViewBtn")?.addEventListener("click",()=>{
  else { render(); renderBiMonthly(); }
 });
 
+document.getElementById("annualExcelBtn")?.addEventListener("click", exportAnnualCashflowExcel);
+document.getElementById("annualPrintBtn")?.addEventListener("click", printAnnualCashflow);
+
 onAuthStateChanged(auth,user=>{if(!user){location.href="/";return}loadData(user).catch(err=>{console.error(err);alert("לא הצלחנו לטעון את נתוני התזרים. נסי לרענן את העמוד.")})});
 
 </script>
-<script src="/app-nav.js">
-
-document.getElementById("annualExcelBtn")?.addEventListener("click",exportAnnualCashflowExcel);
-document.getElementById("annualPrintBtn")?.addEventListener("click",printAnnualCashflow);
-</script>
+<script src="/app-nav.js"></script>
 </body>
 </html>
