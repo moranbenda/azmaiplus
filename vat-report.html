@@ -20,48 +20,160 @@
     .notice{border:1px solid #bfdbfe;background:#eff6ff;border-radius:16px;padding:13px 15px;line-height:1.6} .warnbox{border-color:#fed7aa;background:#fff7ed} pre{direction:ltr;text-align:left;background:#101827;color:#e5eefc;border-radius:14px;padding:14px;overflow:auto;font-size:12px}
     .status{font-size:13px;color:var(--muted)} .ok{color:var(--green);font-weight:800} .bad{color:var(--red);font-weight:800} .validation-box{border-radius:16px;padding:14px 16px;line-height:1.7}.validation-box.good{background:#f0fdf4;border:1px solid #bbf7d0}.validation-box.warn{background:#fff7ed;border:1px solid #fed7aa}.validation-box.badbox{background:#fef2f2;border:1px solid #fecaca}.validation-box ul{margin:8px 0 0;padding-right:20px}.validation-box b{font-weight:800}
     @media(max-width:850px){.wrap{padding:14px}.controls,.metrics,.choice-grid{grid-template-columns:1fr}.brand h1{font-size:23px}.table-scroll{overflow:auto}table{min-width:720px}}
-  </style>
+  
+  .tax-guide{border:1px solid #d7dee8;background:#f7f9fc;border-radius:16px;overflow:hidden}
+  .tax-guide-head{padding:18px 20px;background:#eef3f8;border-bottom:1px solid #d7dee8}
+  .tax-guide-head h2{margin:0 0 6px;font-size:21px}
+  .tax-guide-head p{margin:0;color:#475569;line-height:1.55}
+  .tax-form{padding:18px 20px;background:#fff}
+  .tax-form-title{font-size:18px;font-weight:800;margin:0 0 12px;padding-bottom:8px;border-bottom:2px solid #315b7d;color:#1f425e}
+  .tax-section{margin-top:20px}
+  .tax-section:first-child{margin-top:0}
+  .tax-section h3{font-size:16px;margin:0 0 10px;color:#263746}
+  .tax-row{display:grid;grid-template-columns:minmax(250px,1fr) 170px 74px;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #edf0f4}
+  .tax-row:last-child{border-bottom:0}
+  .tax-label{font-size:14px;line-height:1.4}
+  .tax-value{height:42px;border:1px solid #aeb8c4;border-radius:4px;background:#fff;display:flex;align-items:center;justify-content:flex-end;padding:0 12px;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .copy-btn{height:38px;border:1px solid #315b7d;background:#fff;color:#244a68;border-radius:7px;font-weight:700;cursor:pointer}
+  .copy-btn:hover{background:#eef5fa}
+  .tax-total-row{background:#f4f7fa;margin:4px -8px 0;padding:10px 8px;border-radius:7px;border-bottom:0}
+  .tax-total-row .tax-value{border-color:#718096;background:#fbfdff}
+  .tax-pay-row{background:#fff7df;margin:12px -8px 0;padding:12px 8px;border:1px solid #e6c55e;border-radius:8px}
+  .tax-pay-row .tax-label{font-weight:800}
+  .tax-pay-row .tax-value{font-size:20px;border-color:#c59c23;background:#fffdf7}
+  .guide-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:16px;border-top:1px solid #e5e7eb}
+  .guide-note{margin-top:14px;padding:12px 14px;border-radius:9px;background:#f1f7fc;border:1px solid #cbdfea;line-height:1.55;color:#29485e}
+  .control-box{margin-top:18px;padding:14px 16px;border-radius:10px;font-weight:700;line-height:1.6}
+  .control-box.ok{background:#edf9f1;border:1px solid #a8d7b7;color:#1f6a3c}
+  .control-box.bad{background:#fff0f0;border:1px solid #efb1b1;color:#9c2424}
+  .source-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+  .source-summary .mini{border:1px solid #e1e6ec;border-radius:10px;padding:12px;background:#fff}
+  .source-summary .mini .k{font-size:12px;color:#64748b}
+  .source-summary .mini .v{font-size:18px;font-weight:800;margin-top:4px}
+  @media(max-width:720px){
+    .tax-row{grid-template-columns:1fr 120px 64px}
+    .source-summary{grid-template-columns:repeat(2,1fr)}
+  }
+  @media(max-width:520px){
+    .tax-form,.tax-guide-head{padding:14px}
+    .tax-row{grid-template-columns:1fr 105px}
+    .tax-row .copy-btn{grid-column:2}
+    .tax-value{font-size:15px}
+  }
+
+</style>
 </head>
 <body>
 <header><div class="wrap top"><div class="brand"><div><h1>דיווח מע״מ</h1><div class="sub">עצמאי פלוס · הכנה, בדיקה ודיווח תקופתי</div></div></div><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn secondary" href="/">חזרה למערכת</a><span id="status" class="status">טוען נתונים…</span></div></div></header>
 <main class="wrap">
-  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תקופת הדיווח</h2></div><div class="bd controls">
-    <div><label>חודש סיום הדיווח</label><input id="endMonth" type="month" /></div>
-    <div><label>מחזור דיווח</label><select id="cycle"><option value="1">חודשי</option><option value="2">דו־חודשי</option></select></div>
-    <div><label>עסקאות פטורות בתקופה</label><input id="exemptIncome" type="number" min="0" step="1" value="0" /></div>
-  </div></section>
-
-  <div id="ptorNotice" class="notice warnbox" style="display:none">הפרופיל מוגדר כעוסק פטור. דוח תקופתי למע״מ אינו המסלול הרגיל לעוסק פטור, ולכן שליחת API לא תהיה זמינה.</div>
-
-  <section class="metrics">
-    <div class="metric"><div class="k">עסקאות חייבות ללא מע״מ</div><div id="taxableIncome" class="v green">₪0.00</div></div>
-    <div class="metric"><div class="k">מס עסקאות</div><div id="outputVat" class="v green">₪0.00</div></div>
-    <div class="metric"><div class="k">סה״כ מס תשומות</div><div id="inputVat" class="v red">₪0.00</div></div>
-    <div class="metric"><div class="k">לתשלום / להחזר</div><div id="vatBalance" class="v orange">₪0.00</div></div>
+  <section class="card">
+    <div class="hd"><h2 style="margin:0;font-size:20px">תקופת הדיווח</h2><span id="periodLabel" class="status"></span></div>
+    <div class="bd controls">
+      <div><label>חודש סיום הדיווח</label><input id="endMonth" type="month" /></div>
+      <div><label>מחזור דיווח</label><select id="cycle"><option value="1">חודשי</option><option value="2">דו־חודשי</option></select></div>
+      <div><label>עסקאות פטורות / בשיעור אפס בתקופה</label><input id="exemptIncome" type="number" min="0" step="1" value="0" /></div>
+    </div>
   </section>
 
-  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">הנתונים שיישלחו לרשות המסים</h2><span id="periodLabel" class="status"></span></div><div class="bd table-scroll">
-    <table><thead><tr><th>שדה</th><th>סכום</th><th>הסבר</th></tr></thead><tbody>
-      <tr><td>עסקאות חייבות</td><td id="rIncome" class="money"></td><td>הכנסות חייבות ללא מע״מ</td></tr>
-      <tr><td>מס עסקאות</td><td id="rIncomeVat" class="money"></td><td>המע״מ על העסקאות החייבות</td></tr>
-      <tr><td>עסקאות פטורות</td><td id="rExempt" class="money"></td><td>ניתן לעדכן ידנית למעלה אם קיימות</td></tr>
-      <tr><td>תשומות ציוד</td><td id="rAssetVat" class="money"></td><td>מע״מ מוכר מהוצאות המסווגות כציוד ונכסים</td></tr>
-      <tr><td>תשומות אחרות</td><td id="rExpenseVat" class="money"></td><td>מע״מ מוכר משאר ההוצאות</td></tr>
-      <tr><td><b>סכום הדוח</b></td><td id="rTotal" class="money"><b></b></td><td id="rType"></td></tr>
-    </tbody></table>
-  </div></section>
+  <div id="ptorNotice" class="notice warnbox" style="display:none">הפרופיל מוגדר כעוסק פטור. מסך זה מיועד לדיווח תקופתי של עוסק מורשה.</div>
 
-  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">איך תרצו לדווח?</h2></div><div class="bd choice-grid">
-    <div class="choice"><h3>בדיקת VATReportV3Api — Sandbox</h3><p><b>שלב 0:</b> מתחברים לסביבת הבדיקות הנפרדת של רשות המסים. <b>שלב 1:</b> בדיקת מוכנות בטוחה שאינה שולחת דבר. רק לאחר שהבדיקה עוברת ניתן לבצע שליחת ניסיון ל־Sandbox.</p><button id="vatSandboxConnect" class="btn secondary" type="button">חיבור ל־Sandbox של רשות המסים</button><button id="apiSend" class="btn" style="margin-inline-start:8px" disabled>בדיקת מוכנות — ללא שליחה</button><button id="apiSubmit" class="btn" style="display:none;margin-inline-start:8px;background:#b42318;border-color:#b42318" disabled>שליחת ניסיון ל־Sandbox</button><div id="vatSandboxNotice" class="status" style="margin-top:10px"></div></div>
-    <div class="choice"><h3>דיווח באתר רשות המסים</h3><p>אפשר להמשיך לדווח בדרך הרגילה. הנתונים בטבלה למעלה הם הנתונים שצריך להעתיק לשדות המקבילים באתר.</p><a class="btn secondary" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a></div>
-  </div></section>
+  <section class="source-summary">
+    <div class="mini"><div class="k">עסקאות חייבות ללא מע״מ</div><div id="taxableIncome" class="v">₪0</div></div>
+    <div class="mini"><div class="k">מס עסקאות</div><div id="outputVat" class="v">₪0</div></div>
+    <div class="mini"><div class="k">סה״כ מס תשומות</div><div id="inputVat" class="v">₪0</div></div>
+    <div class="mini"><div class="k">סכום הדוח</div><div id="vatBalance" class="v">₪0</div></div>
+  </section>
 
-  <section id="apiValidationCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת בדיקת המוכנות</h2><span class="status">בדיקה בלבד · ללא שליחה</span></div><div class="bd"><div id="apiValidationResult" class="validation-box warn">טרם בוצעה בדיקה.</div></div></section>
+  <section class="tax-guide">
+    <div class="tax-guide-head">
+      <h2>הזנת הדוח באתר רשות המסים</h2>
+      <p>יש לפתוח את אתר רשות המסים בחלון נוסף ולהזין את הסכומים המוצגים כאן בשדות המקבילים. בשדה שאין בו פעילות יש להזין 0.</p>
+    </div>
 
-  <section id="apiSubmitCard" class="card" style="display:none"><div class="hd"><h2 style="margin:0;font-size:20px">תוצאת שליחת הניסיון ל־Sandbox</h2><span class="status">Sandbox בלבד</span></div><div class="bd"><div id="apiSubmitResult" class="validation-box warn">טרם נשלח דוח.</div></div></section>
+    <div class="tax-form">
+      <div class="tax-form-title">דוח תקופתי למע״מ</div>
 
-  <section class="card"><div class="hd"><h2 style="margin:0;font-size:20px">תצוגה מקדימה ל־API</h2><span class="status">הנתונים שיועברו לאחר אישור מפורש</span></div><div class="bd"><pre id="payloadPreview">{}</pre></div></section>
+      <div class="tax-section">
+        <h3>עסקאות</h3>
+
+        <div class="tax-row">
+          <div class="tax-label">עסקאות חייבות במס בשיעור 18% — ללא מע״מ</div>
+          <div id="taxTaxable18" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxTaxable18">העתקה</button>
+        </div>
+
+        <div class="tax-row">
+          <div class="tax-label">עסקאות חייבות במס בשיעור 17% — ללא מע״מ</div>
+          <div id="taxTaxable17" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxTaxable17">העתקה</button>
+        </div>
+
+        <div class="tax-row">
+          <div class="tax-label">עסקאות פטורות או בשיעור אפס</div>
+          <div id="taxExempt" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxExempt">העתקה</button>
+        </div>
+
+        <div class="tax-row tax-total-row">
+          <div class="tax-label"><b>מס עסקאות</b></div>
+          <div id="taxOutputVat" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxOutputVat">העתקה</button>
+        </div>
+      </div>
+
+      <div class="tax-section">
+        <h3>מס תשומות</h3>
+
+        <div class="tax-row">
+          <div class="tax-label">מס תשומות על ציוד ונכסים קבועים — 18%</div>
+          <div id="taxAsset18" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxAsset18">העתקה</button>
+        </div>
+
+        <div class="tax-row">
+          <div class="tax-label">מס תשומות אחרות — 18%</div>
+          <div id="taxOther18" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxOther18">העתקה</button>
+        </div>
+
+        <div class="tax-row">
+          <div class="tax-label">מס תשומות על ציוד ונכסים קבועים — 17%</div>
+          <div id="taxAsset17" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxAsset17">העתקה</button>
+        </div>
+
+        <div class="tax-row">
+          <div class="tax-label">מס תשומות אחרות — 17%</div>
+          <div id="taxOther17" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxOther17">העתקה</button>
+        </div>
+
+        <div class="tax-row tax-total-row">
+          <div class="tax-label"><b>סה״כ מס תשומות</b></div>
+          <div id="taxInputTotal" class="tax-value">0</div>
+          <button class="copy-btn" type="button" data-copy-id="taxInputTotal">העתקה</button>
+        </div>
+      </div>
+
+      <div class="tax-row tax-pay-row">
+        <div class="tax-label" id="taxBalanceLabel">סכום לתשלום</div>
+        <div id="taxBalance" class="tax-value">0</div>
+        <button class="copy-btn" type="button" data-copy-id="taxBalance">העתקה</button>
+      </div>
+
+      <div id="controlBox" class="control-box ok">בדיקת התאמה: ממתין לנתונים.</div>
+
+      <div class="guide-note">
+        הסכומים מוצגים בשקלים שלמים בהתאם לשדות הדיווח. מומלץ להשוות את סכום התשלום המוצג באתר רשות המסים לסכום המוצג כאן לפני אישור הדוח והתשלום.
+      </div>
+
+      <div class="guide-actions">
+        <a class="btn" target="_blank" rel="noopener" href="https://www.gov.il/he/service/reporting-or-payment-of-vat-reports">פתיחת אתר רשות המסים</a>
+      </div>
+    </div>
+  </section>
 </main>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
@@ -175,13 +287,85 @@ function vatFactor(row){const m=meta(row);if(m)return m.vatAllowed?1:0;return Ma
 function isAsset(row){const m=meta(row);return m?.vatInputType==='asset'||m?.category==='ציוד ונכסים'}
 function money(n){return new Intl.NumberFormat('he-IL',{style:'currency',currency:'ILS',minimumFractionDigits:2}).format(Number(n)||0)}
 function monthRange(){const raw=document.getElementById('endMonth').value;if(!raw)return null;const [y,m]=raw.split('-').map(Number);const count=Number(document.getElementById('cycle').value)||1;const end=new Date(y,m,0), start=new Date(y,m-count,1);const iso=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;return{from:iso(start),to:iso(end),reportPeriod:y*100+m,label:`${start.toLocaleDateString('he-IL')}–${end.toLocaleDateString('he-IL')}`}}
-function calculate(){const rg=monthRange();if(!rg)return;const rate=settings.vatEnabled!==false?(Number(settings.vatRate||profile.vatRate)||DEFAULT_VAT):0;let income=0,incomeVat=0,assetVat=0,expenseVat=0;for(const r of rows){if(!r?.date||r.date<rg.from||r.date>rg.to)continue;const a=split(r.amount,r.incVat,rate);if(r.type==='income'){income+=a.net;incomeVat+=a.vat}else if(r.type==='expense'){const v=a.vat*vatFactor(r);if(isAsset(r))assetVat+=v;else expenseVat+=v}}const exempt=Math.max(0,Number(document.getElementById('exemptIncome').value)||0);const balance=incomeVat-assetVat-expenseVat;const roundedIncomeVat=Math.round(incomeVat),roundedAssetVat=Math.round(assetVat),roundedExpenseVat=Math.round(expenseVat);const reportBalance=roundedIncomeVat-roundedAssetVat-roundedExpenseVat;const reportType=reportBalance===0?3:(reportBalance>0?1:2);const total=Math.abs(reportBalance);
- document.getElementById('taxableIncome').textContent=money(income);document.getElementById('outputVat').textContent=money(incomeVat);document.getElementById('inputVat').textContent=money(assetVat+expenseVat);document.getElementById('vatBalance').textContent=(balance>=0?'לתשלום ':'להחזר ')+money(Math.abs(balance));document.getElementById('periodLabel').textContent=rg.label;
- const vals={rIncome:income,rIncomeVat:incomeVat,rExempt:exempt,rAssetVat:assetVat,rExpenseVat:expenseVat,rTotal:Math.abs(balance)};for(const [id,v] of Object.entries(vals))document.getElementById(id).textContent=money(v);document.getElementById('rType').textContent=reportType===1?'דוח לתשלום':reportType===2?'דוח להחזר':'דוח אפס';
- apiReady=false;const submitBtn=document.getElementById('apiSubmit');if(submitBtn){submitBtn.style.display='none';submitBtn.disabled=true}
- const payload={BookkeepingCorporateNumber:Number(String(profile.bookkeepingCorporateNumber||profile.representativeNumber||'').replace(/\D/g,''))||0,CorporateNumber:Number(String(profile.businessId||profile.taxId||'').replace(/\D/g,''))||0,ReportPeriod:rg.reportPeriod,ReportType:reportType,TotalVAT:total,ExemptIncome:Math.round(exempt),IncomeItems:[{Income:Math.round(income),VATRate:rate,IncomeVAT:roundedIncomeVat}],AssetVAT:roundedAssetVat,ExpenseVAT:roundedExpenseVat,PaymentMethod:reportType===1?1:0,NumberOfPayments:reportType===1?1:0};lastPayload=payload;document.getElementById('payloadPreview').textContent=JSON.stringify(payload,null,2);
+function setTaxField(id,value){
+ const el=document.getElementById(id);
+ if(el)el.textContent=String(Math.round(Number(value)||0));
 }
-async function load(user){const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);profile=us.exists()?us.data():{email:user.email};const ledger=ls.exists()?ls.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';const type=String(profile.businessType||'').toLowerCase();const isPtor=type==='ptor';document.getElementById('ptorNotice').style.display=isPtor?'block':'none';document.getElementById('apiSend').disabled=isPtor;const d=new Date();d.setMonth(d.getMonth()-1);document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;calculate()}
+function calculate(){
+ const rg=monthRange();if(!rg)return;
+ const rate=settings.vatEnabled!==false?(Number(settings.vatRate||profile.vatRate)||DEFAULT_VAT):0;
+ let income=0,incomeVat=0,assetVat=0,expenseVat=0;
+ for(const r of rows){
+  if(!r?.date||r.date<rg.from||r.date>rg.to)continue;
+  const a=split(r.amount,r.incVat,rate);
+  if(r.type==='income'){income+=a.net;incomeVat+=a.vat}
+  else if(r.type==='expense'){
+   const v=a.vat*vatFactor(r);
+   if(isAsset(r))assetVat+=v;else expenseVat+=v;
+  }
+ }
+ const exempt=Math.max(0,Number(document.getElementById('exemptIncome').value)||0);
+ const roundedIncome=Math.round(income);
+ const roundedIncomeVat=Math.round(incomeVat);
+ const roundedAssetVat=Math.round(assetVat);
+ const roundedExpenseVat=Math.round(expenseVat);
+ const roundedInputVat=roundedAssetVat+roundedExpenseVat;
+ const reportBalance=roundedIncomeVat-roundedInputVat;
+
+ const is17=Math.round(rate)===17;
+ const taxable18=is17?0:roundedIncome;
+ const taxable17=is17?roundedIncome:0;
+ const output18=is17?0:roundedIncomeVat;
+ const output17=is17?roundedIncomeVat:0;
+ const asset18=is17?0:roundedAssetVat;
+ const asset17=is17?roundedAssetVat:0;
+ const other18=is17?0:roundedExpenseVat;
+ const other17=is17?roundedExpenseVat:0;
+
+ document.getElementById('taxableIncome').textContent=money(income);
+ document.getElementById('outputVat').textContent=money(incomeVat);
+ document.getElementById('inputVat').textContent=money(assetVat+expenseVat);
+ document.getElementById('vatBalance').textContent=(reportBalance>=0?'לתשלום ':'להחזר ')+money(Math.abs(reportBalance));
+ document.getElementById('periodLabel').textContent=rg.label;
+
+ setTaxField('taxTaxable18',taxable18);
+ setTaxField('taxTaxable17',taxable17);
+ setTaxField('taxExempt',exempt);
+ setTaxField('taxOutputVat',output18+output17);
+ setTaxField('taxAsset18',asset18);
+ setTaxField('taxOther18',other18);
+ setTaxField('taxAsset17',asset17);
+ setTaxField('taxOther17',other17);
+ setTaxField('taxInputTotal',roundedInputVat);
+ setTaxField('taxBalance',Math.abs(reportBalance));
+
+ const balanceLabel=document.getElementById('taxBalanceLabel');
+ if(balanceLabel)balanceLabel.textContent=reportBalance>=0?'סכום לתשלום':'סכום להחזר';
+
+ const control=document.getElementById('controlBox');
+ if(control){
+  const check=(output18+output17)-roundedInputVat;
+  const ok=check===reportBalance;
+  control.className='control-box '+(ok?'ok':'bad');
+  control.textContent=ok
+   ? `✓ בדיקת התאמה תקינה: מס עסקאות ${roundedIncomeVat.toLocaleString('he-IL')} − מס תשומות ${roundedInputVat.toLocaleString('he-IL')} = ${Math.abs(reportBalance).toLocaleString('he-IL')} ₪ ${reportBalance>=0?'לתשלום':'להחזר'}`
+   : 'נמצאה אי־התאמה בחישוב. אין להגיש את הדוח לפני בדיקה.';
+ }
+}
+async function load(user){
+ const [us,ls]=await Promise.all([getDoc(doc(db,'users',user.uid)),getDoc(doc(db,'ledgers',user.uid))]);
+ profile=us.exists()?us.data():{email:user.email};
+ const ledger=ls.exists()?ls.data():{};
+ rows=Array.isArray(ledger.rows)?ledger.rows:[];
+ settings=ledger.settings||{vatEnabled:true,vatRate:profile.vatRate||DEFAULT_VAT};
+ document.getElementById('status').innerHTML='<span class="ok">מחובר</span>';
+ const type=String(profile.businessType||'').toLowerCase();
+ const isPtor=type==='ptor';
+ document.getElementById('ptorNotice').style.display=isPtor?'block':'none';
+ const d=new Date();d.setMonth(d.getMonth()-1);
+ document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+ calculate();
+}
 function renderValidationResult(data,httpOk){
  const card=document.getElementById('apiValidationCard'),box=document.getElementById('apiValidationResult'),submitBtn=document.getElementById('apiSubmit');card.style.display='block';box.innerHTML='';
  apiReady=data?.ready===true;
@@ -287,14 +471,22 @@ async function submitVatReport(){
  }
 }
 
-document.getElementById('vatSandboxConnect').addEventListener('click',()=>{location.href='/api/vat-report/auth'});
-const vatSandboxParams=new URLSearchParams(location.search);
-const vatSandboxNotice=document.getElementById('vatSandboxNotice');
-if(vatSandboxParams.get('vatSandbox')==='connected'){vatSandboxNotice.textContent='✓ חיבור ה־Sandbox הושלם. אפשר לבצע בדיקת מוכנות.';vatSandboxNotice.className='status ok'}
-else if(vatSandboxParams.get('vatSandbox')==='error'){vatSandboxNotice.textContent='חיבור ה־Sandbox נכשל: '+(vatSandboxParams.get('message')||'יש לנסות שוב.');vatSandboxNotice.className='status bad'}
 
-document.getElementById('apiSend').addEventListener('click',validateApiReadiness);
-document.getElementById('apiSubmit').addEventListener('click',submitVatReport);
+
+document.querySelectorAll('[data-copy-id]').forEach(btn=>{
+ btn.addEventListener('click',async()=>{
+  const el=document.getElementById(btn.dataset.copyId);
+  const value=el?.textContent?.trim()||'0';
+  try{
+   await navigator.clipboard.writeText(value);
+  }catch(e){
+   const ta=document.createElement('textarea');ta.value=value;document.body.appendChild(ta);ta.select();
+   document.execCommand('copy');ta.remove();
+  }
+  const old=btn.textContent;btn.textContent='הועתק ✓';
+  setTimeout(()=>btn.textContent=old,900);
+ });
+});
 
 ['endMonth','cycle','exemptIncome'].forEach(id=>document.getElementById(id).addEventListener('input',calculate));
 onAuthStateChanged(auth,u=>{if(!u){location.href='/';return}load(u).catch(e=>{console.error(e);document.getElementById('status').innerHTML='<span class="bad">שגיאה בטעינה</span>'})});
