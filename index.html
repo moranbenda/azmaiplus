@@ -1195,8 +1195,7 @@ body.account-frozen .readonly-disabled{
 
       <div class="sidebar-section">דוחות ומסים</div>
       <button class="sidebar-item" id="homeGoReports" type="button">דוחות</button>
-      <button class="sidebar-item disabled" id="homeGoVat" type="button" disabled aria-disabled="true">דיווח מע״מ <span class="sidebar-soon">בקרוב</span></button>
-      <a class="sidebar-item" id="btnVatLink" href="/open-format.html">ממשק פתוח</a>
+      <a class="sidebar-item" id="homeGoVat" href="/vat-report.html">דיווח מע״מ</a>
       <a class="sidebar-item" id="homeGoYearEnd" href="/year-end.html">סגירת שנה</a>
 
       <div class="sidebar-section">מערכת</div>
@@ -1619,6 +1618,15 @@ body.account-frozen .readonly-disabled{
           <label>אחוז מע"מ (לעוסק מורשה/חברה)</label>
           <input type="number" id="pVatRate" step="0.1" min="0" />
         </div>
+        <div id="pVatReportingCycleWrap">
+          <label>תדירות דיווח ותשלום מע״מ</label>
+          <select id="pVatReportingCycle">
+            <option value="">יש לבחור</option>
+            <option value="monthly">חודשי</option>
+            <option value="bimonthly">דו־חודשי</option>
+          </select>
+          <div class="hint" style="margin-top:5px">ההגדרה משמשת את דוח המע״מ ואת תכנון התזרים.</div>
+        </div>
         <div>
           <label>אחוז מקדמות מס הכנסה</label>
           <input type="number" id="pAdvanceTaxRate" step="0.1" min="0" max="100" placeholder="0" />
@@ -1657,6 +1665,7 @@ body.account-frozen .readonly-disabled{
   <div class="dlg-bd">
     <p class="hint">
       הטבלה מבוססת על פירוט ההוצאות/הכנסות המוכרות: אחוז הוצאה מוכרת למס הכנסה והאם ההוצאה מוכרת למע"מ.
+      תשלומי מס סטטוטוריים מוצגים לצורכי תזרים בלבד ואינם נחשבים הוצאה עסקית מוכרת.
     </p>
     <div class="cat-table-wrap" style="max-height:60vh;overflow:auto">
       <table class="keep-table">
@@ -2091,6 +2100,8 @@ const pBusinessZip = document.getElementById("pBusinessZip");
 const pWithholdingFileNumber = document.getElementById("pWithholdingFileNumber");
 const pBusinessType = document.getElementById("pBusinessType");
 const pVatRate = document.getElementById("pVatRate");
+const pVatReportingCycle = document.getElementById("pVatReportingCycle");
+const pVatReportingCycleWrap = document.getElementById("pVatReportingCycleWrap");
 const pAdvanceTaxRate = document.getElementById("pAdvanceTaxRate");
 const pBusinessLogoFile = document.getElementById("pBusinessLogoFile");
 const pBusinessLogoPreview = document.getElementById("pBusinessLogoPreview");
@@ -2741,6 +2752,7 @@ async function createDefaultProfile(uid, email, opts = {}) {
     withholdingFileNumber: opts.withholdingFileNumber || "",
     businessType: opts.businessType || "ptor",
     vatRate: opts.businessType === "ptor" ? 0 : DEFAULT_VAT,
+    vatReportingCycle: opts.vatReportingCycle || "",
     advanceTaxRate: Math.max(0, Number(opts.advanceTaxRate || 0)),
     createdAt
   };
@@ -3240,6 +3252,9 @@ const EXPENSE_ITEMS = [
   { item: "כנסים והשתלמויות", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
   { item: "ביגוד מקצועי / ממותג", category: "ביגוד מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
 
+  // תשלומי מס סטטוטוריים — תנועת תזרים בלבד, לא הוצאה מוכרת.
+  { item: "תשלום מע״מ", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
+
   { item: "הוצאה אחרת", category: "הוצאות אחרות", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" }
 ];
 
@@ -3579,6 +3594,7 @@ function applyProfileToUI() {
   if (pWithholdingFileNumber) pWithholdingFileNumber.value = userProfile.withholdingFileNumber || "";
   pBusinessType.value = normalizeBusinessType(userProfile.businessType);
   pVatRate.value      = normalizeBusinessType(userProfile.businessType) === "ptor" ? 0 : getEffectiveVatRate(userProfile.vatRate);
+  if (pVatReportingCycle) pVatReportingCycle.value = userProfile.vatReportingCycle || "";
   pAdvanceTaxRate.value = Math.max(0, Number(userProfile.advanceTaxRate || 0));
   renderBusinessLogoPreview(userProfile.businessLogoDataUrl || "");
 
@@ -3592,7 +3608,14 @@ function applyProfileToUI() {
     vatSettingsPanel.open = false;
     vatSettingsPanel.style.opacity = 0.4;
     vatIncludedPill.style.display = "none";
+    if (pVatReportingCycle) {
+      pVatReportingCycle.disabled = true;
+      pVatReportingCycle.value = "";
+    }
+    if (pVatReportingCycleWrap) pVatReportingCycleWrap.style.opacity = "0.5";
   } else {
+    if (pVatReportingCycle) pVatReportingCycle.disabled = false;
+    if (pVatReportingCycleWrap) pVatReportingCycleWrap.style.opacity = "1";
     businessHint.textContent = "מצב: עוסק מורשה / חברה — מע\"מ פעיל";
     vatRateInput.value = getEffectiveVatRate(userProfile.vatRate);
     vatEnabledCheckbox.disabled = false;
@@ -3644,6 +3667,7 @@ async function loadUserProfile(uid) {
       advanceTaxRate: 0,
       businessType: "morasha",
       vatRate: DEFAULT_VAT,
+      vatReportingCycle: "",
       businessLogoDataUrl: "",
       plan: "legacy"
     };
@@ -3672,6 +3696,15 @@ async function loadUserProfile(uid) {
   renderAccountFlags();
 }
 
+
+pBusinessType?.addEventListener("change", () => {
+  const isPtorProfile = normalizeBusinessType(pBusinessType.value) === "ptor";
+  if (pVatReportingCycle) {
+    pVatReportingCycle.disabled = isPtorProfile;
+    if (isPtorProfile) pVatReportingCycle.value = "";
+  }
+  if (pVatReportingCycleWrap) pVatReportingCycleWrap.style.opacity = isPtorProfile ? "0.5" : "1";
+});
 
 pBusinessLogoFile?.addEventListener("change", async () => {
   const file = pBusinessLogoFile.files?.[0];
@@ -3711,6 +3744,7 @@ btnSaveProfile.onclick = async () => {
     withholdingFileNumber: pWithholdingFileNumber?.value.trim() || "",
     businessType: pBusinessType.value,
     vatRate:      parseFloat(pVatRate.value || "0"),
+    vatReportingCycle: pBusinessType.value === "ptor" ? "" : (pVatReportingCycle?.value || ""),
     advanceTaxRate: Math.max(0, parseFloat(pAdvanceTaxRate.value || "0") || 0),
     businessLogoDataUrl: userProfile?.businessLogoDataUrl || ""
   };
@@ -3722,6 +3756,7 @@ btnSaveProfile.onclick = async () => {
       fields: Object.keys(payload),
       businessType: payload.businessType || "",
       vatRate: payload.vatRate || 0,
+      vatReportingCycle: payload.vatReportingCycle || "",
       advanceTaxRate: payload.advanceTaxRate || 0
     });
     userProfile = { ...(userProfile || {}), ...payload };
@@ -4286,6 +4321,33 @@ function render() {
 let driveTokenClient = null;
 let driveAccessToken = null;
 let driveTokenExpiresAt = 0;
+const DRIVE_TOKEN_SESSION_KEY = "azmaiPlusDriveTokenV1";
+
+function restoreDriveAccessTokenFromSession() {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(DRIVE_TOKEN_SESSION_KEY) || "null");
+    if (saved?.token && Number(saved.expiresAt || 0) > Date.now() + 60000) {
+      driveAccessToken = saved.token;
+      driveTokenExpiresAt = Number(saved.expiresAt);
+    }
+  } catch {}
+}
+function persistDriveAccessTokenToSession() {
+  try {
+    if (driveAccessToken && driveTokenExpiresAt > Date.now()) {
+      sessionStorage.setItem(DRIVE_TOKEN_SESSION_KEY, JSON.stringify({
+        token: driveAccessToken,
+        expiresAt: driveTokenExpiresAt
+      }));
+    }
+  } catch {}
+}
+function clearDriveAccessToken() {
+  driveAccessToken = null;
+  driveTokenExpiresAt = 0;
+  try { sessionStorage.removeItem(DRIVE_TOKEN_SESSION_KEY); } catch {}
+}
+restoreDriveAccessTokenFromSession();
 
 function ensureGoogleDriveConfigured() {
   if (!GOOGLE_DRIVE_CLIENT_ID || GOOGLE_DRIVE_CLIENT_ID.includes("PASTE_YOUR")) {
@@ -4302,7 +4364,6 @@ function getDriveTokenClient() {
     driveTokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_DRIVE_CLIENT_ID,
       scope: GOOGLE_DRIVE_SCOPE,
-      prompt: "consent",
       callback: () => {}
     });
   }
@@ -4317,6 +4378,9 @@ function requestDriveAccessToken() {
   return new Promise((resolve, reject) => {
     try {
       const tokenClient = getDriveTokenClient();
+      const hadPriorSessionGrant = (() => {
+        try { return !!sessionStorage.getItem("azmaiPlusDriveGrantSeenV1"); } catch { return false; }
+      })();
       tokenClient.callback = (resp) => {
         if (resp?.error) {
           reject(new Error(resp.error_description || resp.error));
@@ -4325,9 +4389,11 @@ function requestDriveAccessToken() {
         driveAccessToken = resp.access_token;
         const expiresInMs = Number(resp.expires_in || 3600) * 1000;
         driveTokenExpiresAt = Date.now() + expiresInMs;
+        persistDriveAccessTokenToSession();
+        try { sessionStorage.setItem("azmaiPlusDriveGrantSeenV1", "1"); } catch {}
         resolve(driveAccessToken);
       };
-      tokenClient.requestAccessToken({ prompt: driveAccessToken ? "" : "consent" });
+      tokenClient.requestAccessToken({ prompt: hadPriorSessionGrant ? "" : "consent" });
     } catch (err) {
       reject(err);
     }
@@ -4344,6 +4410,7 @@ async function driveFetch(path, options = {}) {
     }
   });
   if (!res.ok) {
+    if (res.status === 401) clearDriveAccessToken();
     const text = await res.text().catch(() => "");
     throw new Error(`שגיאת Google Drive (${res.status}): ${text || res.statusText}`);
   }
@@ -4420,6 +4487,7 @@ async function uploadReceiptToDrive(file, rowDraft) {
     body: form
   });
   if (!res.ok) {
+    if (res.status === 401) clearDriveAccessToken();
     const text = await res.text().catch(() => "");
     throw new Error(`העלאת החשבונית ל-Drive נכשלה (${res.status}): ${text || res.statusText}`);
   }
@@ -4516,11 +4584,11 @@ function normalizeReceiptDate(raw) {
 function guessCategoryFromText(text) {
   const t = (text || '').toLowerCase();
   if (/דלק|פז|סונול|דלקן|כביש|חניה|רכב|מוסך|איתוראן/.test(t)) return 'רכב';
-  if (/canva|זום|zoom|google|microsoft|adobe|רב מסר|חשבונית ירוקה|תוכנה|אתר|דומיין|אחסון/.test(t)) return 'תוכנה ושירותים';
+  if (/canva|זום|zoom|google|microsoft|adobe|רב מסר|חשבונית ירוקה|תוכנה|אתר|דומיין|אחסון/.test(t)) return 'תוכנות ומנויים';
   if (/קפה|מסעד|כיבוד|מאפה|מזון|ארומה/.test(t)) return 'כיבוד קל';
-  if (/ציוד|אופיס|office|דיו|מדפסת|מחשב|מקלדת/.test(t)) return 'ציוד משרדי';
-  if (/פרסום|facebook|meta|instagram|google ads|קידום/.test(t)) return 'פרסום ושיווק';
-  return 'כללי';
+  if (/ציוד|אופיס|office|דיו|מדפסת|מחשב|מקלדת/.test(t)) return 'ציוד ונכסים';
+  if (/פרסום|facebook|meta|instagram|google ads|קידום/.test(t)) return 'קידום ממומן / פרסום';
+  return 'הוצאה אחרת';
 }
 
 function hasDecimalMark(raw) {
@@ -7348,7 +7416,6 @@ function initAppLogic(uid) {
     if (homeGoLedger) homeGoLedger.onclick = scrollToMainWorkArea;
     if (homeGoImport) homeGoImport.onclick = () => dataManageDialog?.showModal();
     if (homeGoReports) homeGoReports.onclick = () => reportsDialog?.showModal();
-    // דיווח מע"מ מסומן "בקרוב" במסך הבית ולכן הכרטיס אינו לחיץ כרגע.
     if (homeGoCategories) homeGoCategories.onclick = () => categoriesDialog?.showModal();
     if (homeGoProfile) homeGoProfile.onclick = () => profileDialog?.showModal();
     if (btnHomeApplyRange) btnHomeApplyRange.onclick = applyHomeRange;
