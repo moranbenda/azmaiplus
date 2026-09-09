@@ -103,7 +103,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
 
   <div class="month-nav">
     <button class="month-arrow" id="nextMonth" title="החודש הבא">‹</button>
-    <div class="month-title"><strong id="monthLabel"></strong><span id="monthMeta"></span>
+    <div class="month-title"><strong id="monthLabel"></strong><span id="monthMeta"></span><span id="vatCycleMeta" class="tiny muted" style="display:block;margin-top:4px"></span>
       <div class="month-tools"><input type="month" id="monthPicker" title="בחירת חודש"><button type="button" id="btnAnnual">תצוגה שנתית</button><button type="button" id="biMonthlyViewBtn" class="btn secondary">תצוגה דו־חודשית</button></div>
     </div>
     <button class="month-arrow" id="prevMonth" title="החודש הקודם">›</button>
@@ -121,7 +121,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
 
   <section class="card annual-view" id="annualView">
     <div class="card-hd"><h2 id="annualTitle">תמונה שנתית</h2><span class="tiny muted">12 חודשים במקום אחד</span></div>
-    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>מע״מ ששולם בפועל</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
 
   <div class="grid" id="monthlyGrid">
@@ -347,6 +347,9 @@ function vatRate(){return businessType()==="ptor"?0:Math.max(0,Number(profile.va
 function splitVAT(amount,incVat,rate){const gross=Number(amount)||0;if(!rate||!incVat)return{gross,net:gross,vat:0};const net=gross/(1+rate/100);return{gross,net,vat:gross-net}}
 
 function configuredVatCycle(){
+  /* ההגדרה הראשית שתגיע מהאינדקס:
+     users/{uid}.vatReportingCycle = "monthly" | "bimonthly"
+     נשמרת תאימות גם לערכים ישנים/חלופיים. */
   const raw=profile.vatReportingCycle ?? ledger?.settings?.vatReportingCycle ?? ledger?.vatReportingCycle ?? null;
   if(raw===1||raw==="1"||norm(raw)==="monthly"||norm(raw)==="חודשי") return 1;
   if(raw===2||raw==="2"||norm(raw)==="bimonthly"||norm(raw)==="דו-חודשי"||norm(raw)==="דו חודשי") return 2;
@@ -372,6 +375,24 @@ function vatPeriodForPaymentMonth(d=selected){
     : `${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(start)}–${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(end)}`;
   return{cycle,from,to,label};
 }
+
+function actualVatPaidForMonth(d=selected){
+  const monthList=monthRows(d);
+  const manual=monthList.filter(isVatPaymentRow);
+  let total=manual.reduce((sum,r)=>sum+Math.abs(Number(r.amount)||0),0);
+
+  for(const rec of paidVatRecordsForMonth(d)){
+    const recDate=String(rec.paidAt||"").slice(0,10);
+    const amount=Math.max(0,Number(rec.amount)||0);
+    const duplicate=manual.some(r=>
+      String(r.date||"").slice(0,10)===recDate &&
+      Math.abs(Math.abs(Number(r.amount)||0)-amount)<0.01
+    );
+    if(!duplicate) total+=amount;
+  }
+  return total;
+}
+
 function paidVatRecordsForMonth(d=selected){
   const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
   const map=(ledger&&ledger.vatPayments&&typeof ledger.vatPayments==="object")?ledger.vatPayments:{};
@@ -538,9 +559,11 @@ function twoMonthData(){
     a.actualOut+=x.calc.actualOut||0;
     a.commitments+=x.calc.commitments||0;
     a.authorityReserve+=x.calc.authorityReserve||0;
+    a.vatExpected+=x.calc.vatReserve||0;
+    a.vatPaid+=actualVatPaidForMonth(x.date)||0;
     a.balance+=x.calc.balance||0;
     return a;
-  },{incomeGross:0,actualOut:0,commitments:0,authorityReserve:0,balance:0});
+  },{incomeGross:0,actualOut:0,commitments:0,authorityReserve:0,vatExpected:0,vatPaid:0,balance:0});
   return{months:data,total};
 }
 
@@ -591,6 +614,8 @@ function renderBiMonthly(){
       <div class="kpi bad"><div class="label">הוצאות בפועל · חודשיים</div><div class="value">${money(total.actualOut)}</div></div>
       <div class="kpi warn"><div class="label">התחייבויות · חודשיים</div><div class="value">${money(total.commitments)}</div></div>
       <div class="kpi warn"><div class="label">הפרשות לרשויות · חודשיים</div><div class="value">${money(total.authorityReserve)}</div></div>
+      <div class="kpi warn"><div class="label">מע״מ צפוי · חודשיים</div><div class="value">${money(total.vatExpected)}</div></div>
+      <div class="kpi bad"><div class="label">מע״מ ששולם בפועל · חודשיים</div><div class="value">${total.vatPaid>0?money(total.vatPaid):"—"}</div></div>
       <div class="kpi ${total.balance>=0?"good":"bad"}"><div class="label">יתרה לאחר התחייבויות והפרשות</div><div class="value">${money(total.balance)}</div></div>
     </div>
 
@@ -604,6 +629,8 @@ function renderBiMonthly(){
               <div class="authority"><div class="desc">הוצאות בפועל</div><div class="amount">${money(calc.actualOut)}</div></div>
               <div class="authority"><div class="desc">התחייבויות</div><div class="amount">${money(calc.commitments)}</div></div>
               <div class="authority"><div class="desc">רשויות</div><div class="amount">${money(calc.authorityReserve)}</div></div>
+              <div class="authority"><div class="desc">מע״מ צפוי</div><div class="amount">${money(calc.vatReserve)}</div></div>
+              <div class="authority"><div class="desc">מע״מ ששולם בפועל</div><div class="amount">${actualVatPaidForMonth(date)>0?money(actualVatPaidForMonth(date)):"—"}</div></div>
             </div>
             <div class="table-wrap" style="max-height:340px">
               <table>
@@ -633,6 +660,9 @@ function render(){
   const label=new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected);
   document.getElementById("monthLabel").textContent=label;
   document.getElementById("monthMeta").textContent=isFutureMonth()? "תכנון לחודש עתידי" : monthKey()===monthKey(new Date(new Date().getFullYear(),new Date().getMonth(),1)) ? "החודש הנוכחי" : "נתוני חודש";
+  const cycle=configuredVatCycle();
+  const cycleMeta=document.getElementById("vatCycleMeta");
+  if(cycleMeta) cycleMeta.textContent=cycle===1?"דיווח מע״מ חודשי":cycle===2?"דיווח מע״מ דו־חודשי":"תדירות דיווח מע״מ טרם הוגדרה בפרופיל";
   kIncome.textContent=money(c.incomeGross);kExpenses.textContent=money(c.actualOut);kCommitments.textContent=money(c.commitments);kAuthorities.textContent=money(c.authorityReserve);kBalance.textContent=money(c.balance);
   balanceCard.className="kpi "+(c.balance>=0?"good":"bad");
   advanceAmount.textContent=money(c.advanceReserve);
@@ -875,7 +905,20 @@ keepYearReview.onclick=()=>saveYearReview(true);
 
 function renderAnnual(){
   const year=selected.getFullYear(); annualTitle.textContent=`תמונה שנתית · ${year}`;
-  annualTbody.innerHTML=Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),x=calcMonthForExport(d),label=new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d);return `<tr><td><b>${label}</b></td><td>${money(x.incomeGross)}</td><td>${money(x.actualOut)}</td><td>${money(x.commitments)}</td><td>${money(x.advanceReserve)}</td><td>${money(x.vatReserve)}</td><td><b>${money(x.balance)}</b></td></tr>`}).join("");
+  annualTbody.innerHTML=Array.from({length:12},(_,m)=>{
+    const d=new Date(year,m,1),x=calcMonthForExport(d),label=new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d);
+    const actualVat=actualVatPaidForMonth(d);
+    return `<tr>
+      <td><b>${label}</b></td>
+      <td>${money(x.incomeGross)}</td>
+      <td>${money(x.actualOut)}</td>
+      <td>${money(x.commitments)}</td>
+      <td>${money(x.advanceReserve)}</td>
+      <td>${money(x.vatReserve)}</td>
+      <td>${actualVat>0?money(actualVat):"—"}</td>
+      <td><b>${money(x.balance)}</b></td>
+    </tr>`;
+  }).join("");
 }
 btnAnnual.onclick=()=>{annualView.classList.toggle("open");btnAnnual.textContent=annualView.classList.contains("open")?"סגירת תצוגה שנתית":"תצוגה שנתית";if(annualView.classList.contains("open"))renderAnnual()};
 btnBack.onclick=()=>location.href="/";
