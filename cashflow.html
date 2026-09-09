@@ -486,6 +486,23 @@ function calcMonth(d=selected){
       expVat+=Math.max(0,s.vat)*vatDeductFactor(r);
     }
   }
+
+  /* תשלום מע״מ שסומן בעמוד הדוח הוא יציאה סטטוטורית בפועל.
+     מוסיפים אותו לסיכומי התזרים, אבל לא אם כבר קיימת תנועת מע״מ ידנית
+     באותו תאריך ובאותו סכום — כדי למנוע כפל. */
+  let syncedVatPaid=0;
+  for(const paidRec of paidVatRecordsForMonth(d)){
+    const paidDate=String(paidRec.paidAt||"");
+    const paidAmount=Math.max(0,Number(paidRec.amount)||0);
+    const duplicateManual=list.some(r=>
+      isVatPaymentRow(r) &&
+      String(r.date||"").slice(0,10)===paidDate &&
+      Math.abs(Math.abs(Number(r.amount)||0)-paidAmount)<0.01
+    );
+    if(!duplicateManual) syncedVatPaid+=paidAmount;
+  }
+  personalPaid+=syncedVatPaid;
+
   const obs=selectedObligations(d), unpaidObs=obs;
   const unpaidFixed=obs.filter(o=>o.type!=="authority").reduce((s,o)=>s+(Number(o.displayAmount??o.amount)||0),0);
   const unpaidAuthority=obs.filter(o=>o.type==="authority").reduce((s,o)=>s+(Number(o.displayAmount??o.amount)||0),0);
@@ -500,7 +517,7 @@ function calcMonth(d=selected){
   const commitments=unpaidFixed+unpaidAuthority;
   const authorityReserve=advanceReserve+vatReserve;
   const balance=incomeGross-actualOut-commitments-authorityReserve;
-  return{list,incomeGross,incomeNet,businessExpenseGross,personalPaid,incVat,expVat,vatReserve,vatPlan,advanceReserve,advanceRate,unpaidFixed,unpaidAuthority,commitments,authorityReserve,actualOut,extraIncome,balance,obs,unpaidObs,adjustment};
+  return{list,incomeGross,incomeNet,businessExpenseGross,personalPaid,syncedVatPaid,incVat,expVat,vatReserve,vatPlan,advanceReserve,advanceRate,unpaidFixed,unpaidAuthority,commitments,authorityReserve,actualOut,extraIncome,balance,obs,unpaidObs,adjustment};
 }
 
 
