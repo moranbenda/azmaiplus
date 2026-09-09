@@ -685,7 +685,7 @@ window.addEventListener("message", async event => {
 function syncStats(){ $('statCustomers').textContent=customers.length; $('statDrafts').textContent=drafts.length; $('statNextInvoice').textContent=settings.tax_invoice||1; $('statNextReceipt').textContent=settings.receipt||1; }
 function renderCustomerOptions(){ const input=$('docCustomerSearch'); if(!input)return; if(!customers.length){ input.value=''; input.placeholder='אין לקוחות — יש להוסיף לקוח במודול לקוחות'; input.disabled=true; $('docCustomer').value=''; } else { input.disabled=false; input.placeholder='חיפוש לפי שם, מייל, טלפון או מספר מזהה...'; if(!$('docCustomer').value && customers.length===1) setSelectedCustomer(customers[0]); else renderSelectedCustomerHint(); } }
 function updateDocNumber(){ $('docNumber').value = nextNumberFor($('docType').value); }
-function updatePaymentVisibility(){ const wrap=$('paymentMethodWrap'); if(wrap) wrap.hidden=!isPaymentDoc(); if(isPaymentDoc()){ ensurePaymentEntries(); renderPaymentEntries(); } }
+function updatePaymentVisibility(renderEntries=true){ const wrap=$('paymentMethodWrap'); if(wrap) wrap.hidden=!isPaymentDoc(); if(isPaymentDoc()){ ensurePaymentEntries(); if(renderEntries) renderPaymentEntries(); } }
 function bidiValue(value, dir='ltr'){ return `<bdi dir="${dir}">${escapeHtml(value ?? '')}</bdi>`; }
 function businessBlock(){
   const parts=[];
@@ -704,7 +704,7 @@ function customerBlock(c){
 }
 function renderPreview(){
   const type=$('docType').value, c=getSelectedCustomer(), t=totals();
-  updatePaymentVisibility();
+  updatePaymentVisibility(false);
   renderAllocationPanel();
   const allocation=allocationCheck();
   const logo=profile.businessLogoDataUrl || profile.businessLogo || profile.logoDataUrl || "";
