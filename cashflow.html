@@ -76,6 +76,10 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
 @media(max-width:1000px){.dashboard{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
 @media(max-width:700px){.wrap{padding:10px}.dashboard{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr 1fr}.donut-wrap{grid-template-columns:1fr}.month-plan{grid-template-columns:1fr}}
 @media(max-width:480px){.dashboard{grid-template-columns:1fr}.brand h1{font-size:22px}.form-grid{grid-template-columns:1fr}}
+
+  /* ניווט תקופה — חצים קרובים יותר לכותרת */
+  .period-nav,.month-nav,.date-nav{max-width:760px;margin-inline:auto}
+  .month-header,.period-header{max-width:760px;margin-inline:auto}
 </style>
 </head>
 <body>
@@ -97,7 +101,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
   <div class="month-nav">
     <button class="month-arrow" id="nextMonth" title="החודש הבא">‹</button>
     <div class="month-title"><strong id="monthLabel"></strong><span id="monthMeta"></span>
-      <div class="month-tools"><input type="month" id="monthPicker" title="בחירת חודש"><button type="button" id="btnAnnual">תצוגה שנתית</button></div>
+      <div class="month-tools"><input type="month" id="monthPicker" title="בחירת חודש"><button type="button" id="btnAnnual">תצוגה שנתית</button><button type="button" id="biMonthlyViewBtn" class="btn secondary">תצוגה דו־חודשית</button></div>
     </div>
     <button class="month-arrow" id="prevMonth" title="החודש הקודם">›</button>
   </div>
@@ -363,6 +367,11 @@ function vatPeriodForPaymentMonth(d=selected){
     : `${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(start)}–${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(end)}`;
   return{cycle,from,to,label};
 }
+function paidVatRecordsForMonth(d=selected){
+  const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  const map=(ledger&&ledger.vatPayments&&typeof ledger.vatPayments==="object")?ledger.vatPayments:{};
+  return Object.values(map).filter(v=>v&&v.status==="paid"&&String(v.paidAt||"").startsWith(key));
+}
 function calculatedVatPayment(d=selected){
   const period=vatPeriodForPaymentMonth(d);
   if(!period) return{configured:configuredVatCycle()>0,period:null,expected:0,paid:0,remaining:0,paidRecord:null};
@@ -494,6 +503,28 @@ function calcMonth(d=selected){
   return{list,incomeGross,incomeNet,businessExpenseGross,personalPaid,incVat,expVat,vatReserve,vatPlan,advanceReserve,advanceRate,unpaidFixed,unpaidAuthority,commitments,authorityReserve,actualOut,extraIncome,balance,obs,unpaidObs,adjustment};
 }
 
+
+let biMonthlyMode=false;
+function renderBiMonthly(){
+ const host=document.getElementById("biMonthlyPanel");
+ if(!host)return;
+ if(!biMonthlyMode){host.hidden=true;return}
+ host.hidden=false;
+ const cur=new Date(selected.getFullYear(),selected.getMonth(),1);
+ const prev=new Date(selected.getFullYear(),selected.getMonth()-1,1);
+ const months=[prev,cur];
+ const fmt=d=>d.toLocaleDateString("he-IL",{month:"long",year:"numeric"});
+ host.innerHTML=`<div class="card"><h2 style="margin-top:0">תצוגה דו־חודשית</h2>
+ <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px">
+ ${months.map(d=>{const c=calcMonth(d);return `<div style="border:1px solid #e5e7eb;border-radius:12px;padding:14px">
+ <b>${fmt(d)}</b>
+ <div style="margin-top:10px;line-height:1.9">הכנסות בפועל: <b>${money(c.incomeGross||0)}</b><br>
+ הוצאות בפועל: <b>${money(c.actualOut||0)}</b><br>
+ התחייבויות: <b>${money(c.commitments||0)}</b><br>
+ הפרשות לרשויות: <b>${money(c.authorityReserve||0)}</b><br>
+ יתרה: <b>${money(c.balance||0)}</b></div></div>`}).join("")}
+ </div></div>`;
+}
 function render(){
   const c=calcMonth();
   const label=new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected);
@@ -593,10 +624,12 @@ function renderRows(c){
   if(c.vatPlan?.configured && c.vatPlan?.period && c.vatPlan?.remaining>0){
     planned.push({date:`${monthKey()}-19`,type:"planned",desc:`תשלום מע״מ – ${c.vatPlan.period.label}`,category:"רשות המסים · מחושב אוטומטית",amount:c.vatPlan.remaining});
   }
-  if(c.vatPlan?.paidRecord?.status==="paid"){
-    const paidDate=String(c.vatPlan.paidRecord.paidAt||"");
-    if(paidDate.startsWith(monthKey())){
-      planned.push({date:paidDate,type:"planned",desc:`תשלום מע״מ – ${c.vatPlan.period.label}`,category:"רשות המסים · שולם בפועל",amount:Number(c.vatPlan.paidRecord.amount)||c.vatPlan.expected,paidVat:true});
+  for(const paidRec of paidVatRecordsForMonth(selected)){
+    const paidDate=String(paidRec.paidAt||"");
+    const paidAmount=Math.max(0,Number(paidRec.amount)||0);
+    const duplicateManual=c.list.some(r=>isVatPaymentRow(r)&&String(r.date||"").slice(0,10)===paidDate&&Math.abs(Math.abs(Number(r.amount)||0)-paidAmount)<0.01);
+    if(!duplicateManual){
+      planned.push({date:paidDate,type:"planned",desc:`תשלום מע״מ${paidRec.label?` – ${paidRec.label}`:""}`,category:"רשות המסים · שולם בפועל",amount:paidAmount,paidVat:true});
     }
   }
 
@@ -775,6 +808,14 @@ function exportExcel(){
 }
 
 btnExcel.onclick=exportExcel;
+
+
+document.getElementById("biMonthlyViewBtn")?.addEventListener("click",()=>{
+ biMonthlyMode=!biMonthlyMode;
+ const b=document.getElementById("biMonthlyViewBtn");
+ if(b)b.textContent=biMonthlyMode?"חזרה לתצוגה חודשית":"תצוגה דו־חודשית";
+ renderBiMonthly();
+});
 
 onAuthStateChanged(auth,user=>{if(!user){location.href="/";return}loadData(user).catch(err=>{console.error(err);alert("לא הצלחנו לטעון את נתוני התזרים. נסי לרענן את העמוד.")})});
 
