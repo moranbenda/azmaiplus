@@ -1603,6 +1603,116 @@ async function setDocumentPaidStatus(docId, paid){
   }
 }
 
+
+async function setDocumentPaymentDate(docId, paymentDate){
+  const idx = ledgerDocuments.findIndex(d => String(d.id || "") === String(docId || ""));
+  if (idx < 0 || !ledgerDocuments[idx].paid) {
+    showToast("לא ניתן לעדכן את תאריך התשלום במסמך הזה.", true);
+    renderSelected();
+    return;
+  }
+
+  const previousPaidAt = ledgerDocuments[idx].paidAt || null;
+  const chosen = String(paymentDate || "").trim();
+  if (!chosen) {
+    showToast("יש לבחור תאריך תשלום.", true);
+    renderSelected();
+    return;
+  }
+
+  ledgerDocuments[idx] = {
+    ...ledgerDocuments[idx],
+    paidAt: `${chosen}T12:00:00.000Z`
+  };
+
+  try {
+    if (ledgerDocuments[idx]._storage === "subcollection") {
+      await setDoc(
+        doc(db, "ledgers", currentUser.uid, "documents", String(docId)),
+        { paidAt: ledgerDocuments[idx].paidAt },
+        { merge: true }
+      );
+    } else {
+      const legacyDocuments = ledgerDocuments
+        .filter(item => item._storage !== "subcollection")
+        .map(({_storage, ...item}) => item);
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        documents: legacyDocuments,
+        documentsUpdatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    await writeAuditLog("תאריך תשלום לחשבונית עודכן", {
+      entityType: "מסמך",
+      entityId: docId,
+      documentId: docId,
+      documentNumber: ledgerDocuments[idx].number || "",
+      customerId: ledgerDocuments[idx].customerId || selectedId || "",
+      paidAt: ledgerDocuments[idx].paidAt,
+      summary: `עודכן תאריך תשלום: ${documentDisplayType(ledgerDocuments[idx])} ${ledgerDocuments[idx].number || ""}`
+    });
+
+    renderSelected();
+    showToast("תאריך התשלום עודכן.");
+  } catch (error) {
+    console.error("Document payment date update failed", error);
+    ledgerDocuments[idx] = {...ledgerDocuments[idx], paidAt: previousPaidAt};
+    showToast("שמירת תאריך התשלום נכשלה.", true);
+    renderSelected();
+  }
+}
+
+async function setDocumentPaymentMethod(docId, paymentMethod){
+  const idx = ledgerDocuments.findIndex(d => String(d.id || "") === String(docId || ""));
+  if (idx < 0 || !ledgerDocuments[idx].paid) {
+    showToast("לא ניתן לעדכן את אמצעי התשלום במסמך הזה.", true);
+    renderSelected();
+    return;
+  }
+
+  const previousPaymentMethod = ledgerDocuments[idx].paymentMethod || "";
+  ledgerDocuments[idx] = {
+    ...ledgerDocuments[idx],
+    paymentMethod: String(paymentMethod || "")
+  };
+
+  try {
+    if (ledgerDocuments[idx]._storage === "subcollection") {
+      await setDoc(
+        doc(db, "ledgers", currentUser.uid, "documents", String(docId)),
+        { paymentMethod: ledgerDocuments[idx].paymentMethod },
+        { merge: true }
+      );
+    } else {
+      const legacyDocuments = ledgerDocuments
+        .filter(item => item._storage !== "subcollection")
+        .map(({_storage, ...item}) => item);
+      await setDoc(doc(db, "ledgers", currentUser.uid), {
+        documents: legacyDocuments,
+        documentsUpdatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+
+    await writeAuditLog("אמצעי תשלום לחשבונית עודכן", {
+      entityType: "מסמך",
+      entityId: docId,
+      documentId: docId,
+      documentNumber: ledgerDocuments[idx].number || "",
+      customerId: ledgerDocuments[idx].customerId || selectedId || "",
+      paymentMethod: ledgerDocuments[idx].paymentMethod || "",
+      summary: `עודכן אמצעי תשלום: ${documentDisplayType(ledgerDocuments[idx])} ${ledgerDocuments[idx].number || ""}`
+    });
+
+    renderSelected();
+    showToast("אמצעי התשלום עודכן.");
+  } catch (error) {
+    console.error("Document payment method update failed", error);
+    ledgerDocuments[idx] = {...ledgerDocuments[idx], paymentMethod: previousPaymentMethod};
+    showToast("שמירת אמצעי התשלום נכשלה.", true);
+    renderSelected();
+  }
+}
+
 function documentHtmlForView(d){
   if (d.previewHtml) return d.previewHtml;
   return `
@@ -2172,16 +2282,20 @@ function renderSelected(){
                                ${canPersistPaid ? "" : "disabled"} />
                         <span class="${paid ? "payment-paid" : "payment-open"}">${paid ? "שולמה" : "פתוחה לתשלום"}</span>
                       </label>
-                      ${d._importedIncome && paid ? `
+                      ${paid ? `
                         <label class="payment-inline-field">
                           תאריך תשלום
                           <input type="date"
-                                 data-paid-date-import="${escapeHtml(d.id || "")}"
+                                 ${d._importedIncome
+                                   ? `data-paid-date-import="${escapeHtml(d.id || "")}"`
+                                   : `data-paid-date-doc="${escapeHtml(d.id || "")}"`}
                                  value="${escapeHtml(paymentDate)}" />
                         </label>
                         <label class="payment-inline-field">
                           שולם באמצעות
-                          <select data-paid-method-import="${escapeHtml(d.id || "")}">
+                          <select ${d._importedIncome
+                            ? `data-paid-method-import="${escapeHtml(d.id || "")}"`
+                            : `data-paid-method-doc="${escapeHtml(d.id || "")}"`}>
                             <option value="">לא צוין</option>
                             ${Object.entries(importedPaymentMethodLabels).map(([value,label]) =>
                               `<option value="${escapeHtml(value)}" ${String(d.paymentMethod || "") === value ? "selected" : ""}>${escapeHtml(label)}</option>`
@@ -2332,6 +2446,20 @@ function renderSelected(){
     select.addEventListener("change", async () => {
       select.disabled = true;
       await setImportedIncomePaymentMethod(select.dataset.paidMethodImport, select.value);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-date-doc]").forEach(input => {
+    input.addEventListener("change", async () => {
+      input.disabled = true;
+      await setDocumentPaymentDate(input.dataset.paidDateDoc, input.value);
+    });
+  });
+
+  body.querySelectorAll("[data-paid-method-doc]").forEach(select => {
+    select.addEventListener("change", async () => {
+      select.disabled = true;
+      await setDocumentPaymentMethod(select.dataset.paidMethodDoc, select.value);
     });
   });
 }
