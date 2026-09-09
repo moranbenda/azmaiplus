@@ -146,7 +146,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
             <div class="authority-top"><div><b>מקדמות מס הכנסה</b><div class="desc" id="advanceDesc"></div></div><div class="amount" id="advanceAmount">₪0</div></div>
           </div>
           <div class="authority">
-            <div class="authority-top"><div><b>הפרשה צפויה למע״מ</b><div class="desc">אומדן לפי עסקאות ותשומות שנרשמו בחודש. הדיווח והתשלום בפועל מתבצעים לפי תקופת הדיווח של העסק.</div></div><div class="amount" id="vatAmount">₪0</div></div>
+            <div class="authority-top"><div><b>הפרשה צפויה למע״מ</b><div class="desc">אומדן חודשי לצורך הפרשה בצד. גם בדיווח דו־חודשי ההפרשה מחושבת בכל חודש; התשלום בפועל מוצג בנפרד במועד שבו הוא יוצא.</div></div><div class="amount" id="vatAmount">₪0</div></div>
           </div>
           <div class="authority">
             <div class="authority-top"><div><b>תשלומים אישיים/סטטוטוריים שנרשמו בפועל</b><div class="desc">לדוגמה ביטוח לאומי, פנסיה, קרן השתלמות, מקדמות ותשלום מע״מ שכבר נרשמו כהוצאה.</div></div><div class="amount" id="personalPaidAmount">₪0</div></div>
@@ -537,8 +537,10 @@ function calcMonth(d=selected){
   const advanceRate=profileAdvanceRate();
   const advanceReserve=Math.max(0,incomeNet*advanceRate/100);
   const vatPlan=calculatedVatPayment(d);
+  /* מע״מ צפוי הוא הפרשה חודשית שוטפת — גם כאשר הדיווח דו־חודשי.
+     vatPlan נשאר נפרד ומייצג את מועד התשלום בפועל/המתוכנן של תקופת הדיווח. */
   const legacyVatReserve=businessType()==="ptor"?0:Math.max(0,incVat-expVat);
-  const vatReserve=vatPlan.configured ? vatPlan.remaining : legacyVatReserve;
+  const vatReserve=legacyVatReserve;
   const actualOut=businessExpenseGross+personalPaid;
   const commitments=unpaidFixed+unpaidAuthority;
   const authorityReserve=advanceReserve+vatReserve;
