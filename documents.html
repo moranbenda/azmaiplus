@@ -804,6 +804,80 @@ function creditSourceLines(d){
     netPrice: Math.max(0, net)
   })];
 }
+
+function sourceDocumentLines(d){
+  const candidates = [d?.lines, d?.items, d?.documentLines, d?.lineItems].find(arr => Array.isArray(arr) && arr.length) || [];
+  const normalized = candidates.map((line, index) => {
+    const qty = Number(line?.qty ?? line?.quantity ?? line?.units ?? 1) || 1;
+    let netPrice = Number(line?.netPrice ?? line?.price ?? line?.unitPrice ?? line?.priceBeforeVat ?? line?.netUnitPrice ?? 0);
+    const grossPrice = Number(line?.grossPrice ?? line?.priceIncludingVat ?? line?.unitPriceIncludingVat ?? 0);
+    const sourceRate = Number(d?.vatRate ?? profile.vatRate ?? 18);
+    if (!(netPrice > 0) && grossPrice > 0) netPrice = round2(grossPrice / (1 + sourceRate / 100));
+    return makeLine({
+      desc: line?.desc ?? line?.description ?? line?.itemDesc ?? line?.name ?? line?.title ?? `שורה ${index+1}`,
+      transactionType: line?.transactionType || 'service',
+      unit: line?.unit || 'יחידה',
+      qty,
+      netPrice,
+      lineDiscount: Number(line?.lineDiscount ?? line?.discount ?? 0)
+    });
+  }).filter(line => String(line.desc || '').trim() || Number(line.netPrice || 0) > 0);
+  if(normalized.length) return normalized;
+
+  const gross = Number(d?.gross ?? d?.total ?? d?.amount ?? 0);
+  const vat = Number(d?.vat ?? d?.vatAmount ?? 0);
+  let net = Number(d?.net ?? d?.subtotal ?? d?.amountBeforeVat ?? 0);
+  if(!(net > 0) && gross > 0 && vat >= 0 && gross > vat) net = round2(gross - vat);
+  if(!(net > 0) && gross > 0){
+    const sourceRate = Number(d?.vatRate ?? profile.vatRate ?? 18);
+    net = round2(gross / (1 + sourceRate / 100));
+  }
+  return [makeLine({desc:d?.title || d?.documentTitle || `${d?.typeLabel || TYPE_LABELS[d?.type] || 'מסמך'} ${d?.number || ''}`, qty:1, netPrice:Math.max(0,net)})];
+}
+
+function prepareDocumentFromIssuedSource(sourceId, targetType, copyToOtherCustomer=false){
+  const source=(issuedDocuments||[]).find(x=>String(x.id)===String(sourceId));
+  if(!source) return setStatus($('draftStatus'),'מסמך המקור לא נמצא.','err');
+  const allowedTargets=new Set(['tax_invoice','tax_invoice_receipt','quote','deal_invoice']);
+  if(!allowedTargets.has(targetType) || !isDocTypeAllowedForBusiness(targetType)) return setStatus($('draftStatus'),'סוג המסמך המבוקש אינו זמין לעסק זה.','err');
+
+  creditSourceDocument=null;
+  $('docType').value=targetType;
+  updateDocNumber();
+  $('docDate').value=today();
+  $('docVatRate').value=Number(source.vatRate ?? profile.vatRate ?? 18);
+
+  if(copyToOtherCustomer){
+    $('docCustomer').value='';
+    $('docCustomerSearch').value='';
+    renderSelectedCustomerHint();
+  }else{
+    const c=resolveCreditCustomer(source);
+    $('docCustomer').value=c?.id || source.customerId || '';
+    $('docCustomerSearch').value=c ? customerName(c) : (source.customerName || source.customerSnapshot?.name || source.customerSnapshot?.businessName || '');
+    renderSelectedCustomerHint();
+  }
+
+  docLines=sourceDocumentLines(source);
+  $('docDiscountPct').value=Number(source.discountPct ?? source.discountPercent ?? 0);
+  $('docTitle').value=String(source.title || source.documentTitle || '');
+  $('docNotes').value=String(source.notes || '');
+  paymentEntries=[makePaymentEntry({amount:0})];
+  if($('withholdingTaxAmount')) $('withholdingTaxAmount').value=0;
+  previewFinal=false; lastIssuedDocument=null;
+  syncGrossFromNet();
+  updatePaymentVisibility();
+  renderLinesEditor();
+  renderPreview();
+
+  const sourceLabel=source.typeLabel || TYPE_LABELS[source.type] || 'מסמך';
+  const targetLabel=TYPE_LABELS[targetType] || 'מסמך';
+  setStatus($('draftStatus'), copyToOtherCustomer
+    ? `הועתקו פרטי ${sourceLabel} ${source.number||''}. יש לבחור לקוח אחר, לבדוק ולהפיק.`
+    : `הוכן ${targetLabel} על בסיס ${sourceLabel} ${source.number||''}. יש לבדוק ולהפיק.`, 'ok');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
 function resolveCreditCustomer(d){
   let c = customers.find(x => String(x.id || '') === String(d?.customerId || ''));
   if(c) return c;
@@ -925,6 +999,9 @@ async function loadAll(){
   const params = new URLSearchParams(location.search);
   const preCustomerId = params.get("customerId");
   const creditDocumentId = params.get("creditDocumentId");
+  const sourceDocumentId = params.get("sourceDocumentId");
+  const targetType = params.get("targetType");
+  const copyToOtherCustomer = params.get("copyToOtherCustomer") === "1";
 
   if(preCustomerId){
     const c = customers.find(
@@ -941,6 +1018,17 @@ async function loadAll(){
     if(original){
       prepareCreditFromIssuedDocument(creditDocumentId);
       params.delete("creditDocumentId");
+      const qs = params.toString();
+      history.replaceState({}, "", location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }else if(sourceDocumentId && targetType){
+    const original = issuedDocuments.find(d => String(d.id) === String(sourceDocumentId));
+    if(original){
+      prepareDocumentFromIssuedSource(sourceDocumentId, targetType, copyToOtherCustomer);
+      params.delete("sourceDocumentId");
+      params.delete("targetType");
+      params.delete("copyToOtherCustomer");
+      if(copyToOtherCustomer) params.delete("customerId");
       const qs = params.toString();
       history.replaceState({}, "", location.pathname + (qs ? `?${qs}` : ""));
     }
