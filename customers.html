@@ -2970,6 +2970,13 @@ async function loadData(){
     ledgerDocuments = Array.from(byId.values());
 
     saveStatus.textContent = recoveredImportedPayments ? `נטענו ${customers.length} לקוחות · שוחזרו סטטוסי תשלום מיובאים` : `נטענו ${customers.length} לקוחות`;
+
+    // If another page sent us directly to a customer card, open that customer.
+    const requestedCustomerId = new URLSearchParams(location.search).get("customerId");
+    if (requestedCustomerId && customers.some(c => String(c.id) === String(requestedCustomerId))) {
+      selectedId = requestedCustomerId;
+    }
+
     render();
   } catch (err) {
     console.error(err);
