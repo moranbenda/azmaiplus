@@ -204,7 +204,24 @@
     .customer-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
     .customer-meta .meta-item{font-size:12px;color:#475467;background:#f8fafc;border:1px solid var(--line);border-radius:999px;padding:4px 8px}
     .customer-meta .meta-item.ok{background:#ecfdf5;border-color:#bbf7d0;color:#166534}
-    .selected-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+    .selected-actions{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin:10px 0 14px;
+      padding:9px 10px;
+      border:1px solid #e6edf6;
+      border-radius:14px;
+      background:#fbfdff;
+    }
+    .selected-actions .btn{
+      min-height:34px;
+      padding:7px 11px;
+      font-size:12px;
+      border-radius:10px;
+      box-shadow:none;
+    }
     .ledger-list{display:grid;gap:8px;margin-top:8px}
     .ledger-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px}
     .ledger-card .ledger-title{font-weight:800;margin-bottom:6px}
@@ -2202,6 +2219,27 @@ function switchDirectlyToCustomer(id){
   selectCustomer(id);
 }
 
+
+async function cancelNonAccountingSourceDocument(docId){
+  const d = ledgerDocuments.find(x => String(x.id || "") === String(docId || ""));
+  if(!d) return showToast("המסמך לא נמצא.", true);
+  const type = documentDisplayType(d);
+  if(!["הצעת מחיר","חשבונית עסקה"].includes(type)) return showToast("פעולת ביטול זו זמינה רק להצעת מחיר או לחשבונית עסקה.", true);
+  if(["cancelled","cancelled_technical_duplicate","credited"].includes(documentLifecycleStatus(d))) return;
+  if(!confirm(`לסמן את ${type} ${d.number || ""} כמבוטל?\n\nהמסמך יישאר בהיסטוריית הלקוח ולא יימחק.`)) return;
+
+  try{
+    const cancelledAt=new Date().toISOString();
+    await setDoc(doc(db,"ledgers",currentUser.uid,"documents",String(d.id)),{status:"cancelled",cancelledAt},{merge:true});
+    d.status="cancelled"; d.cancelledAt=cancelledAt;
+    renderSelected();
+    showToast(`${type} ${d.number || ""} סומן כמבוטל.`);
+  }catch(err){
+    console.error(err);
+    showToast("לא ניתן היה לסמן את המסמך כמבוטל.", true);
+  }
+}
+
 function renderSelected(){
   const c = customers.find(x => x.id === selectedId);
   const status = $("selectedStatus");
@@ -2260,7 +2298,11 @@ function renderSelected(){
                 : lifecycleStatus === "credited"
                   ? `זוכה${d.creditedByNumber ? ` · זיכוי ${d.creditedByNumber}` : ""}`
                   : "";
-            const canCreateCredit = !d._importedIncome && ["חשבונית מס", "חשבונית מס/קבלה"].includes(documentDisplayType(d)) && !statusText && !!d.id;
+            const displayType = documentDisplayType(d);
+            const canCreateCredit = !d._importedIncome && ["חשבונית מס", "חשבונית מס/קבלה"].includes(displayType) && !statusText && !!d.id;
+            const canConvertSource = !d._importedIncome && ["הצעת מחיר", "חשבונית עסקה"].includes(displayType) && !statusText && !!d.id;
+            const canCopyToOtherCustomer = !d._importedIncome && ["הצעת מחיר", "חשבונית עסקה"].includes(displayType) && !statusText && !!d.id;
+            const canCancelSource = !d._importedIncome && ["הצעת מחיר", "חשבונית עסקה"].includes(displayType) && !statusText && !!d.id;
             const importedPayable = payable && !!d._importedIncome && !!d.id;
             const issuedPayable = payable && !!d.id && ledgerDocuments.some(x => String(x.id || "") === String(d.id || ""));
             const canPersistPaid = importedPayable || issuedPayable;
@@ -2313,7 +2355,11 @@ function renderSelected(){
                       : `<button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
                          <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
                          <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
-                         ${canCreateCredit ? `<button class="btn secondary small" type="button" data-credit-doc="${escapeHtml(d.id || "")}">צור זיכוי</button>` : ""}`}
+                         ${canCreateCredit ? `<button class="btn secondary small" type="button" data-credit-doc="${escapeHtml(d.id || "")}">צור זיכוי</button>` : ""}
+                         ${canConvertSource ? `<button class="btn secondary small" type="button" data-convert-doc="${escapeHtml(d.id || "")}" data-target-type="tax_invoice">הפק חשבונית מס</button>
+                         <button class="btn secondary small" type="button" data-convert-doc="${escapeHtml(d.id || "")}" data-target-type="tax_invoice_receipt">הפק חשבונית מס/קבלה</button>` : ""}
+                         ${canCopyToOtherCustomer ? `<button class="btn secondary small" type="button" data-copy-other-doc="${escapeHtml(d.id || "")}">העתק ללקוח אחר</button>` : ""}
+                         ${canCancelSource ? `<button class="btn danger small" type="button" data-cancel-source-doc="${escapeHtml(d.id || "")}">סמן כמבוטל</button>` : ""}`}
                   </div>
                 </td>
               </tr>`;
@@ -2370,6 +2416,14 @@ function renderSelected(){
       </div>
     </section>
 
+    <div class="selected-actions">
+      <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
+      <button class="btn secondary" type="button" id="btnSaveVerifyImported">שמור ואמת תשלומים</button>
+      <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
+      <button class="btn secondary" type="button" id="btnEditSelected">עריכת לקוח</button>
+      <button class="btn danger" type="button" id="btnDeleteSelected">מחיקת לקוח</button>
+    </div>
+
     <section class="customer-documents-section">
       <div class="section-title-row">
         <div>
@@ -2379,14 +2433,6 @@ function renderSelected(){
       </div>
       ${docsHtml}
     </section>
-
-    <div class="selected-actions">
-      <button class="btn" type="button" id="btnCreateDocSelected">הפקת מסמך ללקוח</button>
-      <button class="btn secondary" type="button" id="btnSaveVerifyImported">שמור ואמת תשלומים</button>
-      <button class="btn secondary" type="button" id="btnPrintLedgerSelected">הדפסת כרטסת</button>
-      <button class="btn secondary" type="button" id="btnEditSelected">עריכת לקוח</button>
-      <button class="btn danger" type="button" id="btnDeleteSelected">מחיקת לקוח</button>
-    </div>
   `;
 
   $("btnCreateDocSelected").addEventListener("click", () => {
@@ -2416,6 +2462,27 @@ function renderSelected(){
       if (!docId) return;
       location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}&creditDocumentId=${encodeURIComponent(docId)}`;
     })
+  );
+
+  body.querySelectorAll("[data-convert-doc]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const docId = btn.dataset.convertDoc || "";
+      const targetType = btn.dataset.targetType || "";
+      if (!docId || !targetType) return;
+      location.href = `/documents.html?customerId=${encodeURIComponent(c.id)}&sourceDocumentId=${encodeURIComponent(docId)}&targetType=${encodeURIComponent(targetType)}`;
+    })
+  );
+
+  body.querySelectorAll("[data-copy-other-doc]").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const docId = btn.dataset.copyOtherDoc || "";
+      if (!docId) return;
+      location.href = `/documents.html?sourceDocumentId=${encodeURIComponent(docId)}&targetType=quote&copyToOtherCustomer=1`;
+    })
+  );
+
+  body.querySelectorAll("[data-cancel-source-doc]").forEach(btn =>
+    btn.addEventListener("click", () => cancelNonAccountingSourceDocument(btn.dataset.cancelSourceDoc || ""))
   );
 
   body.querySelectorAll("[data-paid-doc]").forEach(input => {
