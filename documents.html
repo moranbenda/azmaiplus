@@ -1167,7 +1167,7 @@ function printableDocumentHtml(content){
   <style>
     body{font-family:Arial,"Segoe UI",sans-serif;direction:rtl;color:#111827;margin:24px;background:white}.print-footer{position:fixed;bottom:8mm;left:0;right:0;text-align:center;font-size:11px;color:#64748b}
     .doc-logo{max-width:120px;max-height:70px;object-fit:contain}.doc-head{display:flex;justify-content:space-between;gap:16px;margin-bottom:14px}.doc-parties{display:block!important;direction:rtl;text-align:right;margin-bottom:12px}.doc-parties .box,.customer-box{display:block!important;width:42%;min-width:220px;margin-right:0!important;margin-left:auto!important;text-align:right!important;direction:rtl!important}.box{border:1px solid #dbe3ef;border-radius:12px;padding:10px 12px;min-height:0;font-size:11px;line-height:1.5}.customer-box h3,.box h3{font-size:12px;margin:0 0 5px}.doc-meta{font-size:11px;color:#334155;line-height:1.55}.doc-title{text-align:left}.doc-number{font-size:11px;line-height:1.55}.doc-number b{font-size:17px}.allocation-number{font-size:10px;margin-top:4px;color:#475569}.allocation-number b{font-size:12px!important}.document-subtitle{margin:12px auto 4px;font-size:16px;font-weight:700;line-height:1.4;text-align:center;width:100%}h2{margin:0 0 8px;font-size:27px}h3{margin:0 0 6px;font-size:12px}table,.items{width:100%;border-collapse:collapse;margin-top:14px}th,td{border-bottom:1px solid #e5edf7;padding:8px 7px;text-align:right;font-size:12px;white-space:nowrap}th:first-child,td:first-child{white-space:normal}th{background:#f1f5f9}.totals{margin-top:12px;margin-right:auto;width:245px;border:1px solid #dbe3ef;border-radius:12px;overflow:hidden;font-size:11px}.totals div{display:flex;justify-content:space-between;padding:7px 10px;border-bottom:1px solid #e5edf7}.totals div:last-child{border-bottom:0;font-weight:700;background:#f8fafc}.draft-watermark{display:none!important}.document-note{margin-top:12px!important}.document-note div{white-space:pre-wrap;line-height:1.55}.doc-parties~.box,.totals~.box{margin-top:12px!important}bdi[dir="ltr"]{direction:ltr;unicode-bidi:isolate;display:inline-block}@page{size:A4 portrait;margin:14mm}
-  </style></head><body>${content}<div class="print-footer">הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
+  </style></head><body>${content}<div class="print-footer">מסמך ממוחשב · חתום בחתימה אלקטרונית מאובטחת · הופק על ידי מערכת עצמאי פלוס</div></body></html>`;
 }
 
 function polishHebrewPdfHtml(html){
@@ -1400,6 +1400,42 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
   }
 }
 
+function pdfBase64ToBytes(base64){
+  const binary = atob(String(base64 || ""));
+  const bytes = new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+  return bytes;
+}
+
+function pdfBytesToBase64(bytes){
+  const chunkSize = 0x8000;
+  let binary = "";
+  for(let i=0;i<bytes.length;i+=chunkSize){
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function signPdfBase64(pdfBase64){
+  const unsignedBytes = pdfBase64ToBytes(pdfBase64);
+  const response = await fetch("/api/sign-pdf", {
+    method: "POST",
+    headers: {"Content-Type": "application/pdf"},
+    body: unsignedBytes
+  });
+
+  if(!response.ok){
+    const message = await response.text().catch(() => "");
+    throw new Error(message || "חתימת קובץ ה־PDF נכשלה.");
+  }
+
+  const signedBytes = new Uint8Array(await response.arrayBuffer());
+  if(!signedBytes.length){
+    throw new Error("השרת החזיר קובץ PDF חתום ריק.");
+  }
+  return pdfBytesToBase64(signedBytes);
+}
+
 function businessNameForEmail(){
   return String(
     profile.businessName ||
@@ -1439,10 +1475,11 @@ async function sendIssuedDocumentEmail(finalDoc, customer){
 
   const fileName = pdfFileNameForDocument(finalDoc);
   const polishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
-  const [idToken, pdfBase64] = await Promise.all([
+  const [idToken, unsignedPdfBase64] = await Promise.all([
     auth.currentUser.getIdToken(),
     documentHtmlToPdfBase64(polishedHtml, fileName)
   ]);
+  const pdfBase64 = await signPdfBase64(unsignedPdfBase64);
 
   const response = await fetch("/api/send-document-email", {
     method: "POST",
@@ -1701,10 +1738,9 @@ async function downloadCurrentDocument(){
   try{
     setStatus($('draftStatus'),'מכין PDF להורדה…','ok');
     const polishedHtml = polishHebrewPdfHtml(printableHtml);
-    const pdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
-    const binary = atob(pdfBase64);
-    const bytes = new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+    const unsignedPdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
+    const pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+    const bytes = pdfBase64ToBytes(pdfBase64);
     const blob = new Blob([bytes], {type:'application/pdf'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
