@@ -73,7 +73,7 @@
     <div class="hd"><h2 style="margin:0;font-size:20px">תקופת הדיווח</h2><span id="periodLabel" class="status"></span></div>
     <div class="bd controls">
       <div><label>חודש סיום הדיווח</label><input id="endMonth" type="month" /></div>
-      <div><label>מחזור דיווח</label><select id="cycle"><option value="1">חודשי</option><option value="2">דו־חודשי</option></select></div>
+      <div><label>מחזור דיווח</label><select id="cycle" title="נקבע לפי ההגדרה בפרופיל העסק"><option value="1">חודשי</option><option value="2">דו־חודשי</option></select><div class="status" id="cycleProfileHint" style="margin-top:5px">נקבע לפי פרופיל העסק</div></div>
       <div><label>עסקאות פטורות / בשיעור אפס בתקופה</label><input id="exemptIncome" type="number" min="0" step="1" value="0" /></div>
     </div>
   </section>
@@ -432,6 +432,21 @@ async function load(user){
  const type=String(profile.businessType||'').toLowerCase();
  const isPtor=type==='ptor';
  document.getElementById('ptorNotice').style.display=isPtor?'block':'none';
+
+ // מחזור הדיווח נקבע בפרופיל העסק ונקרא מכאן בלבד.
+ const savedVatReportingCycle=String(profile.vatReportingCycle||'monthly').toLowerCase();
+ const cycleEl=document.getElementById('cycle');
+ if(cycleEl){
+  cycleEl.value=savedVatReportingCycle==='bimonthly'?'2':'1';
+  cycleEl.disabled=true;
+ }
+ const cycleHint=document.getElementById('cycleProfileHint');
+ if(cycleHint){
+  cycleHint.textContent=savedVatReportingCycle==='bimonthly'
+   ? 'דו־חודשי · לפי פרופיל העסק'
+   : 'חודשי · לפי פרופיל העסק';
+ }
+
  const d=new Date();d.setMonth(d.getMonth()-1);
  document.getElementById('endMonth').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
  calculate();
