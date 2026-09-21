@@ -157,7 +157,7 @@
         </div>
         <div class="wide"><label>הערה למסמך</label><textarea id="docNotes" placeholder="למשל: פרטי חשבון להעברה, תנאי תשלום או מידע נוסף ללקוח"></textarea></div>
       </div>
-      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הדפסה / PDF</button><button class="btn secondary" id="btnGoCustomer">כרטיס לקוח</button></div><span class="status" id="draftStatus"></span></div>
+      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button><button class="btn secondary" id="btnGoCustomer">כרטיס לקוח</button></div><span class="status" id="draftStatus"></span></div>
     </section>
 
     <section class="card preview-card">
@@ -1775,7 +1775,7 @@ async function downloadCurrentDocument(){
 
 $('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null;creditSourceDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnAddPayment')?.addEventListener('click',()=>{ paymentEntries.push(makePaymentEntry({amount:Math.max(0,round2(totals().gross-paymentEntriesTotal()))})); renderPaymentEntries(); renderPreview(); });
-$('btnPrint').onclick=printPreviewOnly;
+$('btnPrint').onclick=downloadCurrentDocument;
 $('btnDownload')?.addEventListener('click',downloadCurrentDocument);
 $('btnGoCustomer').onclick=()=>{ const c=getSelectedCustomer(); if(!c?.id) return setStatus($('draftStatus'),'יש לבחור לקוח כדי לעבור לכרטיס הלקוח','err'); location.href='/customers.html?customerId='+encodeURIComponent(c.id); };
 $('btnIssueDocument').onclick=issueDocument;
