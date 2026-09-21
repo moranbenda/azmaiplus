@@ -1462,7 +1462,7 @@ function pdfFileNameForDocument(finalDoc){
   return `${type}-${number}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
 }
 
-async function sendIssuedDocumentEmail(finalDoc, customer){
+async function sendIssuedDocumentEmail(finalDoc, customer, signedPdfBase64 = ""){
   const recipientEmail = String(
     customer?.email ||
     finalDoc.customerSnapshot?.email ||
@@ -1474,12 +1474,14 @@ async function sendIssuedDocumentEmail(finalDoc, customer){
   }
 
   const fileName = pdfFileNameForDocument(finalDoc);
-  const polishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
-  const [idToken, unsignedPdfBase64] = await Promise.all([
-    auth.currentUser.getIdToken(),
-    documentHtmlToPdfBase64(polishedHtml, fileName)
-  ]);
-  const pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+  const idToken = await auth.currentUser.getIdToken();
+  let pdfBase64 = String(signedPdfBase64 || "").trim();
+
+  if(!pdfBase64){
+    const polishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
+    const unsignedPdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
+    pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+  }
 
   const response = await fetch("/api/send-document-email", {
     method: "POST",
@@ -1529,6 +1531,7 @@ function resetFormAfterSuccessfulIssue(){
 }
 
 let issueDocumentInProgress = false;
+let lastSignedPdfBase64 = '';
 
 async function issueDocument(){
   if(issueDocumentInProgress) return;
@@ -1590,6 +1593,15 @@ async function issueDocument(){
   finalDoc.printHtml = printableDocumentHtml(finalDoc.previewHtml);
   finalDoc.printFooter = 'הופק על ידי מערכת עצמאי פלוס';
   finalDoc.customerSearchKey = [finalDoc.customerName, finalDoc.customerSnapshot?.taxId, finalDoc.customerSnapshot?.email, finalDoc.customerSnapshot?.phone].filter(Boolean).join(' ').toLowerCase();
+
+  // Create and cryptographically sign the final PDF before the document is saved.
+  // The signed bytes stay only in memory; Firestore continues to store the existing
+  // document data/HTML exactly as before.
+  setStatus($('draftStatus'),'חותם על המסמך בחתימה אלקטרונית מאובטחת…','ok');
+  const issuedPdfFileName = pdfFileNameForDocument(finalDoc);
+  const issuedPolishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
+  const issuedUnsignedPdfBase64 = await documentHtmlToPdfBase64(issuedPolishedHtml, issuedPdfFileName);
+  const issuedSignedPdfBase64 = await signPdfBase64(issuedUnsignedPdfBase64);
   const latestLedgerSnapForRows=await getDoc(doc(db,'ledgers',uid));
   const latestLedgerDataForRows=latestLedgerSnapForRows.exists()?latestLedgerSnapForRows.data():{};
   const existingRows=Array.isArray(latestLedgerDataForRows.rows) ? latestLedgerDataForRows.rows : (Array.isArray(ledger.rows) ? ledger.rows : []);
@@ -1642,6 +1654,7 @@ async function issueDocument(){
       renderDrafts();
     }
     lastIssuedDocument=finalDoc;
+    lastSignedPdfBase64=issuedSignedPdfBase64;
     previewFinal=true;
     renderNumberingSettings();
     renderCustomerOptions();
@@ -1662,7 +1675,7 @@ async function issueDocument(){
       }else{
         try{
           setStatus($('draftStatus'), `${baseSuccessMessage} מכין PDF ושולח ללקוח…`, 'ok');
-          await sendIssuedDocumentEmail(finalDoc, c);
+          await sendIssuedDocumentEmail(finalDoc, c, issuedSignedPdfBase64);
           setStatus(
             $('draftStatus'),
             `${baseSuccessMessage} המסמך נשלח ל־${c.email} ✅`,
@@ -1737,9 +1750,12 @@ async function downloadCurrentDocument(){
   const fileName = safeFileNameForDocument()+'.pdf';
   try{
     setStatus($('draftStatus'),'מכין PDF להורדה…','ok');
-    const polishedHtml = polishHebrewPdfHtml(printableHtml);
-    const unsignedPdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
-    const pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+    let pdfBase64 = String(lastSignedPdfBase64 || "").trim();
+    if(!pdfBase64){
+      const polishedHtml = polishHebrewPdfHtml(printableHtml);
+      const unsignedPdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
+      pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+    }
     const bytes = pdfBase64ToBytes(pdfBase64);
     const blob = new Blob([bytes], {type:'application/pdf'});
     const url = URL.createObjectURL(blob);
