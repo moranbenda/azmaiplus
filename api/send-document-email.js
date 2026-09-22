@@ -4,7 +4,7 @@
  * Required Vercel environment variables:
  * - RESEND_API_KEY
  * - FIREBASE_WEB_API_KEY
- * - RESEND_FROM_EMAIL (optional; defaults to documents@azmaiplus.co.il)
+ * - RESEND_FROM_EMAIL (optional; defaults to noreply@azmaiplus.co.il)
  */
 
 module.exports = async function handler(req, res) {
@@ -81,6 +81,7 @@ module.exports = async function handler(req, res) {
       fileName,
       businessName,
       businessLogoDataUrl,
+      businessEmail,
     } = req.body || {};
 
     const recipientEmail = String(to || "").trim();
@@ -114,6 +115,11 @@ module.exports = async function handler(req, res) {
     const safeBusinessName =
       String(businessName || "").trim() || "עצמאי פלוס";
 
+    const safeBusinessEmail = String(businessEmail || "").trim();
+    const replyTo = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(safeBusinessEmail)
+      ? safeBusinessEmail
+      : "";
+
     const safeCustomerName =
       String(customerName || "").trim() || "לקוח/ה";
 
@@ -139,15 +145,15 @@ module.exports = async function handler(req, res) {
       .trim() || "עצמאי פלוס";
 
     // RESEND_FROM_EMAIL may be either a bare address
-    // (support@azmaiplus.co.il) or a complete Resend sender
-    // (עצמאי פלוס <support@azmaiplus.co.il>).
+    // (noreply@azmaiplus.co.il) or a complete Resend sender
+    // (עצמאי פלוס <noreply@azmaiplus.co.il>).
     // Supporting both prevents an invalid nested From header.
     const configuredFrom = String(process.env.RESEND_FROM_EMAIL || "").trim();
     const resendFrom = configuredFrom
       ? (configuredFrom.includes("<")
           ? configuredFrom
           : `${fromName} <${configuredFrom}>`)
-      : `${fromName} <documents@azmaiplus.co.il>`;
+      : `${fromName} <noreply@azmaiplus.co.il>`;
 
     const inlineLogo = parseImageDataUrl(businessLogoDataUrl);
     const attachments = [
@@ -230,6 +236,7 @@ module.exports = async function handler(req, res) {
         subject,
         html: emailHtml,
         attachments,
+        ...(replyTo ? { reply_to: replyTo } : {}),
       }),
     });
 
