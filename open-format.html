@@ -258,5 +258,6 @@ $('printVerification').onclick=()=>printHtml(verificationHtml());$('printRunRepo
 
 onAuthStateChanged(auth,async user=>{if(!user){location.href='/';return}uid=user.uid;try{const pSnap=await getDoc(doc(db,'users',uid));profile=pSnap.exists()?pSnap.data():{};$('businessName').value=profile.businessName||'';$('businessId').value=profile.businessId||'';const warns=profileIssues();if(warns.length){$('profileWarning').textContent=warns.join(' · ');$('profileWarning').style.display='block'}await loadDocumentsForRange();renderMetrics(selectedDocs())}catch(e){console.error(e);setStatus('לא ניתן לטעון את נתוני העסק/המסמכים.','err')}});
 </script>
+  <script src="/app-nav.js"></script>
 </body>
 </html>
