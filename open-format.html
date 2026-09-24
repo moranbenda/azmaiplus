@@ -128,9 +128,10 @@ async function loadDocumentsForRange(){
   const {from,to}=getRange();
   if(!uid||!from||!to||from>to){documents=[];return}
   const ref=collection(db,'ledgers',uid,'documents');
-  const q=query(ref,where('source','==','issued'),where('date','>=',from),where('date','<=',to));
-  const snap=await getDocs(q);
-  documents=snap.docs.map(x=>({id:x.id,...x.data()}));
+  const snap=await getDocs(ref);
+  documents=snap.docs
+    .map(x=>({id:x.id,...x.data()}))
+    .filter(d=>d.source==='issued' && dateInRange(d,from,to));
 }
 
 function makeC100(d,seq,link){
