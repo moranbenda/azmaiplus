@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ממשק פתוח - עצמאי פלוס</title>
+<title>קבצים במבנה אחיד - עצמאי פלוס</title>
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--text:#172033;--muted:#718096;--line:#dbe3ef;--blue:#3867f4;--green:#169c55;--amber:#b7791f;--red:#d64545}
 *{box-sizing:border-box}body{margin:0;font-family:Arial,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
@@ -14,7 +14,7 @@ a{color:inherit}.wrap{max-width:1180px;margin:0 auto;padding:24px}.top{display:f
 <body>
 <div class="wrap">
   <div class="top no-print">
-    <div><h1>ממשק פתוח · מבנה אחיד 1.31</h1><div class="hint">הפקת קבצים, דוח אימות וחבילת בדיקה לסימולטור רשות המסים</div></div>
+    <div><h1>קבצים במבנה אחיד · גרסה 1.31</h1><div class="hint">הפקת קבצים, דוח אימות וחבילת בדיקה לסימולטור רשות המסים</div></div>
     <a class="btn secondary" href="/">חזרה ללוח הבקרה</a>
   </div>
 
@@ -61,7 +61,7 @@ a{color:inherit}.wrap{max-width:1180px;margin:0 auto;padding:24px}.top{display:f
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig={apiKey:"AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",authDomain:"freelance-accounting-6c3bb.firebaseapp.com",projectId:"freelance-accounting-6c3bb",storageBucket:"freelance-accounting-6c3bb.firebasestorage.app",messagingSenderId:"196974556694",appId:"1:196974556694:web:60ba710567f2a7c67c6737"};
 const app=initializeApp(firebaseConfig), auth=getAuth(app), db=getFirestore(app);
@@ -124,6 +124,14 @@ function money(n){return (Number(n)||0).toLocaleString('he-IL',{minimumFractionD
 function setStatus(msg,cls='ok'){const el=$('status');el.className='status '+cls;el.textContent=msg}
 function getRange(){return {from:$('fromDate').value,to:$('toDate').value}}
 function selectedDocs(){const {from,to}=getRange();return documents.filter(d=>eligible(d)&&dateInRange(d,from,to))}
+async function loadDocumentsForRange(){
+  const {from,to}=getRange();
+  if(!uid||!from||!to||from>to){documents=[];return}
+  const ref=collection(db,'ledgers',uid,'documents');
+  const q=query(ref,where('source','==','issued'),where('date','>=',from),where('date','<=',to));
+  const snap=await getDocs(q);
+  documents=snap.docs.map(x=>({id:x.id,...x.data()}));
+}
 
 function makeC100(d,seq,link){
   const c=d.customerSnapshot||{};const lines=Array.isArray(d.lines)?d.lines:[];
@@ -241,13 +249,13 @@ function runReportHtml(){if(!lastRun)return '<p>טרם בוצעה הפקה.</p>'
 function printHtml(html){$('printArea').innerHTML=html;window.print()}
 
 $('fromDate').value=`${new Date().getFullYear()}-01-01`;$('toDate').value=new Date().toISOString().slice(0,10);
-$('fromDate').onchange=$('toDate').onchange=()=>renderMetrics(selectedDocs());$('registrationNumber').oninput=()=>renderMetrics(selectedDocs());
+$('fromDate').onchange=$('toDate').onchange=async()=>{try{await loadDocumentsForRange();renderMetrics(selectedDocs())}catch(e){console.error(e);setStatus('לא ניתן לטעון את המסמכים לטווח שנבחר.','err')}};$('registrationNumber').oninput=()=>renderMetrics(selectedDocs());
 $('chooseDir').onclick=async()=>{if(!window.showDirectoryPicker){$('dirHint').textContent='הדפדפן הזה לא תומך בבחירת תיקייה. הקבצים יישמרו בהורדות.';return}try{chosenDir=await window.showDirectoryPicker();$('dirHint').textContent=`נבחרה תיקייה: ${chosenDir.name}`}catch(e){if(e.name!=='AbortError')console.error(e)}};
 $('buildExport').onclick=async()=>{try{await exportPackage(selectedDocs())}catch(e){console.error(e);setStatus(e.message||'שגיאה בהפקה','err')}};
 $('buildSimulatorPack').onclick=async()=>{try{const testDocs=syntheticDocsFromTemplate(selectedDocs().length?selectedDocs():documents);await exportPackage(testDocs,{test:true})}catch(e){console.error(e);setStatus(e.message||'שגיאה בהפקת חבילת בדיקה','err')}};
 $('printVerification').onclick=()=>printHtml(verificationHtml());$('printRunReport').onclick=()=>printHtml(runReportHtml());
 
-onAuthStateChanged(auth,async user=>{if(!user){location.href='/';return}uid=user.uid;try{const [pSnap,docsSnap]=await Promise.all([getDoc(doc(db,'users',uid)),getDocs(collection(db,'ledgers',uid,'documents'))]);profile=pSnap.exists()?pSnap.data():{};documents=docsSnap.docs.map(x=>({id:x.id,...x.data()}));$('businessName').value=profile.businessName||'';$('businessId').value=profile.businessId||'';const warns=profileIssues();if(warns.length){$('profileWarning').textContent=warns.join(' · ');$('profileWarning').style.display='block'}renderMetrics(selectedDocs())}catch(e){console.error(e);setStatus('לא ניתן לטעון את נתוני העסק/המסמכים.','err')}});
+onAuthStateChanged(auth,async user=>{if(!user){location.href='/';return}uid=user.uid;try{const pSnap=await getDoc(doc(db,'users',uid));profile=pSnap.exists()?pSnap.data():{};$('businessName').value=profile.businessName||'';$('businessId').value=profile.businessId||'';const warns=profileIssues();if(warns.length){$('profileWarning').textContent=warns.join(' · ');$('profileWarning').style.display='block'}await loadDocumentsForRange();renderMetrics(selectedDocs())}catch(e){console.error(e);setStatus('לא ניתן לטעון את נתוני העסק/המסמכים.','err')}});
 </script>
 </body>
 </html>
