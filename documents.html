@@ -1347,11 +1347,26 @@ async function waitForFrameImages(frameDocument){
   }));
 }
 
+function isMobilePdfDevice(){
+  return window.matchMedia("(max-width: 900px)").matches ||
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+}
+
+function withTimeout(promise, ms, message){
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function documentHtmlToPdfBase64(documentHtml, fileName){
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   iframe.style.position = "fixed";
-  iframe.style.left = "0";
+  // Keep the rendering frame off-screen. It must remain renderable (not display:none)
+  // because mobile Safari can otherwise produce a blank PDF.
+  iframe.style.left = "-10000px";
   iframe.style.top = "0";
   iframe.style.width = "794px";
   iframe.style.height = "1123px";
@@ -1465,15 +1480,29 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
       });
     }
 
-    await new Promise(resolve => setTimeout(resolve, 350));
+    // Wait for fonts instead of an unconditional 350 ms pause.
+    if (frameDocument.fonts?.ready) {
+      await withTimeout(
+        frameDocument.fonts.ready.catch(() => undefined),
+        2500,
+        "טעינת הגופנים למסמך נמשכה זמן רב מדי."
+      ).catch(() => undefined);
+    }
+    await new Promise(resolve => requestAnimationFrame(() => resolve()));
 
-    const dataUri = await frameWindow.html2pdf()
+    const mobilePdf = isMobilePdfDevice();
+    // Desktop keeps the exact previous render quality.
+    // Mobile uses far fewer canvas pixels while preserving the same A4 layout/content.
+    const pdfRenderScale = mobilePdf ? 1.35 : 2;
+    const pdfImageQuality = mobilePdf ? 0.96 : 0.98;
+
+    const pdfRenderPromise = frameWindow.html2pdf()
       .set({
         margin: 8,
         filename: fileName,
-        image: {type: "jpeg", quality: 0.98},
+        image: {type: "jpeg", quality: pdfImageQuality},
         html2canvas: {
-          scale: 2,
+          scale: pdfRenderScale,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
@@ -1496,6 +1525,12 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
       })
       .from(frameDocument.body)
       .outputPdf("datauristring");
+
+    const dataUri = await withTimeout(
+      pdfRenderPromise,
+      mobilePdf ? 12000 : 20000,
+      "יצירת קובץ ה־PDF נמשכה זמן רב מדי."
+    );
 
     const base64 = String(dataUri || "").split(",")[1];
 
@@ -1527,11 +1562,24 @@ function pdfBytesToBase64(bytes){
 
 async function signPdfBase64(pdfBase64){
   const unsignedBytes = pdfBase64ToBytes(pdfBase64);
-  const response = await fetch("https://api.azmaiplus.co.il/api/sign-pdf", {
-    method: "POST",
-    headers: {"Content-Type": "application/pdf"},
-    body: unsignedBytes
-  });
+  const controller = new AbortController();
+  const signTimeout = setTimeout(() => controller.abort(), 12000);
+  let response;
+  try{
+    response = await fetch("https://api.azmaiplus.co.il/api/sign-pdf", {
+      method: "POST",
+      headers: {"Content-Type": "application/pdf"},
+      body: unsignedBytes,
+      signal: controller.signal
+    });
+  }catch(error){
+    if(error?.name === "AbortError"){
+      throw new Error("החתימה האלקטרונית נמשכה זמן רב מדי. יש לנסות שוב.");
+    }
+    throw error;
+  }finally{
+    clearTimeout(signTimeout);
+  }
 
   if(!response.ok){
     const message = await response.text().catch(() => "");
@@ -1715,10 +1763,11 @@ async function issueDocument(){
   // Create and cryptographically sign the final PDF before the document is saved.
   // The signed bytes stay only in memory; Firestore continues to store the existing
   // document data/HTML exactly as before.
-  setStatus($('draftStatus'),'חותם על המסמך בחתימה אלקטרונית מאובטחת…','ok');
+  setStatus($('draftStatus'),'מכין את קובץ ה־PDF…','ok');
   const issuedPdfFileName = pdfFileNameForDocument(finalDoc);
   const issuedPolishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
   const issuedUnsignedPdfBase64 = await documentHtmlToPdfBase64(issuedPolishedHtml, issuedPdfFileName);
+  setStatus($('draftStatus'),'חותם על המסמך בחתימה אלקטרונית מאובטחת…','ok');
   const issuedSignedPdfBase64 = await signPdfBase64(issuedUnsignedPdfBase64);
   const latestLedgerSnapForRows=await getDoc(doc(db,'ledgers',uid));
   const latestLedgerDataForRows=latestLedgerSnapForRows.exists()?latestLedgerSnapForRows.data():{};
