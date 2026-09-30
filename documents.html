@@ -1560,17 +1560,53 @@ function pdfBytesToBase64(bytes){
   return btoa(binary);
 }
 
+function blobToBase64(blob){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onerror = ()=>reject(reader.error || new Error("קריאת קובץ ה־PDF החתום נכשלה."));
+    reader.onload = ()=>{
+      const result = String(reader.result || "");
+      const base64 = result.split(",")[1] || "";
+      if(!base64) return reject(new Error("המרת קובץ ה־PDF החתום נכשלה."));
+      resolve(base64);
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 async function signPdfBase64(pdfBase64){
-  const unsignedBytes = pdfBase64ToBytes(pdfBase64);
+  const startedAt = performance.now();
+  console.log("[PDF SIGN] preparing request", {base64Chars:String(pdfBase64 || "").length});
+
+  // Let the browser decode Base64 natively instead of running a large atob/JS loop.
+  // This is substantially safer on iPhone/Safari and avoids blocking before fetch().
+  const unsignedBlob = await fetch(
+    "data:application/pdf;base64," + String(pdfBase64 || "")
+  ).then(r=>r.blob());
+
+  console.log("[PDF SIGN] request ready", {
+    bytes: unsignedBlob.size,
+    ms: Math.round(performance.now() - startedAt)
+  });
+
+  if(!unsignedBlob.size){
+    throw new Error("קובץ ה־PDF לחתימה ריק.");
+  }
+
   const controller = new AbortController();
   const signTimeout = setTimeout(() => controller.abort(), 12000);
   let response;
   try{
+    console.log("[PDF SIGN] sending request");
     response = await fetch("https://api.azmaiplus.co.il/api/sign-pdf", {
       method: "POST",
       headers: {"Content-Type": "application/pdf"},
-      body: unsignedBytes,
+      body: unsignedBlob,
       signal: controller.signal
+    });
+    console.log("[PDF SIGN] response received", {
+      status: response.status,
+      ms: Math.round(performance.now() - startedAt)
     });
   }catch(error){
     if(error?.name === "AbortError"){
@@ -1586,11 +1622,17 @@ async function signPdfBase64(pdfBase64){
     throw new Error(message || "חתימת קובץ ה־PDF נכשלה.");
   }
 
-  const signedBytes = new Uint8Array(await response.arrayBuffer());
-  if(!signedBytes.length){
+  const signedBlob = await response.blob();
+  if(!signedBlob.size){
     throw new Error("השרת החזיר קובץ PDF חתום ריק.");
   }
-  return pdfBytesToBase64(signedBytes);
+
+  const signedBase64 = await blobToBase64(signedBlob);
+  console.log("[PDF SIGN] completed", {
+    signedBytes: signedBlob.size,
+    totalMs: Math.round(performance.now() - startedAt)
+  });
+  return signedBase64;
 }
 
 function businessNameForEmail(){
