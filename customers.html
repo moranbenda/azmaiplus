@@ -2083,6 +2083,53 @@ function businessLogoForEmail(){
   );
 }
 
+async function signStoredDocumentPdfBase64(pdfBase64){
+  const unsignedBlob = await fetch(
+    "data:application/pdf;base64," + String(pdfBase64 || "")
+  ).then(r => r.blob());
+
+  if(!unsignedBlob.size){
+    throw new Error("קובץ ה־PDF לחתימה ריק.");
+  }
+
+  const controller = new AbortController();
+  const signTimeout = setTimeout(() => controller.abort(), 12000);
+  let response;
+
+  try{
+    response = await fetch("https://api.azmaiplus.co.il/api/sign-pdf", {
+      method: "POST",
+      headers: {"Content-Type": "application/pdf"},
+      body: unsignedBlob,
+      signal: controller.signal
+    });
+  }catch(error){
+    if(error?.name === "AbortError"){
+      throw new Error("החתימה האלקטרונית נמשכה זמן רב מדי. יש לנסות שוב.");
+    }
+    throw error;
+  }finally{
+    clearTimeout(signTimeout);
+  }
+
+  if(!response.ok){
+    const message = await response.text().catch(() => "");
+    throw new Error(message || "חתימת קובץ ה־PDF נכשלה.");
+  }
+
+  const signedBlob = await response.blob();
+  if(!signedBlob.size){
+    throw new Error("השרת החזיר קובץ PDF חתום ריק.");
+  }
+
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+    reader.onerror = () => reject(reader.error || new Error("קריאת קובץ ה־PDF החתום נכשלה."));
+    reader.readAsDataURL(signedBlob);
+  });
+}
+
 async function resendStoredDocument(docId){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
 
@@ -2145,10 +2192,11 @@ async function resendStoredDocument(docId){
   try {
     showToast("מכין PDF ושולח את המסמך במייל…");
 
-    const [idToken, pdfBase64] = await Promise.all([
+    const [idToken, unsignedPdfBase64] = await Promise.all([
       currentUser.getIdToken(),
       documentHtmlToPdfBase64(documentHtml, pdfFileName)
     ]);
+    const pdfBase64 = await signStoredDocumentPdfBase64(unsignedPdfBase64);
 
     const response = await fetch("/api/send-document-email", {
       method: "POST",
