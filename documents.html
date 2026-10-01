@@ -138,7 +138,7 @@
     </div>
   </section>
 
-  <section class="card settings-card no-print" id="numberingSettingsCard">
+  <section class="card settings-card no-print is-hidden" id="numberingSettingsCard">
     <h2>הגדרות ספרור</h2>
     <div class="hint">הגדרת מספרים ראשונית לכל סוג מסמך. אחרי השמירה הספרור ננעל ולא יוצג לעריכה.</div>
     <div class="settings-row" style="margin-top:14px">
@@ -789,9 +789,10 @@ function renderDocumentFinder(){
     <td>${escapeHtml(d.number||'')}</td>
     <td>${escapeHtml(d.customerName||d.customerSnapshot?.name||d.customerSnapshot?.businessName||'')}</td>
     <td>${money(d.gross||0)}</td>
-    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button>${canCredit?`<button type="button" class="btn secondary small" data-credit-issued="${escapeHtml(d.id||'')}">צור זיכוי</button>`:''}${duplicateCount>1 && d.status!=='cancelled_technical_duplicate'?`<button type="button" class="btn danger small" data-fix-duplicate="${escapeHtml(d.id||'')}">בטל כפילות</button>`:''}</div></td>
+    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button><button type="button" class="btn secondary small" data-print-issued="${escapeHtml(d.id||'')}">PDF / הדפסה</button>${canCredit?`<button type="button" class="btn secondary small" data-credit-issued="${escapeHtml(d.id||'')}">צור זיכוי</button>`:''}${duplicateCount>1 && d.status!=='cancelled_technical_duplicate'?`<button type="button" class="btn danger small" data-fix-duplicate="${escapeHtml(d.id||'')}">בטל כפילות</button>`:''}</div></td>
   </tr>`}).join('');
   tbody.querySelectorAll('[data-view-issued]').forEach(btn=>btn.onclick=()=>openIssuedDocument(btn.dataset.viewIssued));
+  tbody.querySelectorAll('[data-print-issued]').forEach(btn=>btn.onclick=()=>openIssuedDocumentLikeCustomers(btn.dataset.printIssued, true));
   tbody.querySelectorAll('[data-credit-issued]').forEach(btn=>btn.onclick=()=>prepareCreditFromIssuedDocument(btn.dataset.creditIssued));
   tbody.querySelectorAll('[data-fix-duplicate]').forEach(btn=>btn.onclick=()=>cancelTechnicalDuplicate(btn.dataset.fixDuplicate));
 }
@@ -963,19 +964,122 @@ async function cancelTechnicalDuplicate(id){
     setStatus($('draftStatus'),`הכפילות של מסמך ${d.number||''} בוטלה והרישום הכספי הכפול הוסר ✅`,'ok');
   }catch(e){ console.error(e); alert('לא הצלחתי לבטל את הכפילות. לא בוצע שינוי.'); }
 }
-function openIssuedDocument(id){
+
+function storedDocumentDisplayType(d){
+  return d?.typeLabel || TYPE_LABELS[d?.type] || d?.type || "מסמך";
+}
+
+function polishStoredDocumentHtmlLikeCustomers(html){
+  let out = String(html || "");
+
+  const replacements = [
+    ["הצעת מחיר", "הצעת&nbsp;מחיר"],
+    ["חשבונית מס/קבלה", "חשבונית&nbsp;מס/קבלה"],
+    ["חשבונית מס", "חשבונית&nbsp;מס"],
+    ["חשבונית זיכוי", "חשבונית&nbsp;זיכוי"],
+    ["חשבונית עסקה", "חשבונית&nbsp;עסקה"],
+    ["מספר עוסק/ח.פ:", "מספר&nbsp;עוסק/ח.פ:"],
+    ["מספר מזהה:", "מספר&nbsp;מזהה:"],
+    ["איש קשר:", "איש&nbsp;קשר:"],
+    ["מחיר לפני מע״מ", "מחיר&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לפני מע״מ", "סה״כ&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לאחר הנחה לפני מע״מ", "סה״כ&nbsp;לאחר&nbsp;הנחה&nbsp;לפני&nbsp;מע״מ"],
+    ["סה״כ לתשלום", "סה״כ&nbsp;לתשלום"]
+  ];
+
+  replacements.forEach(([from, to]) => {
+    out = out.split(from).join(to);
+  });
+
+  const pdfTextFix = `
+    <style id="azmai-pdf-hebrew-text-fix">
+      h2,h3,th,td,.doc-meta,.customer-box,.totals span{
+        word-spacing:.12em;
+      }
+      h2,h3,.azmai-nowrap{
+        white-space:nowrap;
+      }
+      .doc-meta,.customer-box{
+        unicode-bidi:embed;
+        direction:rtl;
+      }
+    </style>`;
+
+  if (out.includes("</head>")) {
+    out = out.replace("</head>", `${pdfTextFix}</head>`);
+  } else {
+    out = pdfTextFix + out;
+  }
+
+  return out;
+}
+
+function normalizeStoredDocumentHtmlLikeCustomers(html, d){
+  const title = `${escapeHtml(storedDocumentDisplayType(d))} ${escapeHtml(d.number || "")}`.trim();
+  const customerRightFix = `
+    <style id="azmai-customer-right-fix">
+      html,body{direction:rtl!important;text-align:right!important;}
+      .doc-parties{display:block!important;direction:rtl!important;text-align:right!important;margin-bottom:18px!important;}
+      .doc-parties .box,.doc-parties .customer-box,.customer-box{
+        display:block!important;
+        float:right!important;
+        clear:both!important;
+        width:46%!important;
+        min-width:240px!important;
+        margin:0!important;
+        text-align:right!important;
+        direction:rtl!important;
+      }
+      .doc-parties:after{content:"";display:block;clear:both;}
+      .customer-box *{text-align:right!important;direction:rtl!important;}
+      .doc-date-ltr{direction:ltr!important;unicode-bidi:isolate!important;display:inline-block!important;}
+    </style>`;
+
+  let out = String(html || "");
+  if (!out.trim().toLowerCase().startsWith("<!doctype") && !out.trim().toLowerCase().startsWith("<html")) {
+    out = `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>${title}</title></head><body>${out}</body></html>`;
+  }
+  if (out.includes('</head>')) out = out.replace('</head>', `${customerRightFix}</head>`);
+  else out = customerRightFix + out;
+  out = polishStoredDocumentHtmlLikeCustomers(out);
+  return out;
+}
+
+function customerStyleStoredDocumentHtml(d){
+  const baseHtml = String(d?.printHtml || d?.previewHtml || "").trim();
+  if(!baseHtml) return "";
+  return normalizeStoredDocumentHtmlLikeCustomers(baseHtml, d);
+}
+
+function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
   const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
   if(!d) return;
-  const html=formatStoredDocumentHtmlDate(String(d.printHtml||'').trim(), d.date);
+  const html=customerStyleStoredDocumentHtml(d);
   if(!html){
-    alert('למסמך הישן הזה לא נשמר עותק HTML להצגה. הנתונים החשבונאיים נשמרו, אך אין תצוגת הדפסה זמינה.');
+    alert("למסמך הישן הזה לא נשמר עותק HTML להצגה.");
     return;
   }
-  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const w=window.open(url,'_blank');
-  if(!w){ URL.revokeObjectURL(url); alert('הדפדפן חסם את חלון המסמך.'); return; }
-  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  const title=`${storedDocumentDisplayType(d)} ${d.number || ""}`.trim();
+
+  if(!shouldPrint){
+    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
+    const url=URL.createObjectURL(blob);
+    const w=window.open(url,"_blank");
+    if(!w){ URL.revokeObjectURL(url); alert("הדפדפן חסם את חלון המסמך."); return; }
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    return;
+  }
+
+  const w=window.open("","_blank");
+  if(!w){ alert("הדפדפן חסם את פתיחת המסמך."); return; }
+  const printHtml=html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
+  w.document.open();
+  w.document.write(printHtml);
+  w.document.close();
+}
+
+function openIssuedDocument(id){
+  return openIssuedDocumentLikeCustomers(id, false);
 }
 function openDocumentFinder(){
   renderDocumentFinder();
@@ -1961,6 +2065,9 @@ function printPreviewOnly(){
   w.document.close();
 }
 async function downloadCurrentDocument(){
+  if(lastIssuedDocument?.id){
+    return openIssuedDocumentLikeCustomers(lastIssuedDocument.id, true);
+  }
   const printableHtml = getPrintableContent();
   if(!printableHtml) return setStatus($('draftStatus'),'אין מסמך להורדה','err');
   const fileName = safeFileNameForDocument()+'.pdf';
