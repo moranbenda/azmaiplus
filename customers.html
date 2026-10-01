@@ -303,8 +303,8 @@
     .docs-history-table th,.docs-history-table td{padding:8px 10px;border-bottom:1px solid #e5edf7;text-align:right;vertical-align:middle}
     .docs-history-table th{background:#f8fafc;color:#475569;font-weight:800;white-space:nowrap}
     .docs-history-table tr:last-child td{border-bottom:0}
-    .docs-actions{display:flex;flex-direction:row;gap:4px;align-items:center;justify-content:flex-start;min-width:0;flex-wrap:nowrap}
-    .docs-actions .btn{padding:6px 7px;font-size:11.5px;min-height:auto;white-space:nowrap}
+    .docs-actions{display:flex;flex-direction:row;gap:3px;align-items:center;justify-content:flex-start;min-width:0;flex-wrap:nowrap}
+    .docs-actions .btn{padding:5px 6px;font-size:11px;min-height:30px;white-space:nowrap}
     .docs-mobile-title{display:none}
 
     .customer-card{text-align:right;direction:rtl}
@@ -319,14 +319,13 @@
     .doc-view-close{border:1px solid #dbe3ef;background:white;border-radius:999px;padding:8px 14px;font-weight:800;cursor:pointer;color:#0f2748}
     .doc-view-close:hover{background:#eef6ff}
     .doc-view-frame{border:0;width:100%;height:100%;background:white}
-
-    /* Desktop only: use the available content width more efficiently. */
     @media(min-width:761px){
-      main{padding-left:18px!important;padding-right:18px!important}
-      .wrap{max-width:none!important}
-      .card{padding-left:16px;padding-right:16px}
+      .wrap{width:calc(100% - 12px)!important;max-width:none!important}
+      main{padding-left:0!important;padding-right:0!important}
+      .card-bd{padding-left:10px;padding-right:10px}
+      .customer-details-section,.customer-documents-section{padding-left:10px;padding-right:10px}
+      .docs-history-table th,.docs-history-table td{padding-left:6px;padding-right:6px}
     }
-
     @media(max-width:760px){
       .doc-view-modal{padding:10px}.doc-view-box{height:94vh;border-radius:18px}
       .docs-history-table-wrap{overflow-x:visible;border:0;background:transparent}
@@ -2954,48 +2953,53 @@ async function loadData(){
   userTag.textContent = currentUser.email || "מחובר";
 
   try {
-    const userSnap = await getDoc(doc(db, "users", currentUser.uid));
-    userProfile = userSnap.exists() ? userSnap.data() : {};
-
-    const [ledgerSnap, documentsSnap] = await Promise.all([
-      getDoc(doc(db, "ledgers", currentUser.uid)),
-      getDocs(collection(db, "ledgers", currentUser.uid, "documents"))
+    // The customer screen itself only needs the profile + ledger.
+    // Do not make it wait for the entire documents collection or audit history.
+    const [userSnap, ledgerSnap] = await Promise.all([
+      getDoc(doc(db, "users", currentUser.uid)),
+      getDoc(doc(db, "ledgers", currentUser.uid))
     ]);
+
+    userProfile = userSnap.exists() ? userSnap.data() : {};
     const data = ledgerSnap.exists() ? ledgerSnap.data() : {};
     customers = Array.isArray(data.customers) ? data.customers : [];
     ledgerRows = Array.isArray(data.rows) ? data.rows : [];
 
     const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
-    const subcollectionDocuments = documentsSnap.docs.map(snapshot => ({
-      ...snapshot.data(),
-      id: snapshot.data()?.id || snapshot.id,
-      _storage:"subcollection"
-    }));
-    const byId = new Map();
-    legacyDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
-    subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
-    ledgerDocuments = Array.from(byId.values());
+    ledgerDocuments = legacyDocuments;
 
-    saveStatus.textContent = `נטענו ${customers.length} לקוחות`;
-
-    // If another page sent us directly to a customer card, open that customer.
     const requestedCustomerId = new URLSearchParams(location.search).get("customerId");
     if (requestedCustomerId && customers.some(c => String(c.id) === String(requestedCustomerId))) {
       selectedId = requestedCustomerId;
     }
 
-    // Render immediately; preserve the existing imported-payment recovery,
-    // but do not make the customer screen wait for the audit-log scan.
+    saveStatus.textContent = `נטענו ${customers.length} לקוחות`;
     render();
 
-    recoverImportedPaymentStatusFromAudit()
+    // Load issued-document history after the customer UI is already usable.
+    getDocs(collection(db, "ledgers", currentUser.uid, "documents"))
+      .then(documentsSnap => {
+        const subcollectionDocuments = documentsSnap.docs.map(snapshot => ({
+          ...snapshot.data(),
+          id: snapshot.data()?.id || snapshot.id,
+          _storage:"subcollection"
+        }));
+        const byId = new Map();
+        legacyDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
+        subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
+        ledgerDocuments = Array.from(byId.values());
+        render();
+
+        // Preserve the existing recovery mechanism exactly, but run it last.
+        return recoverImportedPaymentStatusFromAudit();
+      })
       .then(recoveredImportedPayments => {
         if (!recoveredImportedPayments) return;
         saveStatus.textContent = `נטענו ${customers.length} לקוחות · שוחזרו סטטוסי תשלום מיובאים`;
         render();
       })
       .catch(err => {
-        console.error("Imported payment recovery after initial render failed:", err);
+        console.error("Deferred customer history load failed:", err);
       });
   } catch (err) {
     console.error(err);
