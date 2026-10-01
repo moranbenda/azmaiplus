@@ -1491,10 +1491,11 @@ async function documentHtmlToPdfBase64(documentHtml, fileName){
     await new Promise(resolve => requestAnimationFrame(() => resolve()));
 
     const mobilePdf = isMobilePdfDevice();
-    // Desktop keeps the exact previous render quality.
-    // Mobile uses far fewer canvas pixels while preserving the same A4 layout/content.
-    const pdfRenderScale = mobilePdf ? 1.35 : 2;
-    const pdfImageQuality = mobilePdf ? 0.96 : 0.98;
+    // Use one identical A4 render profile on desktop and mobile.
+    // The earlier mobile-only quality reduction is no longer needed now that
+    // the signing delay was traced to CORS rather than PDF rendering.
+    const pdfRenderScale = 2;
+    const pdfImageQuality = 0.98;
 
     const pdfRenderPromise = frameWindow.html2pdf()
       .set({
@@ -1658,7 +1659,11 @@ function businessLogoForEmail(){
 function pdfFileNameForDocument(finalDoc){
   const type = finalDoc.typeLabel || TYPE_LABELS[finalDoc.type] || "מסמך";
   const number = finalDoc.number || "document";
-  return `${type}-${number}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
+  const customer = finalDoc.customerName || "";
+  return [type, number, customer]
+    .filter(Boolean)
+    .join("_")
+    .replace(/[\\/:*?"<>|]+/g, "-") + ".pdf";
 }
 
 async function sendIssuedDocumentEmail(finalDoc, customer, signedPdfBase64 = ""){
