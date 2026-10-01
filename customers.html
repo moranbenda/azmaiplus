@@ -923,6 +923,7 @@ let userProfile = {};
 let customers = [];
 let ledgerDocuments = [];
 let ledgerRows = [];
+let customerDocumentsLoading = true;
 let editingId = null;
 let selectedId = null;
 
@@ -2374,7 +2375,7 @@ function renderSelected(){
         </tbody>
       </table>
     </div>
-  ` : `<div class="empty customer-docs-empty">עדיין אין מסמכים ללקוח.</div>`;
+  ` : `<div class="empty customer-docs-empty">${customerDocumentsLoading ? "טוען מסמכים…" : "עדיין אין מסמכים ללקוח."}</div>`;
 
   body.innerHTML = `
     <section class="customer-details-section">
@@ -2967,6 +2968,7 @@ async function loadData(){
 
     const legacyDocuments = (Array.isArray(data.documents) ? data.documents : []).map(d => ({...d, _storage:"legacy"}));
     ledgerDocuments = legacyDocuments;
+    customerDocumentsLoading = true;
 
     const requestedCustomerId = new URLSearchParams(location.search).get("customerId");
     if (requestedCustomerId && customers.some(c => String(c.id) === String(requestedCustomerId))) {
@@ -2988,6 +2990,7 @@ async function loadData(){
         legacyDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
         subcollectionDocuments.forEach(d => byId.set(String(d.id || `${d.type}-${d.number}`), d));
         ledgerDocuments = Array.from(byId.values());
+        customerDocumentsLoading = false;
         render();
 
         // Preserve the existing recovery mechanism exactly, but run it last.
@@ -2999,6 +3002,8 @@ async function loadData(){
         render();
       })
       .catch(err => {
+        customerDocumentsLoading = false;
+        render();
         console.error("Deferred customer history load failed:", err);
       });
   } catch (err) {
