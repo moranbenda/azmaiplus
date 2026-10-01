@@ -1103,11 +1103,6 @@ async function loadAll(){
     ? ledger.documentDrafts
     : [];
 
-  await migrateLegacyIssuedDocuments();
-  const issuedSnap = await getDocs(collection(db, 'ledgers', uid, 'documents'));
-  issuedDocuments = issuedSnap.docs.map(x=>({id:x.id,...x.data()}));
-  await consumeInvoiceIsraelCallbackFromUrl();
-
   hydrateSettings();
   applyBusinessTypeDocumentRestrictions();
   renderCustomerOptions();
@@ -1137,6 +1132,14 @@ async function loadAll(){
 
   renderPreview();
 
+
+  // Customer selection and the document form are now usable immediately.
+  // Existing-document history is loaded afterwards.
+  try{
+    await migrateLegacyIssuedDocuments();
+    const issuedSnap = await getDocs(collection(db, 'ledgers', uid, 'documents'));
+    issuedDocuments = issuedSnap.docs.map(x=>({id:x.id,...x.data()}));
+    await consumeInvoiceIsraelCallbackFromUrl();
   // מאפשר יצירת זיכוי ישירות מכרטיס הלקוח, לאחר שכל המסמכים והלקוחות נטענו.
   if(creditDocumentId){
     const original = issuedDocuments.find(d => String(d.id) === String(creditDocumentId));
@@ -1157,6 +1160,9 @@ async function loadAll(){
       const qs = params.toString();
       history.replaceState({}, "", location.pathname + (qs ? `?${qs}` : ""));
     }
+  }
+  }catch(err){
+    console.error("Deferred document history load failed:", err);
   }
 }
 function compactCustomersForLedger(list){
