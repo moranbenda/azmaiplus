@@ -1792,8 +1792,8 @@ async function sendIssuedDocumentEmail(finalDoc, customer, signedPdfBase64 = "")
   let pdfBase64 = String(signedPdfBase64 || "").trim();
 
   if(!pdfBase64){
-    const polishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
-    const unsignedPdfBase64 = await documentHtmlToPdfBase64(polishedHtml, fileName);
+    const emailHtml = normalizeStoredDocumentHtmlLikeCustomers(finalDoc.printHtml || "", finalDoc);
+    const unsignedPdfBase64 = await documentHtmlToPdfBase64(emailHtml, fileName);
     pdfBase64 = await signPdfBase64(unsignedPdfBase64);
   }
 
@@ -1922,8 +1922,8 @@ async function issueDocument(){
   // document data/HTML exactly as before.
   setStatus($('draftStatus'),'מכין את קובץ ה־PDF…','ok');
   const issuedPdfFileName = pdfFileNameForDocument(finalDoc);
-  const issuedPolishedHtml = polishHebrewPdfHtml(finalDoc.printHtml || "");
-  const issuedUnsignedPdfBase64 = await documentHtmlToPdfBase64(issuedPolishedHtml, issuedPdfFileName);
+  const issuedEmailHtml = normalizeStoredDocumentHtmlLikeCustomers(finalDoc.printHtml || "", finalDoc);
+  const issuedUnsignedPdfBase64 = await documentHtmlToPdfBase64(issuedEmailHtml, issuedPdfFileName);
   setStatus($('draftStatus'),'חותם על המסמך בחתימה אלקטרונית מאובטחת…','ok');
   const issuedSignedPdfBase64 = await signPdfBase64(issuedUnsignedPdfBase64);
   const latestLedgerSnapForRows=await getDoc(doc(db,'ledgers',uid));
