@@ -1119,6 +1119,245 @@ body:not(.logged-in) .az-nav-sidebar,
 body:not(.logged-in) .az-nav-overlay,
 body:not(.logged-in) .az-nav-menu-btn{display:none!important;}
 body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
+
+
+/* ===== 2026-10-01: איזון מסך הבית ===== */
+/* אזור העבודה הראשי הוא טור אחד: רישום -> תנועות -> סיכומים וחתכים */
+.grid-main{grid-template-columns:1fr!important;}
+.grid-main > .card{min-width:0;}
+
+/* כפתור "היום" נשמר כ-hook ללוגיקה הקיימת אך אינו מוצג */
+#btnQuickToday[hidden]{display:none!important;}
+
+/* רישום הכנסה/הוצאה: גריד מאוזן לרוחב הדסקטופ */
+@media(min-width:901px){
+  #txForm{
+    display:grid!important;
+    grid-template-columns:1.05fr .9fr 1.65fr 1.45fr 1.1fr 1fr;
+    gap:12px!important;
+    align-items:end;
+  }
+  #txForm > div,
+  #txForm > .pill,
+  #txForm > button{
+    width:100%!important;
+    min-width:0!important;
+    margin:0!important;
+  }
+  #txForm > div > input,
+  #txForm > div > select{width:100%;}
+  #vatIncludedPill,
+  #vatDeductPill{
+    min-height:44px;
+    align-self:end;
+    justify-content:center;
+  }
+  #receiptUploadBox{grid-column:1 / span 4;}
+  #vatIncludedPill{grid-column:5;}
+  #vatDeductPill{grid-column:6;}
+  #btnAdd{grid-column:5 / 7;width:100%!important;}
+}
+
+/* בטאבלט/מובייל נשמר הסידור האנכי הקיים */
+@media(max-width:900px){
+  #txForm{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;}
+  #txForm > div,#txForm > .pill,#txForm > button{width:100%!important;min-width:0!important;margin:0!important;}
+}
+
+
+/* Entry form refinement: keep VAT controls on one calm row and make upload less dominant */
+@media(min-width:701px){
+  #txForm{
+    align-items:end;
+  }
+  #txForm #vatIncludedPill,
+  #txForm #vatDeductPill{
+    flex:0 0 auto;
+    min-height:42px;
+    height:42px;
+    padding:6px 12px;
+    align-self:end;
+    white-space:nowrap;
+  }
+  #txForm #vatIncludedPill{
+    min-width:190px;
+    justify-content:center;
+  }
+  #txForm #vatDeductPill{
+    min-width:190px;
+    justify-content:center;
+  }
+  #txForm #vatDeductPill input[type="number"]{
+    width:64px!important;
+    min-height:30px;
+    padding:4px 7px;
+  }
+  #txForm #receiptUploadBox{
+    flex:1 1 300px!important;
+    max-width:420px;
+  }
+  #txForm #btnAdd{
+    flex:0 0 150px;
+    min-height:42px;
+    align-self:end;
+  }
+}
+
+
+/* Entry form refinement v2 — lighter proportions on desktop */
+@media(min-width:701px){
+  #txForm #vatIncludedPill,
+  #txForm #vatDeductPill{
+    min-height:38px;
+    height:38px;
+    padding:4px 10px;
+  }
+
+  #txForm #vatIncludedPill{
+    min-width:176px;
+  }
+
+  #txForm #vatDeductPill{
+    min-width:176px;
+  }
+
+  #txForm #vatIncludedPill input[type="checkbox"]{
+    width:18px!important;
+    height:18px!important;
+    min-height:18px!important;
+    flex:0 0 18px;
+    margin:0;
+    padding:0;
+  }
+
+  #txForm #vatDeductPill input[type="number"]{
+    width:58px!important;
+    min-height:28px;
+    height:28px;
+    padding:3px 6px;
+  }
+
+  #txForm #btnAdd{
+    flex:0 0 112px;
+    width:112px!important;
+    min-height:38px;
+    height:38px;
+    padding:7px 16px;
+  }
+}
+
+
+/* ===== 2026-10-02: compact entry form final ===== */
+@media(min-width:901px){
+  .grid-main > .card:first-child .bd{padding:12px 15px 10px;}
+  #txForm{
+    grid-template-columns:1.05fr .9fr 1.65fr 1.45fr 1.1fr 1fr!important;
+    column-gap:12px!important;
+    row-gap:10px!important;
+    align-items:start!important;
+  }
+  #receiptUploadBox{
+    grid-column:1 / 4!important;
+    grid-row:2 / span 2!important;
+    max-width:none!important;
+    align-self:start!important;
+  }
+  #receiptUploadBox input[type="file"]{min-height:38px;padding:6px 9px;}
+  #receiptUploadBox .hint{line-height:1.35;margin-top:3px;}
+  #vatIncludedPill{
+    grid-column:5!important;
+    grid-row:2!important;
+    min-width:0!important;
+    width:100%!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:4px 8px!important;
+  }
+  #vatDeductPill{
+    grid-column:6!important;
+    grid-row:2!important;
+    min-width:0!important;
+    width:100%!important;
+    height:38px!important;
+    min-height:38px!important;
+    padding:4px 8px!important;
+  }
+  #vatIncludedPill input[type="checkbox"]{
+    width:18px!important;height:18px!important;min-height:18px!important;flex:0 0 18px!important;margin:0!important;padding:0!important;
+  }
+  #vatDeductPill input[type="number"]{width:54px!important;height:28px!important;min-height:28px!important;padding:3px 5px!important;}
+  #btnAdd{
+    grid-column:5 / 7!important;
+    grid-row:3!important;
+    justify-self:start!important;
+    width:112px!important;
+    min-height:38px!important;
+    height:38px!important;
+    margin:0!important;
+  }
+  #txForm + div{margin-top:6px!important;}
+}
+
+
+/* ===== 2026-10-02: mobile entry alignment + explicit section order ===== */
+@media(max-width:560px){
+  /* Keep the main flow unambiguous on phones: entry -> transactions -> summaries. */
+  .grid-main{display:flex!important;flex-direction:column!important;gap:12px!important;}
+  .grid-main > .card:first-child{order:1;}
+  #transactionsCard{order:2;}
+  #summaryCutsCard{order:3;}
+
+  /* Calm, aligned two-column entry form. */
+  #txForm{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px 8px!important;
+    align-items:end!important;
+  }
+  #txForm > *{min-width:0!important;margin:0!important;}
+  #txForm .entry-date{grid-column:1;}
+  #txForm .entry-type{grid-column:2;}
+  #txForm .entry-desc,
+  #txForm .entry-category,
+  #receiptUploadBox,
+  #btnAdd{grid-column:1 / -1!important;}
+  #txForm .entry-docnum{grid-column:1;}
+  #txForm .entry-amount{grid-column:2;}
+  #vatIncludedPill{grid-column:1!important;}
+  #vatDeductPill{grid-column:2!important;}
+
+  #txForm .entry-date > label,
+  #txForm .entry-type > label,
+  #txForm .entry-desc > label,
+  #txForm .entry-category > label,
+  #txForm .entry-docnum > label,
+  #txForm .entry-amount > label,
+  #receiptUploadBox > label{display:block!important;width:100%!important;}
+
+  #txForm .entry-date input,
+  #txForm .entry-type select,
+  #txForm .entry-desc input,
+  #txForm .entry-category select,
+  #txForm .entry-docnum input,
+  #txForm .entry-amount input,
+  #receiptUploadBox input[type="file"]{width:100%!important;max-width:none!important;box-sizing:border-box!important;}
+
+  #vatIncludedPill,
+  #vatDeductPill{
+    width:100%!important;
+    min-width:0!important;
+    min-height:48px!important;
+    height:auto!important;
+    padding:8px 10px!important;
+    justify-content:space-between!important;
+    white-space:nowrap!important;
+  }
+  #vatIncludedPill input[type="checkbox"]{width:18px!important;height:18px!important;min-height:18px!important;flex:0 0 18px!important;}
+  #vatDeductPill input[type="number"]{width:58px!important;min-height:32px!important;height:32px!important;}
+  #receiptUploadBox{width:100%!important;max-width:none!important;}
+  #btnAdd{width:100%!important;min-height:44px!important;height:auto!important;}
+}
+
 </style>
 </head>
 <body class="auth-pending">
@@ -1247,17 +1486,16 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
           aria-expanded="false"
           aria-controls="homeHeroContent"
         >
-          <span>מה עושים היום?</span>
+          <span>תקופת עבודה</span>
           <span class="home-hero-chevron" aria-hidden="true">⌄</span>
         </button>
 
         <div class="home-hero-content" id="homeHeroContent">
           <div class="hint">
-            בחרו טווח חודשים לתצוגה
+            בחרו טווח לתצוגה
             <span id="homeRangeLabel" hidden></span>
           </div>
           <div class="home-range-panel">
-          <div class="home-range-title">תקופת עבודה</div>
           <div class="home-range-controls">
             <label>חודש<br><input type="month" id="homeMonth" /></label>
             <label>שנה קלנדרית<br><select id="homeYear"></select></label>
@@ -1294,22 +1532,22 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
       <section class="card">
         <div class="hd">
           <h3 style="margin:0;font-size:15px">רישום הכנסה / הוצאה</h3>
-          <button class="btn small" id="btnQuickToday">היום</button>
+          <button class="btn small" id="btnQuickToday" hidden aria-hidden="true">היום</button>
         </div>
         <div class="bd">
           <form id="txForm" class="row" onsubmit="return false;">
-            <div style="flex:1 1 130px">
+            <div class="entry-date" style="flex:1 1 130px">
               <label>תאריך</label>
               <input type="date" id="fDate" required />
             </div>
-            <div style="flex:1 1 120px">
+            <div class="entry-type" style="flex:1 1 120px">
               <label>סוג</label>
               <select id="fType">
                 <option value="income">הכנסה</option>
                 <option value="expense" selected>הוצאה</option>
               </select>
             </div>
-            <div style="flex:3 1 250px">
+            <div class="entry-desc" style="flex:3 1 250px">
               <label>תיאור</label>
               <input
                 type="text"
@@ -1319,18 +1557,18 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
               />
               <datalist id="itemsList"></datalist>
             </div>
-            <div style="flex:2 1 210px">
+            <div class="entry-category" style="flex:2 1 210px">
               <label>קטגוריה</label>
               <select id="fCategory"><option value="">בחירת קטגוריה</option></select>
               <datalist id="catsList"></datalist>
             </div>
 
-            <div style="flex:1 1 150px">
+            <div class="entry-docnum" style="flex:1 1 150px">
               <label>מס׳ חשבונית / אסמכתא</label>
               <input type="text" id="fDocNumber" placeholder="אופציונלי" autocomplete="off" />
             </div>
 
-            <div style="flex:1 1 120px">
+            <div class="entry-amount" style="flex:1 1 120px">
               <label>סכום (₪)</label>
               <input type="number" step="0.01" id="fAmount" placeholder="0" required />
             </div>
@@ -1345,7 +1583,7 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
             <div style="flex:2 1 240px" id="receiptUploadBox">
               <label>חשבונית / קבלה (אופציונלי)</label>
               <input type="file" id="fReceiptFile" accept="image/*,.pdf" />
-              <div class="hint">הקובץ יישמר ב־Google Drive של המשתמש בתיקייה חודשית. בתמונה המערכת תנסה לקרוא סכום/תאריך/ספק אוטומטית.</div>
+              <div class="hint">הקובץ יישמר ב־Google Drive של המשתמש בתיקייה חודשית. בתמונה המערכת תנסה לקרוא סכום/תאריך/ספק אוטומטית, יש לוודא התאמה לפני השמירה.</div>
               <div class="hint" id="receiptOcrStatus"></div>
             </div>
 <button type="button" class="btn" id="btnAdd">הוספה</button>
@@ -1360,10 +1598,61 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
                 <label class="pill" style="margin-inline-start:5px">
                   <input type="checkbox" id="vatEnabled" checked /> מע"מ פעיל
                 </label>
-                <span class="hint">ניתן לעדכן את אחוז המע"מ. לעוסק פטור המערכת מכבה את המע"מ אוטומטית.</span>
+                <span class="hint">ניתן לעדכן את אחוז המע"מ במידת הצורך. לעוסק פטור אין גילום מע"מ</span>
               </div>
             </details>
           </div>
+        </div>
+      </section>
+
+      <!-- טבלת תנועות -->
+      <section class="card" id="transactionsCard" style="grid-column:1 / -1">
+        <div class="hd">
+          <h3 style="margin:0;font-size:15px">תנועות</h3>
+          <span class="muted" id="rowsCount">0 שורות</span>
+        </div>
+        <div class="bd">
+          <div class="row" style="gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
+            <label style="min-width:190px">חיפוש מהיר
+              <input id="txQuickSearch" placeholder="תיאור / קטגוריה" />
+            </label>
+            <label style="min-width:150px">סוג
+              <select id="txQuickType">
+                <option value="all">הכל</option>
+                <option value="income">הכנסות</option>
+                <option value="expense">הוצאות</option>
+              </select>
+            </label>
+            <label style="min-width:210px">קטגוריה
+              <select id="txQuickCategory"><option value="">כל הקטגוריות</option></select>
+            </label>
+            <label style="min-width:220px">שיוך לקוח
+              <select id="txQuickCustomer">
+                <option value="all">הכל</option>
+                <option value="unlinked">הכנסות ללא שיוך לקוח</option>
+                <option value="linked">הכנסות משויכות ללקוח</option>
+              </select>
+            </label>
+            <button class="btn secondary small" id="btnTxQuickReset" type="button">ניקוי סינון</button>
+          </div>
+        </div>
+        <div class="bd tx-table-wrap" style="max-height:60vh;overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>תאריך</th>
+<th>סוג</th>
+                <th>תיאור</th>
+                <th>קטגוריה</th>
+                <th>סכום נטו</th>
+                <th>מע"מ</th>
+                <th>סכום כולל</th>
+                <th>חשבונית</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
         </div>
       </section>
 
@@ -1418,56 +1707,6 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
         </div>
       </section>
 
-      <!-- טבלת תנועות -->
-      <section class="card" style="grid-column:1 / -1">
-        <div class="hd">
-          <h3 style="margin:0;font-size:15px">תנועות</h3>
-          <span class="muted" id="rowsCount">0 שורות</span>
-        </div>
-        <div class="bd">
-          <div class="row" style="gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px">
-            <label style="min-width:190px">חיפוש מהיר
-              <input id="txQuickSearch" placeholder="תיאור / קטגוריה" />
-            </label>
-            <label style="min-width:150px">סוג
-              <select id="txQuickType">
-                <option value="all">הכל</option>
-                <option value="income">הכנסות</option>
-                <option value="expense">הוצאות</option>
-              </select>
-            </label>
-            <label style="min-width:210px">קטגוריה
-              <select id="txQuickCategory"><option value="">כל הקטגוריות</option></select>
-            </label>
-            <label style="min-width:220px">שיוך לקוח
-              <select id="txQuickCustomer">
-                <option value="all">הכל</option>
-                <option value="unlinked">הכנסות ללא שיוך לקוח</option>
-                <option value="linked">הכנסות משויכות ללקוח</option>
-              </select>
-            </label>
-            <button class="btn secondary small" id="btnTxQuickReset" type="button">ניקוי סינון</button>
-          </div>
-        </div>
-        <div class="bd tx-table-wrap" style="max-height:60vh;overflow:auto">
-          <table>
-            <thead>
-              <tr>
-                <th>תאריך</th>
-<th>סוג</th>
-                <th>תיאור</th>
-                <th>קטגוריה</th>
-                <th>סכום נטו</th>
-                <th>מע"מ</th>
-                <th>סכום כולל</th>
-                <th>חשבונית</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="tbody"></tbody>
-          </table>
-        </div>
-      </section>
     </div>
   </main>
 </div>
@@ -4105,8 +4344,12 @@ function updateFiltersUI() {
   });
 
   const current = qCategory.value;
+  const fullSummaryCategoryList = Array.from(new Set([
+    ...fullExpenseList,
+    ...uniqueCategories()
+  ])).sort((a,b)=>a.localeCompare(b,"he"));
   qCategory.innerHTML = `<option value="">כל הקטגוריות</option>` +
-    uniqueCategories().map(c =>
+    fullSummaryCategoryList.map(c =>
       `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`
     ).join("");
   if (current) qCategory.value = current;
