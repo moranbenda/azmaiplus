@@ -1298,6 +1298,66 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
   #txForm + div{margin-top:6px!important;}
 }
 
+
+/* ===== 2026-10-02: mobile entry alignment + explicit section order ===== */
+@media(max-width:560px){
+  /* Keep the main flow unambiguous on phones: entry -> transactions -> summaries. */
+  .grid-main{display:flex!important;flex-direction:column!important;gap:12px!important;}
+  .grid-main > .card:first-child{order:1;}
+  #transactionsCard{order:2;}
+  #summaryCutsCard{order:3;}
+
+  /* Calm, aligned two-column entry form. */
+  #txForm{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+    gap:10px 8px!important;
+    align-items:end!important;
+  }
+  #txForm > *{min-width:0!important;margin:0!important;}
+  #txForm .entry-date{grid-column:1;}
+  #txForm .entry-type{grid-column:2;}
+  #txForm .entry-desc,
+  #txForm .entry-category,
+  #receiptUploadBox,
+  #btnAdd{grid-column:1 / -1!important;}
+  #txForm .entry-docnum{grid-column:1;}
+  #txForm .entry-amount{grid-column:2;}
+  #vatIncludedPill{grid-column:1!important;}
+  #vatDeductPill{grid-column:2!important;}
+
+  #txForm .entry-date > label,
+  #txForm .entry-type > label,
+  #txForm .entry-desc > label,
+  #txForm .entry-category > label,
+  #txForm .entry-docnum > label,
+  #txForm .entry-amount > label,
+  #receiptUploadBox > label{display:block!important;width:100%!important;}
+
+  #txForm .entry-date input,
+  #txForm .entry-type select,
+  #txForm .entry-desc input,
+  #txForm .entry-category select,
+  #txForm .entry-docnum input,
+  #txForm .entry-amount input,
+  #receiptUploadBox input[type="file"]{width:100%!important;max-width:none!important;box-sizing:border-box!important;}
+
+  #vatIncludedPill,
+  #vatDeductPill{
+    width:100%!important;
+    min-width:0!important;
+    min-height:48px!important;
+    height:auto!important;
+    padding:8px 10px!important;
+    justify-content:space-between!important;
+    white-space:nowrap!important;
+  }
+  #vatIncludedPill input[type="checkbox"]{width:18px!important;height:18px!important;min-height:18px!important;flex:0 0 18px!important;}
+  #vatDeductPill input[type="number"]{width:58px!important;min-height:32px!important;height:32px!important;}
+  #receiptUploadBox{width:100%!important;max-width:none!important;}
+  #btnAdd{width:100%!important;min-height:44px!important;height:auto!important;}
+}
+
 </style>
 </head>
 <body class="auth-pending">
@@ -1476,18 +1536,18 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
         </div>
         <div class="bd">
           <form id="txForm" class="row" onsubmit="return false;">
-            <div style="flex:1 1 130px">
+            <div class="entry-date" style="flex:1 1 130px">
               <label>תאריך</label>
               <input type="date" id="fDate" required />
             </div>
-            <div style="flex:1 1 120px">
+            <div class="entry-type" style="flex:1 1 120px">
               <label>סוג</label>
               <select id="fType">
                 <option value="income">הכנסה</option>
                 <option value="expense" selected>הוצאה</option>
               </select>
             </div>
-            <div style="flex:3 1 250px">
+            <div class="entry-desc" style="flex:3 1 250px">
               <label>תיאור</label>
               <input
                 type="text"
@@ -1497,18 +1557,18 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
               />
               <datalist id="itemsList"></datalist>
             </div>
-            <div style="flex:2 1 210px">
+            <div class="entry-category" style="flex:2 1 210px">
               <label>קטגוריה</label>
               <select id="fCategory"><option value="">בחירת קטגוריה</option></select>
               <datalist id="catsList"></datalist>
             </div>
 
-            <div style="flex:1 1 150px">
+            <div class="entry-docnum" style="flex:1 1 150px">
               <label>מס׳ חשבונית / אסמכתא</label>
               <input type="text" id="fDocNumber" placeholder="אופציונלי" autocomplete="off" />
             </div>
 
-            <div style="flex:1 1 120px">
+            <div class="entry-amount" style="flex:1 1 120px">
               <label>סכום (₪)</label>
               <input type="number" step="0.01" id="fAmount" placeholder="0" required />
             </div>
@@ -1523,7 +1583,7 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
             <div style="flex:2 1 240px" id="receiptUploadBox">
               <label>חשבונית / קבלה (אופציונלי)</label>
               <input type="file" id="fReceiptFile" accept="image/*,.pdf" />
-              <div class="hint">הקובץ יישמר ב־Google Drive של המשתמש בתיקייה חודשית. המערכת תנסה לקרוא סכום/תאריך/ספק אוטומטית, יש לוודא התאמה לפני השמירה.</div>
+              <div class="hint">הקובץ יישמר ב־Google Drive של המשתמש בתיקייה חודשית. בתמונה המערכת תנסה לקרוא סכום/תאריך/ספק אוטומטית, יש לוודא התאמה לפני השמירה.</div>
               <div class="hint" id="receiptOcrStatus"></div>
             </div>
 <button type="button" class="btn" id="btnAdd">הוספה</button>
@@ -1546,7 +1606,7 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
       </section>
 
       <!-- טבלת תנועות -->
-      <section class="card" style="grid-column:1 / -1">
+      <section class="card" id="transactionsCard" style="grid-column:1 / -1">
         <div class="hd">
           <h3 style="margin:0;font-size:15px">תנועות</h3>
           <span class="muted" id="rowsCount">0 שורות</span>
