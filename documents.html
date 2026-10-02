@@ -1051,7 +1051,7 @@ function customerStyleStoredDocumentHtml(d){
   return normalizeStoredDocumentHtmlLikeCustomers(baseHtml, d);
 }
 
-function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
+async function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
   const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
   if(!d) return;
   const html=customerStyleStoredDocumentHtml(d);
@@ -1070,14 +1070,14 @@ function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
     return;
   }
 
-  const w=window.open("","_blank");
-  if(!w){ alert("הדפדפן חסם את פתיחת המסמך."); return; }
-  const printHtml=html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
-  w.document.open();
-  w.document.write(printHtml);
-  w.document.close();
+  try{
+    const pdfBlob = await renderSignedPdfOnServer(html);
+    downloadPdfBlob(pdfBlob, pdfFileNameForDocument(d));
+  }catch(error){
+    console.error("PDF download failed", error);
+    alert(error?.message || "הורדת קובץ ה־PDF נכשלה.");
+  }
 }
-
 function openIssuedDocument(id){
   return openIssuedDocumentLikeCustomers(id, false);
 }
@@ -1685,6 +1685,48 @@ function blobToBase64(blob){
   });
 }
 
+
+async function renderSignedPdfOnServer(documentHtml){
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try{
+    response = await fetch("https://api.azmaiplus.co.il/api/render-pdf", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({html: String(documentHtml || "")}),
+      signal: controller.signal
+    });
+  }catch(error){
+    if(error?.name === "AbortError"){
+      throw new Error("יצירת קובץ ה־PDF נמשכה זמן רב מדי.");
+    }
+    throw error;
+  }finally{
+    clearTimeout(timeout);
+  }
+
+  if(!response.ok){
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || `יצירת קובץ ה־PDF נכשלה (${response.status}).`);
+  }
+
+  const blob = await response.blob();
+  if(!blob.size) throw new Error("השרת החזיר קובץ PDF ריק.");
+  return blob;
+}
+
+function downloadPdfBlob(blob, fileName){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName || "document.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 async function signPdfBase64(pdfBase64){
   const startedAt = performance.now();
   console.log("[PDF SIGN] preparing request", {base64Chars:String(pdfBase64 || "").length});
@@ -1793,8 +1835,8 @@ async function sendIssuedDocumentEmail(finalDoc, customer, signedPdfBase64 = "")
 
   if(!pdfBase64){
     const emailHtml = normalizeStoredDocumentHtmlLikeCustomers(finalDoc.printHtml || "", finalDoc);
-    const unsignedPdfBase64 = await documentHtmlToPdfBase64(emailHtml, fileName);
-    pdfBase64 = await signPdfBase64(unsignedPdfBase64);
+    const signedPdfBlob = await renderSignedPdfOnServer(emailHtml);
+    pdfBase64 = await blobToBase64(signedPdfBlob);
   }
 
   const response = await fetch("/api/send-document-email", {
@@ -1920,12 +1962,11 @@ async function issueDocument(){
   // Create and cryptographically sign the final PDF before the document is saved.
   // The signed bytes stay only in memory; Firestore continues to store the existing
   // document data/HTML exactly as before.
-  setStatus($('draftStatus'),'מכין את קובץ ה־PDF…','ok');
+  setStatus($('draftStatus'),'מכין וחותם את קובץ ה־PDF…','ok');
   const issuedPdfFileName = pdfFileNameForDocument(finalDoc);
   const issuedEmailHtml = normalizeStoredDocumentHtmlLikeCustomers(finalDoc.printHtml || "", finalDoc);
-  const issuedUnsignedPdfBase64 = await documentHtmlToPdfBase64(issuedEmailHtml, issuedPdfFileName);
-  setStatus($('draftStatus'),'חותם על המסמך בחתימה אלקטרונית מאובטחת…','ok');
-  const issuedSignedPdfBase64 = await signPdfBase64(issuedUnsignedPdfBase64);
+  const issuedSignedPdfBlob = await renderSignedPdfOnServer(issuedEmailHtml);
+  const issuedSignedPdfBase64 = await blobToBase64(issuedSignedPdfBlob);
   const latestLedgerSnapForRows=await getDoc(doc(db,'ledgers',uid));
   const latestLedgerDataForRows=latestLedgerSnapForRows.exists()?latestLedgerSnapForRows.data():{};
   const existingRows=Array.isArray(latestLedgerDataForRows.rows) ? latestLedgerDataForRows.rows : (Array.isArray(ledger.rows) ? ledger.rows : []);
