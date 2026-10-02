@@ -1865,7 +1865,59 @@ function normalizeStoredDocumentHtml(html, d){
   return out;
 }
 
-function openStoredDocument(docId, shouldPrint=false){
+
+async function renderSignedPdfOnServer(documentHtml){
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  let response;
+  try{
+    response = await fetch("https://api.azmaiplus.co.il/api/render-pdf", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({html: String(documentHtml || "")}),
+      signal: controller.signal
+    });
+  }catch(error){
+    if(error?.name === "AbortError"){
+      throw new Error("יצירת קובץ ה־PDF נמשכה זמן רב מדי.");
+    }
+    throw error;
+  }finally{
+    clearTimeout(timeout);
+  }
+
+  if(!response.ok){
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload?.error || `יצירת קובץ ה־PDF נכשלה (${response.status}).`);
+  }
+
+  const blob = await response.blob();
+  if(!blob.size) throw new Error("השרת החזיר קובץ PDF ריק.");
+  return blob;
+}
+
+function storedPdfFileName(d){
+  const type = documentDisplayType(d) || "מסמך";
+  const number = d?.number || "document";
+  const customer = d?.customerName || d?.customerSnapshot?.name || "";
+  return [type, number, customer]
+    .filter(Boolean)
+    .join("_")
+    .replace(/[\\/:*?"<>|]+/g, "-") + ".pdf";
+}
+
+function downloadPdfBlob(blob, fileName){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName || "document.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+async function openStoredDocument(docId, shouldPrint=false){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
   if (!d) return showToast("לא נמצא העתק מסמך לשחזור.", true);
 
@@ -1882,12 +1934,13 @@ function openStoredDocument(docId, shouldPrint=false){
     return showStoredDocumentModal(html, title);
   }
 
-  const w = window.open("", "_blank");
-  if (!w) return showToast("הדפדפן חסם את פתיחת המסמך.", true);
-  const printHtml = html.replace("</body>", `<script>window.onload=()=>{window.print();setTimeout(()=>window.close(),300);};<\/script></body>`);
-  w.document.open();
-  w.document.write(printHtml);
-  w.document.close();
+  try{
+    const pdfBlob = await renderSignedPdfOnServer(html);
+    downloadPdfBlob(pdfBlob, storedPdfFileName(d));
+  }catch(error){
+    console.error("PDF download failed", error);
+    showToast(error?.message || "הורדת קובץ ה־PDF נכשלה.", true);
+  }
 }
 
 async function waitForFrameImages(frameDocument){
