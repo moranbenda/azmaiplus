@@ -2245,11 +2245,11 @@ async function resendStoredDocument(docId){
   try {
     showToast("מכין PDF ושולח את המסמך במייל…");
 
-    const [idToken, unsignedPdfBase64] = await Promise.all([
+    const [idToken, signedPdfBlob] = await Promise.all([
       currentUser.getIdToken(),
-      documentHtmlToPdfBase64(documentHtml, pdfFileName)
+      renderSignedPdfOnServer(documentHtml)
     ]);
-    const pdfBase64 = await signStoredDocumentPdfBase64(unsignedPdfBase64);
+    const pdfBase64 = await blobToBase64(signedPdfBlob);
 
     const response = await fetch("/api/send-document-email", {
       method: "POST",
