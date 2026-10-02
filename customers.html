@@ -2249,7 +2249,12 @@ async function resendStoredDocument(docId){
       currentUser.getIdToken(),
       renderSignedPdfOnServer(documentHtml)
     ]);
-    const pdfBase64 = await blobToBase64(signedPdfBlob);
+    const pdfBase64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || "").split(",")[1] || "");
+      reader.onerror = () => reject(reader.error || new Error("קריאת קובץ ה־PDF החתום נכשלה."));
+      reader.readAsDataURL(signedPdfBlob);
+    });
 
     const response = await fetch("/api/send-document-email", {
       method: "POST",
