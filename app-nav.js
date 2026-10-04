@@ -59,6 +59,7 @@
     .az-nav-soon{font-size:9px;color:#94a3b8;border:1px solid var(--az-nav-line);border-radius:999px;padding:1px 6px;font-weight:700}
     .az-nav-bottom{margin-top:auto;border-top:1px solid var(--az-nav-line);padding-top:10px}.az-nav-user{font-size:11px;color:var(--az-nav-dim);padding:5px 9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .az-nav-home{display:block;padding:8px 10px;border-radius:9px;text-decoration:none!important;color:#64748b!important;font-size:12px;font-weight:600}.az-nav-home:hover{background:#f8fafc}
+    .az-nav-logout{display:block;width:100%;margin-top:3px;padding:8px 10px;border:0;border-radius:9px;background:transparent;text-align:right;color:#64748b;font:inherit;font-size:12px;font-weight:600;cursor:pointer}.az-nav-logout:hover{background:#fef2f2;color:#b91c1c}
     .az-nav-overlay{display:none;position:fixed;z-index:998;inset:0;background:rgba(15,23,42,.34);backdrop-filter:blur(2px)}
     .az-nav-menu-btn{display:none;position:fixed;z-index:1002;right:14px;top:14px;width:44px;height:44px;border:1px solid var(--az-nav-line);border-radius:12px;background:#fff;box-shadow:0 5px 18px rgba(15,23,42,.10);align-items:center;justify-content:center;cursor:pointer}
     .az-nav-menu-lines,.az-nav-menu-lines:before,.az-nav-menu-lines:after{content:"";display:block;width:20px;height:2px;border-radius:2px;background:#334155;position:relative}.az-nav-menu-lines:before{position:absolute;top:-6px;right:0}.az-nav-menu-lines:after{position:absolute;top:6px;right:0}
@@ -88,7 +89,7 @@
       <div><div class="az-nav-brand-name">עצמאי פלוס</div><div class="az-nav-brand-sub">הנהלת חשבונות עצמאית</div></div>
     </div>
     <nav class="az-nav-list">${navHtml}</nav>
-    <div class="az-nav-bottom"><div class="az-nav-user" id="azmaiNavUser">${pageTitle.replace(' - עצמאי פלוס','')}</div><a class="az-nav-home" href="/">חזרה למסך הראשי</a></div>`;
+    <div class="az-nav-bottom"><div class="az-nav-user" id="azmaiNavUser">${pageTitle.replace(' - עצמאי פלוס','')}</div><a class="az-nav-home" href="/">חזרה למסך הראשי</a><button type="button" class="az-nav-logout" id="azmaiNavLogout">התנתקות</button></div>`;
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -110,6 +111,13 @@
   };
   button.addEventListener('click', () => setOpen(!document.body.classList.contains('azmai-nav-open')));
   overlay.addEventListener('click', () => setOpen(false));
+
+  // Reuse the page's existing logout logic instead of duplicating auth behavior here.
+  const navLogout = document.getElementById('azmaiNavLogout');
+  navLogout?.addEventListener('click', () => {
+    const existingLogout = document.getElementById('btnLogout');
+    if (existingLogout && existingLogout !== navLogout) existingLogout.click();
+  });
   sidebar.addEventListener('click', e => {
     if (window.matchMedia('(max-width:900px)').matches && e.target.closest('a')) setOpen(false);
   });
