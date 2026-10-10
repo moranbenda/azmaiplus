@@ -188,7 +188,7 @@
         </div>
         <div class="wide"><label>הערה למסמך</label><textarea id="docNotes" placeholder="למשל: פרטי חשבון להעברה, תנאי תשלום או מידע נוסף ללקוח"></textarea></div>
       </div>
-      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
+      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><button type="button" class="btn small whatsapp" id="btnLastIssuedShare" hidden>שיתוף ב־WhatsApp</button><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
     </section>
 
     <section class="card preview-card">
@@ -1133,7 +1133,8 @@ async function issuedViewerAction(action){
       issuedViewerStatus('קובץ ה־PDF הורד.');
       return;
     }
-    const file=new File([pdfBlob],name,{type:'application/pdf'});
+    const shareName=`AzmaiPlus_${String(d.type||'document').replace(/[^a-zA-Z0-9_-]/g,'_')}_${String(d.number||'').replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
+    const file=new File([pdfBlob],shareName,{type:'application/pdf'});
     if(navigator.canShare?.({files:[file]})&&navigator.share){
       await navigator.share({files:[file],title:`${storedDocumentDisplayType(d)} ${d.number||''}`.trim()});
       issuedViewerStatus('חלון השיתוף נפתח.');
@@ -1967,6 +1968,7 @@ function updateLastIssuedCustomerLink(){
 async function issueDocument(){
   if(issueDocumentInProgress) return;
   issueDocumentInProgress = true;
+  if($('btnLastIssuedShare')) $('btnLastIssuedShare').hidden=true;
   const issueButton = $('btnIssueDocument');
   if(issueButton){ issueButton.disabled = true; issueButton.textContent = 'מפיק מסמך…'; }
   try{
@@ -2088,6 +2090,7 @@ async function issueDocument(){
     lastSignedPdfBase64=issuedSignedPdfBase64;
     lastIssuedCustomerId=String(finalDoc.customerId || c.id || '');
     updateLastIssuedCustomerLink();
+    if($('btnLastIssuedShare')) $('btnLastIssuedShare').hidden=false;
     previewFinal=true;
     renderNumberingSettings();
     renderCustomerOptions();
@@ -2211,6 +2214,11 @@ async function downloadCurrentDocument(){
 
 $('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null;creditSourceDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnAddPayment')?.addEventListener('click',()=>{ paymentEntries.push(makePaymentEntry({amount:Math.max(0,round2(totals().gross-paymentEntriesTotal()))})); renderPaymentEntries(); renderPreview(); });
+$('btnLastIssuedShare')?.addEventListener('click',()=>{
+  if(!lastIssuedDocument?.id) return;
+  selectedIssuedViewerId=String(lastIssuedDocument.id);
+  issuedViewerAction('whatsapp');
+});
 $('btnPrint').onclick=downloadCurrentDocument;
 $('btnDownload')?.addEventListener('click',downloadCurrentDocument);
 $('btnIssueDocument').onclick=issueDocument;
@@ -2268,11 +2276,3 @@ $('finderSearch')?.addEventListener('input', renderDocumentFinder);
 $('finderType')?.addEventListener('change', renderDocumentFinder);
 $('finderFrom')?.addEventListener('change', renderDocumentFinder);
 $('finderTo')?.addEventListener('change', renderDocumentFinder);
-$('finderClear')?.addEventListener('click',()=>{ if($('finderSearch'))$('finderSearch').value=''; if($('finderType'))$('finderType').value=''; if($('finderFrom'))$('finderFrom').value=''; if($('finderTo'))$('finderTo').value=''; renderDocumentFinder(); });
-$('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
-$('btnReconnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
-onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
-</script>
-  <script src="/app-nav.js"></script>
-</body>
-</html>
