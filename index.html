@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>עצמאי פלוס - הנהלת חשבונות עצמאית</title>
-  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="icon" type="image/png" href="/logo.png?v=20261010">
   <style>
     :root{
       --bg:#f4f6f9;
@@ -240,6 +240,10 @@
       box-shadow:0 20px 60px rgba(15,23,42,.18);padding:22px 22px 18px;
       border:1px solid rgba(148,163,184,.35);
     }
+    .auth-brand-logo{display:block;width:78px;height:78px;object-fit:contain;margin:0 auto 12px}
+    .auth-install-guide{margin-top:15px;padding:12px;background:#f8fafc;border:1px solid #e5e9f2;border-radius:14px;font-size:12px;line-height:1.7;color:#475569}
+    .auth-install-guide strong{display:block;color:#1b2430;font-size:13px;margin-bottom:3px}
+    .auth-install-guide div+div{margin-top:5px}
     #authCard h1{margin:4px 0 2px;font-size:20px;text-align:center}
     #authCard .sub{font-size:13px;color:var(--text-dim);text-align:center;margin-bottom:14px}
     .auth-tabs{display:flex;background:var(--muted);border-radius:999px;padding:3px;margin-bottom:14px}
@@ -1365,6 +1369,7 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
 <!-- מסך התחברות / הרשמה -->
 <section id="authScreen">
   <div id="authCard">
+    <img src="/logo.png" alt="לוגו עצמאי פלוס" class="auth-brand-logo" />
     <h1>התחברות לעצמאי פלוס הנהלת חשבונות עצמאית</h1>
     <div class="sub">פעם ראשונה? לחצ/י על הרשמה</div>
 
@@ -1414,6 +1419,12 @@ body:not(.logged-in).azmai-has-shared-nav{padding-right:0!important;}
     </form>
 
     <div class="auth-notice" id="authInfo" hidden></div>
+    <div class="auth-install-guide">
+      <strong>רוצים גישה מהירה מהטלפון?</strong>
+      <div>אפשר להוסיף את עצמאי פלוס למסך הבית ולהיכנס בלחיצה אחת.</div>
+      <div><b>Android (Chrome):</b> תפריט ⋮ ← הוספה למסך הבית או התקנת אפליקציה.</div>
+      <div><b>iPhone (Safari):</b> כפתור השיתוף ← הוספה למסך הבית.</div>
+    </div>
     <div class="auth-footer" id="authError" style="color:#dc2626;min-height:16px;margin-top:4px"></div>
   </div>
 </section>
