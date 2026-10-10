@@ -311,6 +311,14 @@
     .customer-card .name,.customer-card .hint{text-align:right}
     .customer-card .chips{justify-content:flex-start}
     .doc-date-ltr{direction:ltr;unicode-bidi:isolate;display:inline-block}
+    .share-choice-modal{position:fixed;inset:0;z-index:1200;display:none;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.55)}
+    .share-choice-modal.show{display:flex}
+    .share-choice-box{width:min(380px,100%);padding:22px;border-radius:20px;background:#fff;box-shadow:0 22px 60px rgba(15,23,42,.25);text-align:right}
+    .share-choice-box h3{margin:0 0 8px;font-size:19px}
+    .share-choice-actions{display:grid;gap:10px;margin-top:18px}
+    .share-choice-actions .btn{width:100%;font-weight:750}
+    .share-choice-actions .btn.whatsapp{background:#25d366;color:#073b20}
+    .share-choice-actions .btn.whatsapp:hover{background:#1fbd59}
     .doc-view-modal{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:22px;background:rgba(15,23,42,.55)}
     .doc-view-modal.show{display:flex}
     .doc-view-box{width:min(980px,96vw);height:min(92vh,920px);background:white;border-radius:22px;box-shadow:0 30px 80px rgba(15,23,42,.28);border:1px solid #dbe3ef;overflow:hidden;display:flex;flex-direction:column;direction:rtl}
@@ -890,6 +898,17 @@
 </main>
 
 <div class="toast" id="toast"></div>
+<div class="share-choice-modal" id="customerShareChoice" role="dialog" aria-modal="true" aria-labelledby="customerShareTitle">
+  <div class="share-choice-box">
+    <h3 id="customerShareTitle">שיתוף מסמך</h3>
+    <div class="hint">בחרו כיצד לשתף את המסמך</div>
+    <div class="share-choice-actions">
+      <button class="btn secondary" id="customerShareEmail" type="button">שליחה במייל</button>
+      <button class="btn whatsapp" id="customerShareWhatsapp" type="button">שיתוף ב־WhatsApp</button>
+      <button class="btn secondary" id="customerShareCancel" type="button">ביטול</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js"></script>
 
@@ -2183,6 +2202,55 @@ async function signStoredDocumentPdfBase64(pdfBase64){
   });
 }
 
+let customerShareDocId = null;
+function closeCustomerShare(){
+  $("customerShareChoice").classList.remove("show");
+  customerShareDocId = null;
+}
+function openCustomerShare(docId){
+  if (!ledgerDocuments.some(d => String(d.id) === String(docId))) {
+    return showToast("לא נמצא מסמך לשיתוף.", true);
+  }
+  customerShareDocId = docId;
+  $("customerShareChoice").classList.add("show");
+}
+$("customerShareCancel").addEventListener("click", closeCustomerShare);
+$("customerShareChoice").addEventListener("click", ev => {
+  if (ev.target === $("customerShareChoice")) closeCustomerShare();
+});
+$("customerShareEmail").addEventListener("click", () => {
+  const id = customerShareDocId;
+  closeCustomerShare();
+  if (id) resendStoredDocument(id);
+});
+$("customerShareWhatsapp").addEventListener("click", async () => {
+  const id = customerShareDocId;
+  closeCustomerShare();
+  const d = ledgerDocuments.find(x => String(x.id) === String(id));
+  if (!d) return showToast("לא נמצא מסמך לשיתוף.", true);
+  try {
+    showToast("מכין קובץ PDF לשיתוף…");
+    const baseHtml = d.printHtml || d.previewHtml || `<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"></head><body>${documentHtmlForView(d)}</body></html>`;
+    const html = normalizeStoredDocumentHtml(baseHtml, d);
+    const blob = await renderSignedPdfOnServer(html);
+    // ASCII filename avoids garbled names in WhatsApp on Windows.
+    const file = new File([blob], `AzmaiPlus-${String(d.number || "document").replace(/[^a-zA-Z0-9_-]/g, "-")}.pdf`, {type:"application/pdf"});
+    if (navigator.share && navigator.canShare?.({files:[file]})) {
+      try {
+        await navigator.share({files:[file]});
+      } catch (err) {
+        if (err?.name !== "AbortError") throw err;
+      }
+    } else {
+      downloadPdfBlob(blob, file.name);
+      showToast("הקובץ הורד. אפשר לצרף אותו ל־WhatsApp.");
+    }
+  } catch (err) {
+    console.error("Customer PDF sharing failed", err);
+    showToast(err?.message || "שיתוף המסמך נכשל.", true);
+  }
+});
+
 async function resendStoredDocument(docId){
   const d = ledgerDocuments.find(x => String(x.id) === String(docId));
 
@@ -2468,7 +2536,7 @@ function renderSelected(){
                       ? `<span class="payment-na">היסטוריה מיובאת</span>`
                       : `<button class="btn secondary small" type="button" data-view-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>צפייה</button>
                          <button class="btn secondary small" type="button" data-print-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>PDF / הדפסה</button>
-                         <button class="btn secondary small" type="button" data-send-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שליחה במייל</button>
+                         <button class="btn secondary small" type="button" data-share-doc="${escapeHtml(d.id || "")}" ${d.id ? "" : "disabled"}>שיתוף</button>
                          ${canCreateCredit ? `<button class="btn secondary small" type="button" data-credit-doc="${escapeHtml(d.id || "")}">צור זיכוי</button>` : ""}
                          ${canConvertSource ? `<button class="btn secondary small" type="button" data-convert-doc="${escapeHtml(d.id || "")}" data-target-type="tax_invoice">הפק חשבונית מס</button>
                          <button class="btn secondary small" type="button" data-convert-doc="${escapeHtml(d.id || "")}" data-target-type="tax_invoice_receipt">הפק חשבונית מס/קבלה</button>` : ""}
@@ -2566,8 +2634,8 @@ function renderSelected(){
     btn.addEventListener("click", () => openStoredDocument(btn.dataset.printDoc, true))
   );
 
-  body.querySelectorAll("[data-send-doc]").forEach(btn =>
-    btn.addEventListener("click", () => resendStoredDocument(btn.dataset.sendDoc))
+  body.querySelectorAll("[data-share-doc]").forEach(btn =>
+    btn.addEventListener("click", () => openCustomerShare(btn.dataset.shareDoc))
   );
 
   body.querySelectorAll("[data-credit-doc]").forEach(btn =>
