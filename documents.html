@@ -116,6 +116,16 @@
   .finder-table{min-width:760px}
 }
 
+
+/* Issued document viewer — presentation only; PDF generation remains unchanged. */
+.issued-viewer-dialog{width:min(1100px,96vw);max-width:1100px;max-height:94vh;border:1px solid var(--line);border-radius:20px;padding:0;background:#fff;color:var(--text)}
+.issued-viewer-dialog::backdrop{background:rgba(15,23,42,.62)}
+.issued-viewer-header,.issued-viewer-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid var(--line)}
+.issued-viewer-actions{border-bottom:0;border-top:1px solid var(--line);justify-content:flex-start}
+.issued-viewer-dialog iframe{width:100%;height:min(68vh,750px);display:block;border:0;background:#fff}
+.btn.whatsapp{background:#25D366;color:#fff;box-shadow:none}
+.issued-viewer-status{padding:0 16px 10px;color:var(--muted);font-size:13px}
+@media(max-width:700px){.issued-viewer-dialog{width:98vw;max-height:96vh}.issued-viewer-dialog iframe{height:57vh}.issued-viewer-actions .btn{flex:1}}
 </style>
 </head>
 <body>
@@ -236,6 +246,21 @@
     </div>
     <div class="hint" style="margin-top:10px">מסמך שהופק מוצג לקריאה/הדפסה בלבד ואינו ניתן לעריכה.</div>
   </div>
+</dialog>
+
+
+<dialog id="issuedViewerDialog" class="issued-viewer-dialog no-print" aria-label="צפייה במסמך שהופק">
+  <div class="issued-viewer-header"><strong id="issuedViewerTitle">מסמך שהופק</strong><button type="button" class="btn secondary small" id="issuedViewerClose">סגירה</button></div>
+  <iframe id="issuedViewerFrame" title="תצוגת מסמך" sandbox="allow-same-origin"></iframe>
+  <div class="issued-viewer-actions">
+    <button type="button" class="btn secondary small" id="issuedViewerPdf">הורדת PDF / הדפסה</button>
+    <button type="button" class="btn secondary small" id="issuedViewerEmail">שליחה במייל</button>
+    <button type="button" class="btn small whatsapp" id="issuedViewerWhatsapp">שיתוף ב־WhatsApp</button>
+    <button type="button" class="btn secondary small" id="issuedViewerCredit" hidden>יצירת זיכוי</button>
+    <button type="button" class="btn secondary small" id="issuedViewerInvoice" hidden>יצירת חשבונית מס</button>
+    <button type="button" class="btn secondary small" id="issuedViewerTaxReceipt" hidden>יצירת חשבונית מס/קבלה</button>
+  </div>
+  <div class="issued-viewer-status" id="issuedViewerStatus" role="status"></div>
 </dialog>
 
 <script type="module">
@@ -789,7 +814,7 @@ function renderDocumentFinder(){
     <td>${escapeHtml(d.number||'')}</td>
     <td>${escapeHtml(d.customerName||d.customerSnapshot?.name||d.customerSnapshot?.businessName||'')}</td>
     <td>${money(d.gross||0)}</td>
-    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button><button type="button" class="btn secondary small" data-print-issued="${escapeHtml(d.id||'')}">PDF / הדפסה</button>${canCredit?`<button type="button" class="btn secondary small" data-credit-issued="${escapeHtml(d.id||'')}">צור זיכוי</button>`:''}${duplicateCount>1 && d.status!=='cancelled_technical_duplicate'?`<button type="button" class="btn danger small" data-fix-duplicate="${escapeHtml(d.id||'')}">בטל כפילות</button>`:''}</div></td>
+    <td><div class="finder-actions"><button type="button" class="btn secondary small" data-view-issued="${escapeHtml(d.id||'')}">פתיחה</button>${canCredit?`<button type="button" class="btn secondary small" data-credit-issued="${escapeHtml(d.id||'')}">צור זיכוי</button>`:''}${duplicateCount>1 && d.status!=='cancelled_technical_duplicate'?`<button type="button" class="btn danger small" data-fix-duplicate="${escapeHtml(d.id||'')}">בטל כפילות</button>`:''}</div></td>
   </tr>`}).join('');
   tbody.querySelectorAll('[data-view-issued]').forEach(btn=>btn.onclick=()=>openIssuedDocument(btn.dataset.viewIssued));
   tbody.querySelectorAll('[data-print-issued]').forEach(btn=>btn.onclick=()=>openIssuedDocumentLikeCustomers(btn.dataset.printIssued, true));
@@ -1051,35 +1076,76 @@ function customerStyleStoredDocumentHtml(d){
   return normalizeStoredDocumentHtmlLikeCustomers(baseHtml, d);
 }
 
-async function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
-  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));
-  if(!d) return;
-  const html=customerStyleStoredDocumentHtml(d);
-  if(!html){
-    alert("למסמך הישן הזה לא נשמר עותק HTML להצגה.");
-    return;
-  }
-  const title=`${storedDocumentDisplayType(d)} ${d.number || ""}`.trim();
-
-  if(!shouldPrint){
-    const blob=new Blob([html],{type:"text/html;charset=utf-8"});
-    const url=URL.createObjectURL(blob);
-    const w=window.open(url,"_blank");
-    if(!w){ URL.revokeObjectURL(url); alert("הדפדפן חסם את חלון המסמך."); return; }
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    return;
-  }
-
-  try{
-    const pdfBlob = await renderSignedPdfOnServer(html);
-    downloadPdfBlob(pdfBlob, pdfFileNameForDocument(d));
-  }catch(error){
-    console.error("PDF download failed", error);
-    alert(error?.message || "הורדת קובץ ה־PDF נכשלה.");
-  }
+let selectedIssuedViewerId = null;
+function selectedIssuedViewerDocument(){return (issuedDocuments||[]).find(d=>String(d.id)===String(selectedIssuedViewerId))||null;}
+function issuedViewerStatus(message){const el=$('issuedViewerStatus');if(el)el.textContent=message||'';}
+function setIssuedViewerBusy(busy){
+  ['issuedViewerPdf','issuedViewerEmail','issuedViewerWhatsapp','issuedViewerCredit','issuedViewerInvoice','issuedViewerTaxReceipt'].forEach(id=>{const b=$(id);if(b)b.disabled=Boolean(busy);});
+}
+function closeIssuedViewer(){
+  $('issuedViewerDialog')?.close();
+  const frame=$('issuedViewerFrame');if(frame)frame.removeAttribute('srcdoc');
+  selectedIssuedViewerId=null;
 }
 function openIssuedDocument(id){
-  return openIssuedDocumentLikeCustomers(id, false);
+  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));if(!d)return;
+  const html=customerStyleStoredDocumentHtml(d);
+  if(!html){alert('למסמך הישן הזה לא נשמר עותק HTML להצגה.');return;}
+  selectedIssuedViewerId=String(d.id);
+  $('issuedViewerTitle').textContent=`${storedDocumentDisplayType(d)} ${d.number||''}`.trim();
+  $('issuedViewerFrame').srcdoc=html;
+  const canCredit=['tax_invoice','tax_invoice_receipt'].includes(d.type)&&!['credited','cancelled','cancelled_technical_duplicate'].includes(d.status)&&isDocTypeAllowedForBusiness('credit_note');
+  $('issuedViewerCredit').hidden=!canCredit;
+  const canConvert=['quote','deal_invoice'].includes(d.type)&&!['cancelled','cancelled_technical_duplicate'].includes(d.status);
+  $('issuedViewerInvoice').hidden=!(canConvert&&isDocTypeAllowedForBusiness('tax_invoice'));
+  $('issuedViewerTaxReceipt').hidden=!(canConvert&&isDocTypeAllowedForBusiness('tax_invoice_receipt'));
+  issuedViewerStatus('מסמך שהופק — לקריאה בלבד');
+  $('documentFinderDialog')?.close();
+  $('issuedViewerDialog')?.showModal();
+}
+async function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
+  if(!shouldPrint){openIssuedDocument(id);return;}
+  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(id));if(!d)return;
+  const html=customerStyleStoredDocumentHtml(d);
+  if(!html){alert('למסמך הישן הזה לא נשמר עותק HTML להצגה.');return;}
+  try{
+    const pdfBlob=await renderSignedPdfOnServer(html);
+    downloadPdfBlob(pdfBlob,pdfFileNameForDocument(d));
+  }catch(error){console.error('PDF download failed',error);alert(error?.message||'הורדת קובץ ה־PDF נכשלה.');}
+}
+async function issuedViewerAction(action){
+  const d=selectedIssuedViewerDocument();if(!d)return;
+  const html=customerStyleStoredDocumentHtml(d);
+  if(!html){issuedViewerStatus('לא נמצא תוכן המסמך.');return;}
+  setIssuedViewerBusy(true);
+  issuedViewerStatus(action==='email'?'מכין ושולח את המסמך במייל...':action==='whatsapp'?'מכין קובץ PDF לשיתוף...':'מכין קובץ PDF חתום...');
+  try{
+    if(action==='email'){
+      const customer=resolveCreditCustomer(d)||d.customerSnapshot||{email:d.customerEmail||''};
+      await sendIssuedDocumentEmail(d,customer);
+      issuedViewerStatus('המסמך נשלח במייל בהצלחה.');
+      return;
+    }
+    const pdfBlob=await renderSignedPdfOnServer(html);
+    const name=pdfFileNameForDocument(d);
+    if(action==='pdf'){
+      downloadPdfBlob(pdfBlob,name);
+      issuedViewerStatus('קובץ ה־PDF הורד.');
+      return;
+    }
+    const file=new File([pdfBlob],name,{type:'application/pdf'});
+    if(navigator.canShare?.({files:[file]})&&navigator.share){
+      await navigator.share({files:[file],title:`${storedDocumentDisplayType(d)} ${d.number||''}`.trim()});
+      issuedViewerStatus('חלון השיתוף נפתח.');
+    }else{
+      downloadPdfBlob(pdfBlob,name);
+      issuedViewerStatus('הדפדפן אינו תומך בשיתוף PDF ישיר. הקובץ הורד — אפשר לצרף אותו ב־WhatsApp.');
+    }
+  }catch(error){
+    if(error?.name==='AbortError'){issuedViewerStatus('השיתוף בוטל.');return;}
+    console.error('Issued viewer action failed',error);
+    issuedViewerStatus(error?.message||'הפעולה נכשלה.');
+  }finally{setIssuedViewerBusy(false);}
 }
 function openDocumentFinder(){
   renderDocumentFinder();
@@ -2188,6 +2254,14 @@ $('btnSaveDraft').onclick=async()=>{
     setStatus($('draftStatus'),'שגיאה בשמירת טיוטה','err');
   }
 };
+$('issuedViewerClose')?.addEventListener('click',closeIssuedViewer);
+$('issuedViewerDialog')?.addEventListener('close',()=>{selectedIssuedViewerId=null;$('issuedViewerFrame')?.removeAttribute('srcdoc');});
+$('issuedViewerPdf')?.addEventListener('click',()=>issuedViewerAction('pdf'));
+$('issuedViewerEmail')?.addEventListener('click',()=>issuedViewerAction('email'));
+$('issuedViewerWhatsapp')?.addEventListener('click',()=>issuedViewerAction('whatsapp'));
+$('issuedViewerCredit')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareCreditFromIssuedDocument(d.id);});
+$('issuedViewerInvoice')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice');});
+$('issuedViewerTaxReceipt')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice_receipt');});
 $('btnFindDocument')?.addEventListener('click', openDocumentFinder);
 $('btnFinderClose')?.addEventListener('click', ()=>$('documentFinderDialog')?.close());
 $('finderSearch')?.addEventListener('input', renderDocumentFinder);
