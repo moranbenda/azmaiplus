@@ -2481,7 +2481,7 @@ if (btnProfileTop) btnProfileTop.addEventListener("click", () => btnProfileOpen?
    3) מעבר בין "התחברות" ↔ "הרשמה"
 ---------------------------------------------------------- */
 let authMode = "login"; // login/register
-const TRIAL_DAYS = 14;
+const TRIAL_DAYS = 30;
 const BILLING_EXEMPT_EMAILS = new Set([
   "moranbenda@gmail.com",
   "liorbendavid2005@gmail.com",
@@ -2619,7 +2619,7 @@ function computeAccessState(profile, user) {
     if (daysLeft <= 0) {
       state.blocked = true;
       state.kind = "trial_expired";
-      state.reason = "תקופת הניסיון בת 14 הימים הסתיימה. אפשר לצפות בנתונים קיימים, אך פעולות הוספה, עריכה, מחיקה, ייבוא ושחזור חסומות עד לחידוש מנוי.";
+      state.reason = "תקופת הניסיון בת 30 הימים הסתיימה. אפשר לצפות בנתונים קיימים, אך פעולות הוספה, עריכה, מחיקה, ייבוא ושחזור חסומות עד לחידוש מנוי.";
       return state;
     }
     state.flags.push({ text: `ניסיון: ${daysLeft} ימים`, cls: "warn" });
@@ -2782,7 +2782,7 @@ tabRegister.onclick = () => {
   tabLogin.classList.remove("active");
   authSubmitBtn.textContent = "הרשמה";
   authError.textContent = "";
-  setAuthInfo("בהרשמה נשלח מייל אימות, וייפתחו 14 ימי ניסיון לאחר אישור המייל. נא למלא גם טלפון, שם עסק, מספר עוסק וסוג עוסק.");
+  setAuthInfo("בהרשמה נשלח מייל אימות, וייפתחו 30 ימי ניסיון לאחר אישור המייל. נא למלא גם טלפון, שם עסק, מספר עוסק וסוג עוסק.");
   updateAuthAuxUI();
 };
 
