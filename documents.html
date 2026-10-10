@@ -188,7 +188,7 @@
         </div>
         <div class="wide"><label>הערה למסמך</label><textarea id="docNotes" placeholder="למשל: פרטי חשבון להעברה, תנאי תשלום או מידע נוסף ללקוח"></textarea></div>
       </div>
-      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
+      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a><button type="button" class="btn small whatsapp" id="btnShareLastIssued" hidden>פתיחת מסמך ושיתוף ב־WhatsApp</button></div></div>
     </section>
 
     <section class="card preview-card">
@@ -774,7 +774,6 @@ function renderPreview(){
   <div class="totals"><div><span>סה״כ לפני מע״מ</span><span>${money(t.subtotal)}</span></div>${t.discount>0?`<div><span>הנחה ${escapeHtml(t.discountPct)}%</span><span>-${money(t.discount)}</span></div><div><span>סה״כ לאחר הנחה לפני מע״מ</span><span>${money(t.net)}</span></div>`:''}<div><span>מע״מ</span><span>${money(t.vat)}</span></div><div><span>סה״כ לתשלום</span><span>${money(t.gross)}</span></div></div>
   ${paymentHtml}
   ${noteHtml}
-  ${allocationPreviewHtml(allocation)}
   ${previewFinal ? "" : `<div class="draft-watermark">טיוטה לבדיקה</div>`}`;
 }
 
@@ -2088,6 +2087,7 @@ async function issueDocument(){
     lastSignedPdfBase64=issuedSignedPdfBase64;
     lastIssuedCustomerId=String(finalDoc.customerId || c.id || '');
     updateLastIssuedCustomerLink();
+    $('btnShareLastIssued').hidden=false;
     previewFinal=true;
     renderNumberingSettings();
     renderCustomerOptions();
@@ -2259,6 +2259,7 @@ $('issuedViewerDialog')?.addEventListener('close',()=>{selectedIssuedViewerId=nu
 $('issuedViewerPdf')?.addEventListener('click',()=>issuedViewerAction('pdf'));
 $('issuedViewerEmail')?.addEventListener('click',()=>issuedViewerAction('email'));
 $('issuedViewerWhatsapp')?.addEventListener('click',()=>issuedViewerAction('whatsapp'));
+$('btnShareLastIssued')?.addEventListener('click',()=>{if(lastIssuedDocument?.id)openIssuedDocument(lastIssuedDocument.id);});
 $('issuedViewerCredit')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareCreditFromIssuedDocument(d.id);});
 $('issuedViewerInvoice')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice');});
 $('issuedViewerTaxReceipt')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice_receipt');});
