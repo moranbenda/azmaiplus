@@ -188,7 +188,7 @@
         </div>
         <div class="wide"><label>הערה למסמך</label><textarea id="docNotes" placeholder="למשל: פרטי חשבון להעברה, תנאי תשלום או מידע נוסף ללקוח"></textarea></div>
       </div>
-      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><button type="button" class="btn small whatsapp last-issued-customer-link" id="btnLastIssuedShare" hidden>שיתוף ב־WhatsApp</button><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
+      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
     </section>
 
     <section class="card preview-card">
@@ -1113,8 +1113,8 @@ async function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
     downloadPdfBlob(pdfBlob,pdfFileNameForDocument(d));
   }catch(error){console.error('PDF download failed',error);alert(error?.message||'הורדת קובץ ה־PDF נכשלה.');}
 }
-async function issuedViewerAction(action, documentOverride=null){
-  const d=documentOverride||selectedIssuedViewerDocument();if(!d)return;
+async function issuedViewerAction(action){
+  const d=selectedIssuedViewerDocument();if(!d)return;
   const html=customerStyleStoredDocumentHtml(d);
   if(!html){issuedViewerStatus('לא נמצא תוכן המסמך.');return;}
   setIssuedViewerBusy(true);
@@ -1133,8 +1133,7 @@ async function issuedViewerAction(action, documentOverride=null){
       issuedViewerStatus('קובץ ה־PDF הורד.');
       return;
     }
-    const shareName=`AzmaiPlus_${String(d.type||'document').replace(/[^a-zA-Z0-9_-]/g,'_')}_${String(d.number||'').replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
-    const file=new File([pdfBlob],shareName,{type:'application/pdf'});
+    const file=new File([pdfBlob],name,{type:'application/pdf'});
     if(navigator.canShare?.({files:[file]})&&navigator.share){
       await navigator.share({files:[file],title:`${storedDocumentDisplayType(d)} ${d.number||''}`.trim()});
       issuedViewerStatus('חלון השיתוף נפתח.');
@@ -1962,8 +1961,6 @@ function updateLastIssuedCustomerLink(){
   const link=$('btnLastIssuedCustomer');
   if(!link) return;
   link.hidden=!lastIssuedCustomerId;
-  const share=$('btnLastIssuedShare');
-  if(share) share.hidden=!(lastIssuedDocument?.id);
   link.href=lastIssuedCustomerId ? '/customers.html?customerId='+encodeURIComponent(lastIssuedCustomerId) : '/customers.html';
 }
 
@@ -2262,7 +2259,6 @@ $('issuedViewerDialog')?.addEventListener('close',()=>{selectedIssuedViewerId=nu
 $('issuedViewerPdf')?.addEventListener('click',()=>issuedViewerAction('pdf'));
 $('issuedViewerEmail')?.addEventListener('click',()=>issuedViewerAction('email'));
 $('issuedViewerWhatsapp')?.addEventListener('click',()=>issuedViewerAction('whatsapp'));
-$('btnLastIssuedShare')?.addEventListener('click',()=>{if(lastIssuedDocument?.id)issuedViewerAction('whatsapp',lastIssuedDocument);});
 $('issuedViewerCredit')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareCreditFromIssuedDocument(d.id);});
 $('issuedViewerInvoice')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice');});
 $('issuedViewerTaxReceipt')?.addEventListener('click',()=>{const d=selectedIssuedViewerDocument();if(!d)return;closeIssuedViewer();prepareDocumentFromIssuedSource(d.id,'tax_invoice_receipt');});
@@ -2276,3 +2272,7 @@ $('finderClear')?.addEventListener('click',()=>{ if($('finderSearch'))$('finderS
 $('btnConnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 $('btnReconnectInvoiceIsrael')?.addEventListener('click', connectInvoiceIsrael);
 onAuthStateChanged(auth, user=>{ if(!user){ location.href='/'; return; } loadAll().catch(err=>{console.error(err); alert('לא ניתן לטעון את מודול המסמכים כרגע');}); });
+</script>
+  <script src="/app-nav.js"></script>
+</body>
+</html>
