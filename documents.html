@@ -178,7 +178,7 @@
         </div>
         <div class="wide"><label>הערה למסמך</label><textarea id="docNotes" placeholder="למשל: פרטי חשבון להעברה, תנאי תשלום או מידע נוסף ללקוח"></textarea></div>
       </div>
-      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
+      <div class="footer"><div class="actions"><button class="btn" id="btnIssueDocument">הפקת מסמך</button><button class="btn secondary" id="btnSaveDraft">שמירת טיוטה</button><button class="btn secondary" id="btnPrint">הורדת PDF</button><button class="btn secondary" type="button" id="btnSharePdf">שיתוף ב־WhatsApp</button></div><div><span class="status" id="draftStatus"></span><a class="btn secondary small last-issued-customer-link" id="btnLastIssuedCustomer" href="/customers.html" hidden>מעבר לכרטיס הלקוח</a></div></div>
     </section>
 
     <section class="card preview-card">
@@ -750,7 +750,7 @@ function renderPreview(){
   ${paymentHtml}
   ${noteHtml}
   ${allocationPreviewHtml(allocation)}
-  ${previewFinal ? "" : `<div class="draft-watermark">טיוטה לבדיקה</div>`}`;
+  ${previewFinal ? `<div class="azmai-copy-mark" style="margin-top:12px;font-size:13px;font-weight:800;text-align:center">מקור</div>` : `<div class="draft-watermark">טיוטה לבדיקה</div>`}`;
 }
 
 function issuedDocSearchText(d){
@@ -1045,6 +1045,14 @@ function normalizeStoredDocumentHtmlLikeCustomers(html, d){
   return out;
 }
 
+function documentHtmlForAdditionalCopy(html){
+  const source=String(html||'');
+  if(/class=["'][^"']*azmai-copy-mark/.test(source)){
+    return source.replace(/(<div\s+class=["']azmai-copy-mark["'][^>]*>)\s*מקור\s*(<\/div>)/, '$1העתק$2');
+  }
+  return source.replace('</body>', '<div class="azmai-copy-mark" style="margin-top:12px;font-size:13px;font-weight:800;text-align:center">העתק</div></body>');
+}
+
 function customerStyleStoredDocumentHtml(d){
   const baseHtml = String(d?.printHtml || d?.previewHtml || "").trim();
   if(!baseHtml) return "";
@@ -1071,7 +1079,7 @@ async function openIssuedDocumentLikeCustomers(id, shouldPrint=false){
   }
 
   try{
-    const pdfBlob = await renderSignedPdfOnServer(html);
+    const pdfBlob = await renderSignedPdfOnServer(documentHtmlForAdditionalCopy(html));
     downloadPdfBlob(pdfBlob, pdfFileNameForDocument(d));
   }catch(error){
     console.error("PDF download failed", error);
@@ -1716,6 +1724,39 @@ async function renderSignedPdfOnServer(documentHtml){
   return blob;
 }
 
+async function shareCurrentIssuedPdf(){
+  const status=$('draftStatus');
+  if(!lastIssuedDocument?.id){
+    setStatus(status,'יש להפיק מסמך לפני שיתוף PDF.','err');
+    return;
+  }
+  const d=(issuedDocuments||[]).find(x=>String(x.id)===String(lastIssuedDocument.id)) || lastIssuedDocument;
+  const html=customerStyleStoredDocumentHtml(d);
+  if(!html){ setStatus(status,'לא נמצא תוכן המסמך לשיתוף.','err'); return; }
+  const button=$('btnSharePdf');
+  if(button) button.disabled=true;
+  try{
+    setStatus(status,'מכין PDF חתום לשיתוף…','ok');
+    const blob=await renderSignedPdfOnServer(documentHtmlForAdditionalCopy(html));
+    const file=new File([blob],pdfFileNameForDocument(d),{type:'application/pdf'});
+    if(navigator.share && navigator.canShare?.({files:[file]})){
+      try{
+        await navigator.share({files:[file],title:`${storedDocumentDisplayType(d)} ${d.number||''}`.trim()});
+        setStatus(status,'חלון השיתוף נפתח.','ok');
+      }catch(error){
+        if(error?.name==='AbortError'){setStatus(status,'השיתוף בוטל.');return;}
+        throw error;
+      }
+    }else{
+      downloadPdfBlob(blob,file.name);
+      setStatus(status,'המכשיר אינו תומך בשיתוף קבצים ישיר. ה־PDF ירד למכשיר לצירוף ב־WhatsApp.','ok');
+    }
+  }catch(error){
+    console.error('PDF sharing failed',error);
+    setStatus(status,error?.message||'שיתוף קובץ ה־PDF נכשל.','err');
+  }finally{if(button) button.disabled=false;}
+}
+
 function downloadPdfBlob(blob, fileName){
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2146,6 +2187,7 @@ async function downloadCurrentDocument(){
 $('docType').onchange=()=>{previewFinal=false;lastIssuedDocument=null;creditSourceDocument=null; if(!isDocTypeAllowedForBusiness($('docType').value)){ $('docType').value='receipt'; setStatus($('draftStatus'),'לעוסק פטור סוג המסמך שנבחר חסום.','err'); } updateDocNumber();updatePaymentVisibility();renderPreview();}; ['docDate','docDiscountPct','docVatRate','docTitle','docNotes','withholdingTaxAmount'].forEach(id=>$(id)?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; if(id==='docVatRate'){syncGrossFromNet();renderLinesEditor();} updatePaymentTotalsHint(); renderPreview(); })); $('btnAddLine').onclick=()=>{previewFinal=false;lastIssuedDocument=null;ensureLines(); docLines.push(makeLine({desc:'',qty:1,netPrice:0})); renderLinesEditor(); renderPreview();}; $('docCustomerSearch')?.addEventListener('input',()=>{ previewFinal=false;lastIssuedDocument=null; $('docCustomer').value=''; renderSelectedCustomerHint(); renderCustomerSuggestions($('docCustomerSearch').value); renderPreview(); }); $('docCustomerSearch')?.addEventListener('focus',()=>renderCustomerSuggestions($('docCustomerSearch').value)); document.addEventListener('click',(ev)=>{ if(!ev.target.closest('.customer-search-wrap')) hideCustomerSuggestions(); });
 $('btnAddPayment')?.addEventListener('click',()=>{ paymentEntries.push(makePaymentEntry({amount:Math.max(0,round2(totals().gross-paymentEntriesTotal()))})); renderPaymentEntries(); renderPreview(); });
 $('btnPrint').onclick=downloadCurrentDocument;
+$('btnSharePdf').onclick=shareCurrentIssuedPdf;
 $('btnDownload')?.addEventListener('click',downloadCurrentDocument);
 $('btnIssueDocument').onclick=issueDocument;
 $('btnSaveSettings').onclick=async()=>{ if(settingsLocked)return; settings={ tax_invoice:Math.max(1,Number($('setInvoice').value||1)), receipt:Math.max(1,Number($('setReceipt').value||1)), tax_invoice_receipt:Math.max(1,Number($('setTaxReceipt').value||1)), credit_note:Math.max(1,Number($('setCredit').value||1)), quote:Math.max(1,Number($('setQuote').value||1)), deal_invoice:Math.max(1,Number($('setDealInvoice').value||1)) }; try{ await saveLedgerPatch({documentSettings:settings, documentSettingsLocked:true, documentSettingsLockedAt:new Date().toISOString()}); settingsLocked=true; renderNumberingSettings(); updateDocNumber(); syncStats(); renderPreview(); setStatus($('settingsStatus'),'נשמר ✅','ok'); }catch(e){console.error(e);setStatus($('settingsStatus'),'שגיאה בשמירה','err');} };
