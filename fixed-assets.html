@@ -290,7 +290,16 @@
     </section>
 
     <section class="card controls">
-      <div class="card-hd"><h3>רשימת נכסים</h3></div>
+      <div class="card-hd"><h3>רשימת נכסים</h3>
+        <label class="nonprint" style="display:flex;align-items:center;gap:8px;font-size:13px">הצגת נכסים:
+          <select id="assetsListFilter" aria-label="סינון רשימת נכסים" style="min-width:185px;padding:8px 12px;border:1px solid #dbe3ee;border-radius:10px;background:#fff;color:#24344d;font:inherit">
+            <option value="active" selected>ברשות העסק</option>
+            <option value="all">כל הנכסים</option>
+            <option value="disposed">נמכרו / נגרעו</option>
+            <option value="depreciated">הופחתו במלואם</option>
+          </select>
+        </label>
+      </div>
       <div class="card-bd table-scroll">
         <table>
           <thead><tr><th>שם נכס</th><th>קבוצה</th><th>תאריך רכישה</th><th>עלות מקורית</th><th>% פחת</th><th>נמכר</th><th>פעולות</th></tr></thead>
@@ -696,11 +705,19 @@ function renderAssetSuggestions(){
   });
 }
 function renderAssetsList(){
-  if (!assets.length) {
-    assetsBody.innerHTML = '<tr><td colspan="7" class="empty">אין עדיין נכסים</td></tr>';
+  const filter = document.getElementById('assetsListFilter')?.value || 'active';
+  const isDisposed = a => a.sold === true || a.sold === 'true';
+  const visibleAssets = assets.filter(a => {
+    if (filter === 'active') return !isDisposed(a);
+    if (filter === 'disposed') return isDisposed(a);
+    if (filter === 'depreciated') return calcAsset(a, taxYear.value).writtenDown <= 0.005;
+    return true;
+  });
+  if (!visibleAssets.length) {
+    assetsBody.innerHTML = `<tr><td colspan="7" class="empty">${assets.length ? 'אין נכסים התואמים לסינון שנבחר' : 'אין עדיין נכסים'}</td></tr>`;
     return;
   }
-  assetsBody.innerHTML = assets.map(a => `
+  assetsBody.innerHTML = visibleAssets.map(a => `
     <tr>
       <td>${escapeHtml(a.name || '')}</td>
       <td>${escapeHtml(a.group || '')}</td>
@@ -1140,6 +1157,7 @@ $('assetGroup').addEventListener('change', () => applyDefaultRateForGroup(false)
 $('purchaseDate').addEventListener('change', syncActivationDateFromPurchase);
 $('purchaseDate').addEventListener('input', syncActivationDateFromPurchase);
 $('activationDate').addEventListener('change', () => { if (dateLooksInvalid($('activationDate').value)) syncActivationDateFromPurchase(); });
+document.getElementById('assetsListFilter').addEventListener('change', renderAssetsList);
 taxYear.addEventListener('change', renderAll);
 $('btnSave').addEventListener('click', saveAssets);
 $('btnRefresh').addEventListener('click', () => currentUser && loadData(currentUser));
