@@ -237,11 +237,11 @@
           </div>
           <div class="check-row"><input id="incVat" type="checkbox" checked /><span>המחיר כולל מע״מ</span></div>
           <div class="check-row"><input id="vatClaimed" type="checkbox" checked /><span>המע״מ נדרש/יוחזר</span></div>
-          <div class="check-row"><input id="sold" type="checkbox" /><span>הנכס נמכר / נגרע</span></div>
+          <div class="check-row"><input id="sold" type="checkbox" /><span>הנכס כבר אינו ברשות העסק (נמכר / נגרע)</span></div>
           <div>
             <label>תאריך מכירה / גריעה</label>
             <input id="saleDate" type="date" />
-            <div class="field-help">אם הנכס נמכר או יצא משימוש, הפחת יחושב רק עד חודש המכירה/הגריעה.</div>
+            <div class="field-help">יש לציין את התאריך שבו הנכס יצא מרשות העסק. הוא יישמר בהיסטוריה ולא יופיע בדוחות של שנים מאוחרות יותר. נכס שהופחת במלואו אך עדיין ברשות העסק נשאר פעיל.</div>
           </div>
           <div class="advanced-field">
             <label>בסיס לפחת ידני</label>
@@ -361,6 +361,7 @@ let userProfile = null;
 let ledgerSettings = { vatEnabled:true, vatRate:DEFAULT_VAT };
 let assets = [];
 let ledgerRows = [];
+let dismissedAssetCandidates = {};
 let editingId = null;
 
 function escapeHtml(s=''){
@@ -572,6 +573,10 @@ function closeForm(){
   editingId = null;
   formCard.style.display = 'none';
 }
+async function saveDismissedCandidates(){
+  if (!currentUser) throw new Error('Not signed in');
+  await setDoc(doc(db, 'ledgers', currentUser.uid), { fixedAssetDismissedRows: dismissedAssetCandidates }, { merge:true });
+}
 async function saveAssets(){
   if (!currentUser) return;
   statusText.textContent = 'שומר…';
@@ -587,6 +592,7 @@ function rowText(row){ return `${row?.category || ''} ${row?.desc || ''}`.toLowe
 function isLikelyAssetExpense(row){
   if (!row || row.type !== 'expense') return false;
   if (assets.some(a => a.sourceRowId && a.sourceRowId === row.id)) return false;
+  if (row.id && dismissedAssetCandidates[String(row.id)]) return false;
   const text = rowText(row);
   const amount = rowAmount(row);
   const keywords = ['מחשב','טאבלט','טלפון','אייפון','iphone','ipad','ציוד','אלקטרוני','מדפסת','מסך','מצלמה','מיקרופון','שואב','רכב','מכשיר','לפטופ','מכונה'];
@@ -661,7 +667,8 @@ function showValidation(errors){
 function renderAssetSuggestions(){
   if (!assetCandidatesBody || !candidateCard) return;
   const candidates = (ledgerRows || []).filter(isLikelyAssetExpense).slice(0, 30);
-  if (!candidates.length) { candidateCard.style.display = 'none'; return; }
+  const dismissedCount = Object.keys(dismissedAssetCandidates).filter(id => (ledgerRows || []).some(r => String(r.id) === id)).length;
+  if (!candidates.length && !dismissedCount) { candidateCard.style.display = 'none'; return; }
   candidateCard.style.display = '';
   assetCandidatesBody.innerHTML = candidates.map(r => `
     <tr>
@@ -670,8 +677,23 @@ function renderAssetSuggestions(){
       <td>${escapeHtml(r.category || '')}</td>
       <td class="money">${toMoney(r.amount)}</td>
       <td>${escapeHtml(candidateReason(r))}</td>
-      <td><button class="btn secondary" type="button" data-from-expense="${escapeHtml(r.id || '')}">הוספה לרכוש</button></td>
+      <td><div class="actions"><button class="btn secondary" type="button" data-from-expense="${escapeHtml(r.id || '')}">הוספה לרכוש</button><button class="btn secondary" type="button" data-dismiss-expense="${escapeHtml(r.id || '')}" title="לא רכוש קבוע — הסתרת ההצעה בלבד" aria-label="לא רכוש קבוע — הסרת הצעה">✕</button></div></td>
     </tr>`).join('');
+  let restore = document.getElementById('restoreAssetCandidates');
+  if (!restore) {
+    restore = document.createElement('div');
+    restore.id = 'restoreAssetCandidates';
+    restore.style.cssText = 'padding:10px 16px;color:#64748b;font-size:12px;';
+    candidateCard.appendChild(restore);
+  }
+  restore.innerHTML = dismissedCount ? `<button type="button" class="btn secondary" id="restoreDismissedAssets">הצגת ${dismissedCount} הצעות שסומנו כלא רכוש קבוע</button>` : '';
+  restore.querySelector('#restoreDismissedAssets')?.addEventListener('click', async () => {
+    if (!confirm('להחזיר את כל ההצעות שסומנו כלא רכוש קבוע?')) return;
+    const previous = { ...dismissedAssetCandidates };
+    dismissedAssetCandidates = {};
+    renderAssetSuggestions();
+    try { await saveDismissedCandidates(); } catch (err) { dismissedAssetCandidates = previous; renderAssetSuggestions(); alert('לא ניתן לשמור את השינוי.'); }
+  });
 }
 function renderAssetsList(){
   if (!assets.length) {
@@ -685,7 +707,7 @@ function renderAssetsList(){
       <td>${escapeHtml(formatDate(a.purchaseDate))}</td>
       <td class="money">${toMoney(a.originalCost)}</td>
       <td>${escapeHtml(a.legalRate ?? a.depreciationRate ?? '')}%</td>
-      <td>${(a.sold === true || a.sold === 'true') ? 'כן' : 'לא'}${a.sourceRowId ? '<br><span class="hint">מהוצאה</span>' : ''}</td>
+      <td>${(a.sold === true || a.sold === 'true') ? 'נמכר / נגרע' : 'ברשות העסק'}${a.sourceRowId ? '<br><span class="hint">מהוצאה</span>' : ''}</td>
       <td><div class="actions"><button class="btn secondary" type="button" data-edit="${escapeHtml(a.id)}">עריכה</button><button class="btn danger" type="button" data-del="${escapeHtml(a.id)}">מחיקה</button></div></td>
     </tr>`).join('');
 }
@@ -697,6 +719,8 @@ function groupedAssetsForReport(){
     const sold = asset.sold === true || asset.sold === 'true';
     const saleDate = sold ? parseLocalDate(asset.saleDate) : null;
     if (sold && saleDate && saleDate < selectedYearStart) continue;
+    const purchaseDate = parseLocalDate(asset.purchaseDate || asset.activationDate);
+    if (purchaseDate && purchaseDate.getFullYear() > Number(year)) continue;
     const group = asset.group || 'אחר';
     if (!map.has(group)) map.set(group, []);
     map.get(group).push({ asset, calc: calcAsset(asset, year) });
@@ -1019,6 +1043,7 @@ async function loadData(user){
   const ledger = ledgerSnap.exists() ? ledgerSnap.data() : {};
   assets = Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets : [];
   ledgerRows = Array.isArray(ledger.rows) ? ledger.rows : [];
+  dismissedAssetCandidates = ledger.fixedAssetDismissedRows && typeof ledger.fixedAssetDismissedRows === 'object' ? { ...ledger.fixedAssetDismissedRows } : {};
   ledgerSettings = ledger.settings || { vatEnabled:true, vatRate:userProfile?.vatRate || DEFAULT_VAT };
   const years = assetYears();
   const current = taxYear.value;
@@ -1078,7 +1103,20 @@ assetsBody.addEventListener('click', e => {
   }
 });
 
-if (assetCandidatesBody) assetCandidatesBody.addEventListener('click', e => {
+if (assetCandidatesBody) assetCandidatesBody.addEventListener('click', async e => {
+  const dismissId = e.target?.dataset?.dismissExpense;
+  if (dismissId) {
+    if (!confirm('לסמן שהוצאה זו אינה רכוש קבוע? ההוצאה לא תימחק, ורק ההצעה תוסתר.')) return;
+    dismissedAssetCandidates[String(dismissId)] = true;
+    renderAssetSuggestions();
+    try { await saveDismissedCandidates(); } catch (err) {
+      delete dismissedAssetCandidates[String(dismissId)];
+      renderAssetSuggestions();
+      console.error(err);
+      alert('לא הצלחנו לשמור את ההחלטה בענן.');
+    }
+    return;
+  }
   const rowId = e.target?.dataset?.fromExpense;
   if (!rowId) return;
   const row = (ledgerRows || []).find(r => r.id === rowId);
