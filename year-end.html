@@ -83,7 +83,7 @@
         <img class="brand-logo" src="/logo.png" alt="לוגו עצמאי פלוס" />
         <div class="brand-copy">
           <h1>סגירת שנה</h1>
-          <div class="hint">רווח והפסד, פחת וריכוז נתונים לדוח שנתי.</div>
+          <div class="hint">רווח והפסד, פחת וריכוז נתונים לדוח שנתי. נתונים לבדיקה לפני הגשה.</div>
         </div>
       </div>
       <div class="row">
@@ -118,6 +118,11 @@
       <div class="metric"><div class="k">הוצאות מוכרות למס</div><div class="v expense" id="mExpenses">₪ 0.00</div></div>
       <div class="metric"><div class="k">פחת</div><div class="v warn" id="mDep">₪ 0.00</div></div>
       <div class="metric"><div class="k">רווח תפעולי</div><div class="v" id="mProfit">₪ 0.00</div></div>
+    </section>
+
+    <section class="card controls" id="reviewCard" style="display:none">
+      <div class="card-hd"><h3>בדיקות לפני סגירת שנה</h3></div>
+      <div class="card-bd" id="reviewBody"></div>
     </section>
 
     <section class="card controls">
@@ -157,65 +162,142 @@ const db = getFirestore(app);
 const DEFAULT_VAT = 18;
 
 const EXPENSE_ITEMS = [
-  { item: "דלק",                         category: "רכב",                        incomeTaxPct: 45, vatAllowed: true  },
-  { item: "ביטוח",                       category: "רכב",                        incomeTaxPct: 45, vatAllowed: false },
-  { item: "טיפולים במוסך",              category: "רכב",                        incomeTaxPct: 45, vatAllowed: true  },
-  { item: "רישיון רכב",                 category: "רכב",                        incomeTaxPct: 45, vatAllowed: false },
-  { item: "חנייה",                       category: "רכב",                        incomeTaxPct: 100, vatAllowed: true },
+  // רכב — שורת 7 בנספח 1320. האחוז כאן הוא ברירת מחדל תפעולית בלבד וניתן לשינוי בתנועה.
+  { item: "דלק", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "ביטוח רכב", category: "רכב", incomeTaxPct: 45, vatAllowed: false, report1320: "7-הוצאות רכב" },
+  { item: "טיפולים במוסך", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "רישיון רכב", category: "רכב", incomeTaxPct: 45, vatAllowed: false, report1320: "7-הוצאות רכב" },
+  { item: "חנייה / כבישי אגרה", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "שטיפת רכב ותחזוקה שוטפת", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
 
-  { item: "שכירות",                     category: "שכירות משרד / חדר עבודה",   incomeTaxPct: 100, vatAllowed: true },
+  // שכירות ואחזקת מקום העסק
+  { item: "שכירות משרד / קליניקה / סטודיו", category: "שכירות משרד / חדר עבודה", incomeTaxPct: 100, vatAllowed: true, report1320: "11-שכירות וחכירה" },
+  { item: "דמי ניהול / ועד בית עסקי", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "תיקונים ותחזוקת משרד / עסק", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "ארנונה עסקית", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
 
-  { item: "מים",                        category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false },
-  { item: "חשמל",                      category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false },
-  { item: "ארנונה",                    category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false },
-  { item: "אינטרנט",                   category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false },
+  // משרד ביתי — נשמרים כרישום עסקי; אחוז ההכרה הוא ברירת מחדל הניתנת לשינוי.
+  { item: "חשמל - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "מים - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "ארנונה - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אינטרנט - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
 
-  { item: "טלפון נייד",                category: "טלפון נייד",                  incomeTaxPct: 50, vatAllowed: true  },
+  { item: "טלפון נייד", category: "טלפון ותקשורת", incomeTaxPct: 50, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אינטרנט עסקי", category: "טלפון ותקשורת", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
 
-  { item: "מחשב / טאבלט",              category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true },
-  { item: "ציוד אלקטרוני",             category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true },
-  { item: "מדפסת",                      category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true },
-  { item: "טלפון נייד (מכשיר)",        category: "ציוד",                        incomeTaxPct: 100, vatAllowed: true },
+  // ציוד ומשרד
+  { item: "ציוד משרדי ומתכלה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "דואר / שליחויות", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "הדפסות / צילום / כריכה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "מחשב / טאבלט", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד אלקטרוני", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "מדפסת", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "טלפון נייד (מכשיר)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ריהוט וציוד קבוע", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד (כללי)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות", vatInputType: "asset" },
 
-  { item: "CANVA",                      category: "תוכנות ומנויים",              incomeTaxPct: 100, vatAllowed: false },
-  { item: "ZOOM",                       category: "תוכנות ומנויים",              incomeTaxPct: 100, vatAllowed: false },
-  { item: "GOOGLE ONE",                 category: "תוכנות ומנויים",              incomeTaxPct: 100, vatAllowed: false },
-  { item: "OPEN AI",                    category: "תוכנות ומנויים",              incomeTaxPct: 100, vatAllowed: false },
-  { item: "Microsoft 365",              category: "תוכנות ומנויים",              incomeTaxPct: 100, vatAllowed: false },
+  // תוכנה, פרסום ואינטרנט
+  { item: "CANVA", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "ZOOM", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "GOOGLE ONE", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "OPEN AI", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "Microsoft 365", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "תוכנות ומנויים אחרים", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "פייסבוק, אינסטגרם", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: false, report1320: "16-הוצאות אחרות" },
+  { item: "Google Ads", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: false, report1320: "16-הוצאות אחרות" },
+  { item: "רב מסר", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" },
+  { item: "פרסום ושיווק", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" },
+  { item: "אחסון אתר / דומיין", category: "אחסון מידע ואתר", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "תוכנת ניהול", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
 
-  { item: "פייסבוק, אינסטגרם",         category: "קידום ממומן / פרסום",         incomeTaxPct: 100, vatAllowed: false },
-  { item: "רב מסר",                    category: "קידום ממומן / פרסום",         incomeTaxPct: 100, vatAllowed: true  },
+  // שירותים מקצועיים, עורכי דין וקבלני משנה
+  { item: "רו״ח / יועץ מס", category: "הנהלת חשבונות ודוח שנתי", incomeTaxPct: 100, vatAllowed: true, report1320: "10-הנהלת חשבונות והגשת הדוח" },
+  { item: "הנהלת חשבונות", category: "הנהלת חשבונות ודוח שנתי", incomeTaxPct: 100, vatAllowed: true, report1320: "10-הנהלת חשבונות והגשת הדוח" },
+  { item: "עורך דין / ייעוץ משפטי", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "ייעוץ עסקי / פיתוח עסקי", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "שירותים מקצועיים אחרים", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "קבלני משנה / שירותים חיצוניים", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true, report1320: "4-עבודות חוץ וקבלנות משנה" },
 
-  { item: "אחסון אתר/דומיין",          category: "אחסון מידע",                  incomeTaxPct: 100, vatAllowed: true  },
-  { item: "תוכנת ניהול",               category: "אחסון מידע",                  incomeTaxPct: 100, vatAllowed: true  },
+  // עובדים — רישום בלבד, לא מערכת שכר
+  { item: "שכר עובדים", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-משכורת ושכר עבודה" },
+  { item: "הוצאות נלוות לשכר", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
+  { item: "הפרשות מעסיק לפנסיה / פיצויים", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
+  { item: "ביטוח לאומי מעסיק", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
 
-  { item: "רו\"ח",                     category: "ייעוץ מקצועי",                incomeTaxPct: 100, vatAllowed: true  },
-  { item: "ייעוץ עסקי/פיתוח עסקי",     category: "ייעוץ מקצועי",                incomeTaxPct: 100, vatAllowed: true  },
+  // מימון, בנק וסליקה
+  { item: "עמלות בנק", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
+  { item: "ריבית והפרשי הצמדה עסקיים", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
+  { item: "עמלות סליקה", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: true, report1320: "6-הוצאות מימון" }, // מע״מ תשומות רק כאשר התנועה סומנה ככוללת מע״מ ועל בסיס מסמך מתאים
 
-  { item: "תחבורה ציבורית",            category: "נסיעות בתחבורה ציבורית",      incomeTaxPct: 100, vatAllowed: false },
+  // ביטוחים, אגרות וחובות
+  { item: "ביטוח אחריות מקצועית", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
+  { item: "ביטוח משרד / עסק", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
+  { item: "אגרות ורישיונות עסקיים", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
+  { item: "אגרות משפט / בית משפט", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
 
-  { item: "קפה, תה, חלב, ירקות, פירות, עוגיות",
-    category: "כיבוד קל",              incomeTaxPct: 80,  vatAllowed: true  },
+  // נסיעות, כיבוד, הכשרה וביגוד
+  { item: "תחבורה ציבורית", category: "נסיעות ותחבורה", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "מוניות / נסיעות עסקיות", category: "נסיעות ותחבורה", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "נסיעות לחו״ל לצורכי העסק", category: "נסיעות ואש״ל", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אש״ל לצורכי העסק", category: "נסיעות ואש״ל", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "קפה, תה, חלב, ירקות, פירות, עוגיות", category: "כיבוד קל", incomeTaxPct: 80, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אירוח עסקי", category: "אירוח", incomeTaxPct: 0, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "חומרי ניקוי לעסק", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "כלים חד פעמיים", category: "כיבוד / מתכלים", incomeTaxPct: 80, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "קורסים / ספרים / מאגרים מקצועיים", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "כנסים והשתלמויות", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "ביגוד מקצועי / ממותג", category: "ביגוד מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
 
-  { item: "חומרי ניקוי לסטודיו/לעסק בלבד",
-    category: "חומרי ניקוי",           incomeTaxPct: 100, vatAllowed: true  },
+  // תשלומי מס סטטוטוריים — תנועת תזרים בלבד, לא הוצאה מוכרת.
+  { item: "תשלום מע״מ", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
 
-  { item: "כלים חד פעמיים",            category: "כלים חד פעמיים",              incomeTaxPct: 80,  vatAllowed: true  },
-
-  { item: "קורסים, ספרים, אתרים",      category: "ספרות מקצועית",              incomeTaxPct: 100, vatAllowed: true  },
-  { item: "כנסים והשתלמויות",          category: "כנסים והשתלמויות",            incomeTaxPct: 100, vatAllowed: true  },
-
-  { item: "ביגוד",                     category: "ביגוד ממותג בלבד",             incomeTaxPct: 100, vatAllowed: true  },
-
-  { item: "תרומות לעמותות מוכרות",    category: "תרומות",                       incomeTaxPct: 35,  vatAllowed: false },
-  { item: "קרן השתלמות",              category: "קרן השתלמות",                 incomeTaxPct: 0,   vatAllowed: false },
-  { item: "ביטוח לאומי",              category: "תשלומי חובה",                  incomeTaxPct: 100, vatAllowed: false },
-
-  { item: "שטיפת רכב ותחזוקה שוטפת",  category: "רכב",                          incomeTaxPct: 45,  vatAllowed: true  },
-
-  { item: "ציוד (כללי)",                 category: "ציוד",                         incomeTaxPct: 100, vatAllowed: true  },
-  { item: "קבלני משנה / שירותים חיצוניים", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true  }
+  { item: "הוצאה אחרת", category: "הוצאות אחרות", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" }
 ];
+
+function resolveLegacyExpenseItem(row = {}) {
+  if (!row || row.type !== "expense") return "";
+
+  const rawCategory = String(row.category || "").trim();
+  const categoryKey = normalizeExpenseText(rawCategory);
+  const descKey = normalizeExpenseText(row.desc || "");
+
+  // אם זו כבר קטגוריה עדכנית — לא משנים.
+  const currentExact = EXPENSE_ITEMS.find(item =>
+    normalizeExpenseText(item.item) === categoryKey
+  );
+  if (currentExact) return currentExact.item;
+
+  const directMap = new Map([
+    [normalizeExpenseText("חנייה"), "חנייה / כבישי אגרה"],
+    [normalizeExpenseText("ביגוד"), "ביגוד מקצועי / ממותג"],
+    [normalizeExpenseText("מים"), "מים - משרד ביתי"],
+    [normalizeExpenseText("ביטוח"), "ביטוח רכב"],
+    [normalizeExpenseText("ייעוץ עסקי/פיתוח עסקי"), "ייעוץ עסקי / פיתוח עסקי"],
+    [normalizeExpenseText("אחסון אתר/דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר /דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר/ דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("ציוד )כללי("), "ציוד (כללי)"]
+  ]);
+
+  if (directMap.has(categoryKey)) return directMap.get(categoryKey);
+
+  // קטגוריות כלליות ישנות — מסווגים רק כשיש אינדיקציה ברורה בתיאור.
+  if (categoryKey === normalizeExpenseText("כללי")) {
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  if (categoryKey === normalizeExpenseText("רכב")) {
+    if (/ביטוח|חובה|מקיף/.test(descKey)) return "ביטוח רכב";
+    if (/מוסך|טיפול|טסט|תיקון|צמיג|מצבר/.test(descKey)) return "טיפולים במוסך";
+    if (/שטיפ|מגב/.test(descKey)) return "שטיפת רכב ותחזוקה שוטפת";
+    if (/חני|כביש 6|אגרה/.test(descKey)) return "חנייה / כבישי אגרה";
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  return "";
+}
+
+
 
 const taxYear = document.getElementById('taxYear');
 const depreciationInput = document.getElementById('depreciationInput');
@@ -280,11 +362,11 @@ function splitVAT(amount, incVat, rate) {
   return { net: n, vat, gross: n + vat };
 }
 function normalizeExpenseText(s) {
-  return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  return String(s || '').trim().toLowerCase().replace(/["'׳״]/g, '').replace(/\s+/g, ' ');
 }
 function getExpenseMeta(row) {
   if (!row) return null;
-  const categoryKey = normalizeExpenseText(row.category || '');
+  const categoryKey = normalizeExpenseText(resolveLegacyExpenseItem(row) || row.category || '');
   const descKey = normalizeExpenseText(row.desc || '');
   let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
   if (match) return match;
@@ -398,6 +480,8 @@ function calculateYear(){
   const settings = getSettings();
   const list = rows.filter(r => String(r.date || '').slice(0,4) === year);
   const capitalizedExpenseIds = new Set((fixedAssets || []).map(a => a.sourceRowId).filter(Boolean));
+  const review = { unlinkedAssets: [], unclassified: [], personal: [], unlinkedFixedAssets: [] };
+  for (const asset of fixedAssets) { if (!asset.sourceRowId) review.unlinkedFixedAssets.push(asset.name || 'נכס ללא שם'); }
   let incomeNet = 0;
   let incomeGross = 0;
   let incomeVat = 0;
@@ -418,6 +502,9 @@ function calculateYear(){
     if (r.type !== 'expense') continue;
     if (capitalizedExpenseIds.has(r.id)) continue;
     const meta = getExpenseMeta(r);
+    if (!meta) review.unclassified.push(r);
+    if (meta?.depreciable) review.unlinkedAssets.push(r);
+    if (meta?.personalTaxItem) review.personal.push(r);
     const categoryName = meta?.category || r.category || 'לא מסווג';
     const itemName = meta?.item || r.category || r.desc || categoryName;
     const deductible = getTaxDeductibleExpenseAmount(r, amounts);
@@ -442,7 +529,7 @@ function calculateYear(){
   const depreciation = fixedDepreciation + manualDepreciation;
   const totalExpenses = totalDeductible + depreciation;
   const operatingProfit = incomeNet - totalExpenses;
-  return { year, list, incomeNet, incomeGross, incomeVat, groups, totalDeductible, totalGrossExpenses, totalInputVat, manualDepreciation, fixedDepreciation, depreciation, totalExpenses, operatingProfit };
+  return { year, list, incomeNet, incomeGross, incomeVat, groups, totalDeductible, totalGrossExpenses, totalInputVat, manualDepreciation, fixedDepreciation, depreciation, totalExpenses, operatingProfit, review };
 }
 function renderGroups(calc){
   const rowsHtml = [];
@@ -493,6 +580,20 @@ function renderPnl(calc){
     <div class="hint" style="margin-top:12px">לחודשים ינואר עד דצמבר — לא כולל מע״מ</div>
   `;
 }
+function renderReview(calc){
+  const card = document.getElementById('reviewCard');
+  const body = document.getElementById('reviewBody');
+  const items = [
+    [calc.review.unlinkedAssets, 'רכישות שסווגו כרכוש בר־פחת אך אינן מקושרות לנכס. יש לבדוק העברה לרכוש קבוע כדי למנוע הכרה כהוצאה שוטפת.'],
+    [calc.review.unclassified, 'הוצאות ללא התאמה לטבלת הקטגוריות העדכנית. יש לבדוק את הסיווג ואת אחוז ההכרה.'],
+    [calc.review.personal, 'תשלומי מס או ניכויים אישיים שנרשמו בתנועות; אינם חלק מההוצאות המוכרות בדוח רווח והפסד.'],
+    [calc.review.unlinkedFixedAssets, 'נכסים שהוזנו ללא קישור לתנועת הוצאה. יש לבדוק שלא נרשמה אותה רכישה גם כהוצאה.']
+  ];
+  const active = items.filter(([arr]) => arr.length);
+  card.style.display = active.length ? '' : 'none';
+  body.innerHTML = active.map(([arr, message]) => `<p><strong>${arr.length} לבדיקה:</strong> ${escapeHtml(message)}<details><summary>הצגת פריטים</summary><ul>${arr.slice(0,30).map(r=>`<li>${escapeHtml(typeof r === 'string' ? r : `${r.date || ''} · ${r.category || ''} · ${r.desc || ''}`)}</li>`).join('')}</ul></details></p>`).join('');
+}
+
 function renderAll(){
   const calc = calculateYear();
   mIncome.textContent = toMoney(calc.incomeNet);
@@ -502,6 +603,7 @@ function renderAll(){
   mProfit.style.color = calc.operatingProfit >= 0 ? 'var(--green)' : 'var(--red)';
   renderGroups(calc);
   renderPnl(calc);
+  renderReview(calc);
   const linked = new Set((fixedAssets || []).map(a => a.sourceRowId).filter(Boolean)).size;
   statusText.textContent = `${calc.list.length} תנועות, ${fixedAssets.length} נכסי רכוש קבוע בשנת ${calc.year}${linked ? ', ' + linked + ' הוצאות מקושרות לרכוש' : ''}`;
 }
