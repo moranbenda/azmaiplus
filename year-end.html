@@ -74,6 +74,18 @@
       table{min-width:0}
       th,td{padding:7px}
     }
+    .ye-review-section{padding:12px 0;border-bottom:1px solid #e5e9f2}
+    .ye-review-section>p{margin:4px 0 10px}
+    .ye-review-items{display:grid;gap:8px}
+    .ye-review-item{padding:11px;border:1px solid #e5e9f2;border-radius:12px;background:#fff;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .ye-review-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .ye-review-actions .btn{text-decoration:none}
+    .ye-info{display:inline-block;vertical-align:middle;position:relative;margin-inline-start:5px}
+    .ye-info summary{cursor:pointer;color:#2563eb;font-size:12px;list-style:none}
+    .ye-info summary::-webkit-details-marker{display:none}
+    .ye-info-content{font-size:12px;line-height:1.6;color:#475569;max-width:450px;padding:10px;background:#f8fafc;border:1px solid #dbeafe;border-radius:10px;margin-top:6px}
+    .ye-review-ok{margin:8px 0;padding:10px 12px;border:1px solid #d1e7dc;border-radius:10px;background:#f8fcfa;color:#166534;font-size:13px}
+    .ye-review-overview{font-weight:700;margin-bottom:8px}
   </style>
 </head>
 <body>
@@ -146,7 +158,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE",
@@ -313,6 +325,8 @@ let currentUser = null;
 let userProfile = null;
 let rows = [];
 let fixedAssets = [];
+let yearEndReviews = {};
+let savingReview = false;
 let ledgerSettings = { vatEnabled: true, vatRate: DEFAULT_VAT };
 
 function escapeHtml(s=''){
@@ -480,8 +494,15 @@ function calculateYear(){
   const settings = getSettings();
   const list = rows.filter(r => String(r.date || '').slice(0,4) === year);
   const capitalizedExpenseIds = new Set((fixedAssets || []).map(a => a.sourceRowId).filter(Boolean));
-  const review = { unlinkedAssets: [], unclassified: [], personal: [], unlinkedFixedAssets: [] };
-  for (const asset of fixedAssets) { if (!asset.sourceRowId) review.unlinkedFixedAssets.push(asset.name || 'נכס ללא שם'); }
+  const review = { unlinkedAssets: [], unclassified: [], personal: [], vatPayments: [], unlinkedFixedAssets: [], historicalAssets: [] };
+  for (const asset of fixedAssets) {
+    if (asset.sourceRowId) continue;
+    const purchaseYear = Number(String(asset.purchaseDate || '').slice(0,4));
+    if (purchaseYear && purchaseYear < Number(year)) review.historicalAssets.push(asset);
+    else if (purchaseYear === Number(year)) review.unlinkedFixedAssets.push(asset);
+    // Missing purchase dates cannot be silently classified as historical.
+    else if (!purchaseYear) review.unlinkedFixedAssets.push(asset);
+  }
   let incomeNet = 0;
   let incomeGross = 0;
   let incomeVat = 0;
@@ -504,7 +525,11 @@ function calculateYear(){
     const meta = getExpenseMeta(r);
     if (!meta) review.unclassified.push(r);
     if (meta?.depreciable) review.unlinkedAssets.push(r);
-    if (meta?.personalTaxItem) review.personal.push(r);
+    if (meta?.personalTaxItem) {
+      const taxText = `${r.category || ''} ${r.desc || ''} ${meta.item || ''}`;
+      if (/מע[״"׳']?מ|מס ערך מוסף/.test(taxText) && !/ביטוח לאומי|מס הכנסה|מקדמות מס/.test(taxText)) review.vatPayments.push(r);
+      else review.personal.push(r);
+    }
     const categoryName = meta?.category || r.category || 'לא מסווג';
     const itemName = meta?.item || r.category || r.desc || categoryName;
     const deductible = getTaxDeductibleExpenseAmount(r, amounts);
@@ -580,19 +605,72 @@ function renderPnl(calc){
     <div class="hint" style="margin-top:12px">לחודשים ינואר עד דצמבר — לא כולל מע״מ</div>
   `;
 }
+function reviewExplanation(row){
+  const meta = getExpenseMeta(row);
+  const name = meta?.item || row.category || 'הוצאה';
+  if (/מחשב|טאבלט|מכשיר|טלפון|אלקטרוני|מדפסת/.test(name)) return 'מחשבים, טאבלטים וציוד אלקטרוני עשויים לשמש את העסק לאורך מספר שנים ולכן עשויים להיחשב רכוש קבוע, שהעלות שלו מוכרת באמצעות פחת ולא כהוצאה מלאה בשנת הרכישה. שימוש עסקי של 100% אינו קובע לבדו את עיתוי ההכרה. יש לבדוק את סיווג הנכס ושיעור הפחת המתאים.';
+  if (/ריהוט|ציוד/.test(name)) return 'ציוד וריהוט שממשיכים לשמש את העסק לאורך זמן עשויים להיחשב רכוש קבוע. במקרה כזה בוחנים הכרה באמצעות פחת לפי סוג הנכס, ולא בהכרח כהוצאה שוטפת.';
+  return 'הקטגוריה שסומנה באפליקציה עשויה להתייחס לנכס המשמש את העסק לאורך זמן. כדאי לבדוק האם מדובר בהוצאה שוטפת או בנכס בר־פחת.';
+}
+function reviewRowId(row){ return String(row.id || `missing-${row.date || ''}-${row.category || ''}-${row.amount || ''}`); }
+function reviewIsApproved(row, year){
+  return yearEndReviews?.[year]?.[reviewRowId(row)]?.decision === 'expense';
+}
 function renderReview(calc){
   const card = document.getElementById('reviewCard');
   const body = document.getElementById('reviewBody');
-  const items = [
-    [calc.review.unlinkedAssets, 'רכישות שסווגו כרכוש בר־פחת אך אינן מקושרות לנכס. יש לבדוק העברה לרכוש קבוע כדי למנוע הכרה כהוצאה שוטפת.'],
-    [calc.review.unclassified, 'הוצאות ללא התאמה לטבלת הקטגוריות העדכנית. יש לבדוק את הסיווג ואת אחוז ההכרה.'],
-    [calc.review.personal, 'תשלומי מס או ניכויים אישיים שנרשמו בתנועות; אינם חלק מההוצאות המוכרות בדוח רווח והפסד.'],
-    [calc.review.unlinkedFixedAssets, 'נכסים שהוזנו ללא קישור לתנועת הוצאה. יש לבדוק שלא נרשמה אותה רכישה גם כהוצאה.']
-  ];
-  const active = items.filter(([arr]) => arr.length);
-  card.style.display = active.length ? '' : 'none';
-  body.innerHTML = active.map(([arr, message]) => `<p><strong>${arr.length} לבדיקה:</strong> ${escapeHtml(message)}<details><summary>הצגת פריטים</summary><ul>${arr.slice(0,30).map(r=>`<li>${escapeHtml(typeof r === 'string' ? r : `${r.date || ''} · ${r.category || ''} · ${r.desc || ''}`)}</li>`).join('')}</ul></details></p>`).join('');
+  const pendingAssets = calc.review.unlinkedAssets.filter(r => !reviewIsApproved(r, calc.year));
+  const approvedAssets = calc.review.unlinkedAssets.filter(r => reviewIsApproved(r, calc.year));
+  const expenseLine = r => `${r.date || ''} · ${r.category || ''} · ${r.desc || ''} · ${toMoney(r.amount)}`;
+  const section = (title, items, message, renderItem) => items.length ? `<div class="ye-review-section"><strong>${items.length} ${title}</strong><p class="hint">${message}</p><div class="ye-review-items">${items.slice(0,100).map(renderItem).join('')}</div>${items.length>100 ? '<p class="hint">מוצגים 100 פריטים ראשונים.</p>' : ''}</div>` : '';
+  const info = (message) => `<details class="ye-info"><summary aria-label="הסבר לבדיקת הסיווג" title="למה המערכת ממליצה לבדוק?">ⓘ למה?</summary><div class="ye-info-content">${escapeHtml(message)}</div></details>`;
+  const pending = section('רכישות לבדיקה כרכוש קבוע', pendingAssets, 'המערכת מזהה רכישות שעשויות להצריך פחת. ניתן לאשר את הסיווג הקיים או לעבור למסך הרכוש הקבוע ולהוסיף אותן משם.', r => `<div class="ye-review-item"><div><b>${escapeHtml(expenseLine(r))}</b> ${info(reviewExplanation(r))}</div><div class="ye-review-actions"><button type="button" class="btn small secondary" data-review-approve="${escapeHtml(reviewRowId(r))}">נבדק — להשאיר כהוצאה</button><a class="btn small" href="/fixed-assets.html#candidateCard">העברה לרכוש קבוע</a><span class="hint">אפשר גם לטפל בהמשך</span></div></div>`);
+  const approved = section('סיווגי הוצאות שאושרו', approvedAssets, 'ההחלטות נשמרות לשנת המס. ניתן לפתוח מחדש כל החלטה.', r => `<div class="ye-review-item"><span>✓ ${escapeHtml(expenseLine(r))}</span><button type="button" class="btn small secondary" data-review-reopen="${escapeHtml(reviewRowId(r))}">פתיחה מחדש</button></div>`);
+  const unclassified = section('הוצאות ללא סיווג תואם', calc.review.unclassified, 'לא נמצאה התאמה לטבלת הקטגוריות. יש לבדוק את הסיווג במסך ההוצאות.', r => `<div class="ye-review-item">${escapeHtml(expenseLine(r))}</div>`);
+  const personal = section('תשלומי מס וניכויים אישיים לבדיקה', calc.review.personal, 'התנועות אינן נחשבות אוטומטית להוצאה עסקית רגילה. יש לבדוק את סוג התשלום והטיפול המתאים.', r => `<div class="ye-review-item">${escapeHtml(expenseLine(r))}</div>`);
+  const unlinked = section('נכסים חדשים ללא קישור להוצאה', calc.review.unlinkedFixedAssets, 'רק נכסים שנרכשו השנה או ללא תאריך רכישה נבדקים כאן. בדקו שאין רישום כפול של ההוצאה והפחת.', a => `<div class="ye-review-item">${escapeHtml(a.name || 'נכס ללא שם')} · ${escapeHtml(a.purchaseDate || 'תאריך חסר')}</div>`);
+  const ok = [calc.review.vatPayments.length ? `<div class="ye-review-ok">✓ ${calc.review.vatPayments.length} תשלומי מע״מ זוהו — אינם נכללים בהוצאות המוכרות (בהתאם לסיווג התנועות).</div>` : '', calc.review.historicalAssets.length ? `<div class="ye-review-ok">✓ ${calc.review.historicalAssets.length} נכסים משנים קודמות — אין צורך בקישור להוצאה מהשנה הנוכחית.</div>` : ''].join('');
+  card.style.display = '';
+  body.innerHTML = `<div class="ye-review-overview">${pendingAssets.length + calc.review.unclassified.length + calc.review.personal.length + calc.review.unlinkedFixedAssets.length ? 'יש פריטים שדורשים בדיקה.' : '✓ אין התראות פתוחות מהבדיקות הנוכחיות.'}</div>${ok}${pending}${unclassified}${personal}${unlinked}${approved}<p class="hint" style="margin-top:12px">אישור הסיווג מתעד את החלטת המשתמש ואינו משנה את סכום ההוצאה או מהווה אישור משפטי להכרה במס. העברה לרכוש קבוע מתבצעת במסך הרכוש הקבוע, שבו נשמר הקישור להוצאה המקורית.</p>`;
 }
+async function saveReviewDecision(rowId, decision){
+  if (!currentUser || savingReview) return;
+  const year = String(taxYear.value);
+  const row = rows.find(r => reviewRowId(r) === rowId && String(r.date || '').slice(0,4) === year);
+  if (!row || !row.id) { alert('לא ניתן לשמור אישור ללא מזהה תנועה תקין.'); return; }
+  savingReview = true;
+  const previous = yearEndReviews?.[year]?.[rowId];
+  if (!yearEndReviews[year]) yearEndReviews[year] = {};
+  yearEndReviews[year][rowId] = { decision, updatedAt: new Date().toISOString(), category: row.category || '' };
+  renderAll();
+  try {
+    // Merge only the selected year's row decision, preserving ledger rows and other reviews.
+    await setDoc(doc(db, 'ledgers', currentUser.uid), { yearEndReviews: { [year]: { [rowId]: yearEndReviews[year][rowId] } } }, { merge:true });
+  } catch (err) {
+    console.error(err);
+    if (previous) yearEndReviews[year][rowId] = previous;
+    else delete yearEndReviews[year][rowId];
+    renderAll();
+    alert('שמירת האישור נכשלה. ההחלטה לא נשמרה — נסו שוב.');
+  } finally { savingReview = false; }
+}
+// On desktop, hovering over the information icon opens the inline explanation; touch devices use a tap.
+document.getElementById('reviewBody').addEventListener('pointerover', e => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('.ye-info');
+  if (el) el.open = true;
+});
+document.getElementById('reviewBody').addEventListener('pointerout', e => {
+  if (e.pointerType !== 'mouse') return;
+  const el = e.target.closest('.ye-info');
+  if (el && !el.contains(e.relatedTarget)) el.open = false;
+});
+document.getElementById('reviewBody').addEventListener('click', e => {
+  const approve = e.target.closest('[data-review-approve]');
+  const reopen = e.target.closest('[data-review-reopen]');
+  if (approve) saveReviewDecision(approve.dataset.reviewApprove, 'expense');
+  if (reopen) saveReviewDecision(reopen.dataset.reviewReopen, 'reopen');
+});
 
 function renderAll(){
   const calc = calculateYear();
@@ -634,6 +712,7 @@ async function loadData(user){
   const ledger = ledgerSnap.exists() ? ledgerSnap.data() : {};
   rows = Array.isArray(ledger.rows) ? ledger.rows : [];
   fixedAssets = Array.isArray(ledger.fixedAssets) ? ledger.fixedAssets : [];
+  yearEndReviews = ledger.yearEndReviews && typeof ledger.yearEndReviews === "object" ? ledger.yearEndReviews : {};
   ledgerSettings = ledger.settings || { vatEnabled: true, vatRate: userProfile?.vatRate || DEFAULT_VAT };
   const years = yearsFromRows();
   const current = taxYear.value;
