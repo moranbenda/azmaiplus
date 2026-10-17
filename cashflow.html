@@ -238,6 +238,8 @@ html,body{max-width:100%;overflow-x:hidden}
         <button type="button" class="btn small" id="verifyPreviewBtn">הצגת תשלומים לאישור</button>
       </div>
       <div id="verifyPreview" class="footer-note" aria-live="polite"></div>
+      <div id="verifyRows" class="table-wrap" style="display:none;max-height:420px;overflow:auto;margin:12px 0"><table style="width:100%"><thead><tr><th><input type="checkbox" id="verifySelectAll" aria-label="בחירת כל התשלומים המוצגים"></th><th>חודש</th><th>התחייבות</th><th>סכום</th><th>סטטוס</th></tr></thead><tbody id="verifyRowsBody"></tbody></table></div>
+      <p class="footer-note" id="verifySelectedTotal" aria-live="polite"></p>
       <button type="button" class="btn small" id="verifyApplyBtn" hidden>אישור התשלומים שנבחרו</button>
     </div>
   </section>
@@ -1014,13 +1016,26 @@ const verifyObligation=document.getElementById("verifyObligation");
 const verifyPreview=document.getElementById("verifyPreview");
 const verifyApplyBtn=document.getElementById("verifyApplyBtn");
 let verificationCandidates=[];
+const verifyRows=document.getElementById("verifyRows"),verifyRowsBody=document.getElementById("verifyRowsBody"),verifySelectAll=document.getElementById("verifySelectAll"),verifySelectedTotal=document.getElementById("verifySelectedTotal");
+function clearVerification(){verificationCandidates=[];verifyApplyBtn.hidden=true;verifyRows.style.display="none";verifyRowsBody.replaceChildren();verifySelectAll.checked=false;verifySelectedTotal.textContent=""}
+function updateVerificationSelection(){
+ const selected=verificationCandidates.filter(x=>document.getElementById("verify-cb-"+x.idx)?.checked);
+ verifyApplyBtn.hidden=readOnly||!selected.length;
+ verifyApplyBtn.textContent=`אישור ${selected.length} תשלומים שנבחרו`;
+ verifySelectedTotal.textContent=`נבחרו ${selected.length} מתוך ${verificationCandidates.length} תשלומים · סה״כ ${money(selected.reduce((s,x)=>s+x.amount,0))}`;
+ verifySelectAll.checked=verificationCandidates.length>0&&selected.length===verificationCandidates.length;
+ verifySelectAll.indeterminate=selected.length>0&&selected.length<verificationCandidates.length;
+}
+verifySelectAll.addEventListener("change",()=>{verifyRowsBody.querySelectorAll('input[type="checkbox"]').forEach(x=>x.checked=verifySelectAll.checked);updateVerificationSelection()});
+verifyRowsBody.addEventListener("change",updateVerificationSelection);
+
 function refreshVerificationOptions(){
   const previous=verifyObligation.value;
   verifyObligation.innerHTML='<option value="all">כל ההתחייבויות הקבועות</option>'+(config.obligations||[]).filter(o=>o.active!==false).map(o=>`<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("");
   if([...verifyObligation.options].some(o=>o.value===previous))verifyObligation.value=previous;
 }
 function previewHistoricPayments(){
-  verificationCandidates=[];verifyApplyBtn.hidden=true;
+  clearVerification();
   const from=verifyFromMonth.value,to=verifyToMonth.value;
   if(!/^\d{4}-\d{2}$/.test(from)||!/^\d{4}-\d{2}$/.test(to)||from>to){verifyPreview.textContent="יש לבחור טווח חודשים תקין.";return}
   const [fy,fm]=from.split("-").map(Number),[ty,tm]=to.split("-").map(Number);
@@ -1035,24 +1050,27 @@ function previewHistoricPayments(){
       const due=new Date(d.getFullYear(),d.getMonth(),day,23,59,59);
       const key=paymentKey(ob.id,d);
       if(due>now||config.paymentStatus?.[key]===true||config.paymentStatus?.[key]===false)continue;
-      verificationCandidates.push({key,month,name:ob.name,amount:Math.max(0,Number(ob.displayAmount)||0)});
+      verificationCandidates.push({key,month,name:ob.name,amount:Math.max(0,Number(ob.displayAmount)||0),idx:verificationCandidates.length});
     }
   }
   if(!verificationCandidates.length){verifyPreview.textContent="לא נמצאו תשלומים שלא אושרו בטווח שנבחר. תשלומים שסומנו כלא שולמו אינם נכללים באישור גורף.";return}
   const total=verificationCandidates.reduce((s,x)=>s+x.amount,0);
-  verifyPreview.textContent=`נמצאו ${verificationCandidates.length} תשלומים שמועדם חלף וטרם אושרו, בסכום ${money(total)}. יש לבדוק את כולם מול רישומי הבנק לפני אישור.`;
-  verifyApplyBtn.hidden=readOnly;
+  verifyPreview.textContent=`נמצאו ${verificationCandidates.length} תשלומים שמועדם חלף וטרם אושרו, בסכום ${money(total)}. יש לבחור רק תשלומים שנבדקו מול הבנק או הגוף המקבל.`;
+  verifyRowsBody.innerHTML=verificationCandidates.map(x=>`<tr><td><input type="checkbox" id="verify-cb-${x.idx}" aria-label="בחירת תשלום ${esc(x.name)} ${esc(x.month)}"></td><td>${esc(x.month)}</td><td>${esc(x.name)}</td><td>${money(x.amount)}</td><td>בוצע משוער · לא אומת</td></tr>`).join("");
+  verifyRows.style.display="block";
+  updateVerificationSelection();
 }
 document.getElementById("verifyPreviewBtn").onclick=()=>{refreshVerificationOptions();previewHistoricPayments()};
-verifyObligation.onchange=()=>{verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
-verifyFromMonth.onchange=verifyToMonth.onchange=()=>{verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
+verifyObligation.onchange=()=>{clearVerification();verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
+verifyFromMonth.onchange=verifyToMonth.onchange=()=>{clearVerification();verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
 verifyApplyBtn.onclick=async()=>{
-  if(readOnly||!verificationCandidates.length)return;
-  if(!confirm(`לאשר ידנית ${verificationCandidates.length} תשלומים לאחר בדיקה מול אסמכתאות?\n\nאישור זה אינו מהווה אישור הפקדות שנתי ואינו יוצר תנועה בספרים.`))return;
+  const chosen=verificationCandidates.filter(x=>document.getElementById("verify-cb-"+x.idx)?.checked);
+  if(readOnly||!chosen.length)return;
+  if(!confirm(`לאשר ידנית ${chosen.length} תשלומים שנבחרו לאחר בדיקה מול אסמכתאות?\n\nאישור זה אינו מהווה אישור הפקדות שנתי ואינו יוצר תנועה בספרים.`))return;
   const previous={...config.paymentStatus};
   config.paymentStatus=config.paymentStatus||{};
-  for(const x of verificationCandidates)config.paymentStatus[x.key]=true;
-  try{await saveConfig();verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="האישורים נשמרו. לצורכי מס נדרש אימות מול האישורים השנתיים.";render()}
+  for(const x of chosen)config.paymentStatus[x.key]=true;
+  try{await saveConfig();clearVerification();verifyPreview.textContent="האישורים נשמרו. לצורכי מס נדרש אימות מול האישורים השנתיים.";render()}
   catch(err){config.paymentStatus=previous;alert("שמירת האישורים נכשלה. יש לנסות שוב.");console.error(err)}
 };
 
