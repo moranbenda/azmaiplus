@@ -18,7 +18,16 @@
 .pension-issue-collapse>summary{background:#fff7f7;color:#9f2424}
 .pension-issue-collapse>p{margin:8px 15px;font-size:13px}
 .pension-issue-collapse[open]{padding-bottom:8px}
-</style><script src="https://accounts.google.com/gsi/client" async defer></script></head><body><main><div class="top"><div><h1>הכנה לדוח שנתי 1301</h1><p class="muted">עצמאי פלוס · V16.3 בקרת משיכות ומניעת כפילויות · טיוטת הכנה בלבד</p></div><div class="toolbar"><label>שנת מס <select id="year"><option selected>2026</option><option>2025</option></select></label><button id="reload" class="alt">רענון נתונים</button><button id="summary" class="alt">סיכום שדות</button><button id="print" class="alt">הדפסה / PDF</button></div></div><nav class="report-jump" aria-label="ניווט בדוח"><a href="#generalWizard">פרטים כלליים</a><a href="#wizard">שאלון זכאות</a><a href="#documentImportSection">קליטת אישורים</a><a href="#pensionWithdrawalSection">משיכות פנסיה</a><a href="#cashflowImportBox">נתונים מהתזרים</a><a href="#estimate">אומדן מס</a><a href="#advanced">שדות 1301</a></nav><aside class="doc-sidebar" id="docChecklist" aria-label="רשימת מסמכים לדוח השנתי"><h2>המסמכים שלי לדוח השנתי</h2><p>רשימה אישית שמתעדכנת בהתאם לנתונים שלך. וי ירוק מציין שהמסמך ברשותך, לא שהוא אומת.</p><div id="docProgressLabel"></div><div class="doc-progress"><div id="docProgressBar"></div></div><div id="docList" class="doc-list"></div><p class="doc-note">הסימונים נשמרים בטיוטה של שנת המס.</p></aside><div class="notice"><b>חשוב:</b> זהו מסך הכנה, לא הגשה לרשות המסים. מספרי השדות המוצגים הם שדות עזר לטיוטה ויש לבדוק אותם מול הטופס הרשמי לשנת הדיווח. סכומי הפקדות אישיות אינם סכומי ניכוי או זיכוי מאושרים. אין לראות במסך זה אישור להכרה בהוצאה או תחליף לאישור רשות המסים.</div><div class="status" id="status">ממתין לכניסה לחשבון...</div><section class="section" id="generalWizard"><h2>פרטים כלליים לדוח השנתי</h2><div class="wizard-intro">הפרטים שכבר קיימים בפרופיל העסק יישאבו אוטומטית; כאן משלימים פרטים אישיים. סעיף א׳ בדוח מתמלא מהשאלון ואינו דורש הקלדה כפולה.</div><div class="fields" id="generalFields"></div></section><section class="section" id="wizard"><h2>בדיקת זכאות אישית — שאלות פשוטות</h2><div class="wizard-intro">אפשר לסמן כמה זכאויות במקביל. הנתונים נשמרים בטיוטה לכל שנת מס; רק זכאות שניתנת לחישוב בביטחון תיכלל באומדן. רשימת 491 יישובים מלוח הניכויים הרשמי (אפריל 2026). הוראות מאוחרות מיוני 2026 עשויות להוסיף זכאויות שטרם נכללו בלוח. <a href="https://www.gov.il/BlobFolder/generalpage/income-tax-monthly-deductions-booklet/he/generalInformation_income-tax-monthly-deductions-booklet_monthly-deductions-booklet-2026.pdf" target="_blank" rel="noopener noreferrer">לוח הניכויים הרשמי, פרק ח׳</a>.</div><div class="fields" id="wizardFields"></div><div id="eligibilityResults" class="wizard-results"></div></section><section class="section" id="documentImportSection"><h2>קליטת אישורים — חילוץ נתונים ובקרת משתמש</h2><div class="wizard-intro">PDF או תמונה. קריאה וחילוץ מתבצעים בדפדפן. <strong>לא מועבר שום מסמך לענן ולא משתנה חישוב המס לפני אישור מפורש.</strong> לאחר אישור, המקור יישמר ב־Google Drive הפרטי שלך בתיקיית ״עצמאי פלוס / מסמכים לדוח שנתי [שנה]״. הנתונים שאישרת יישמרו בטיוטת השנה ב־Firestore. לא ניתנת הרשאת שיתוף לקובץ.</div><div class="import-controls"><label>סוג האישור <select id="documentImportType"><option value="pension">משיכת פנסיה / גמל / פיצויים</option><option value="106">טופס 106</option><option value="study">קרן השתלמות</option><option value="national">ביטוח לאומי</option><option value="donation">תרומות</option><option value="867">טופס 867</option><option value="other">אישור אחר</option></select></label><label>בחירת קובץ <input type="file" id="documentImportFile" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"></label><button type="button" id="documentImportRead">חלץ נתונים לבדיקה</button><button type="button" class="alt" id="documentImportCancel">בטל בחירה</button></div><div id="docExtractStatus" aria-live="polite" style="padding:0 15px"></div><div id="docImportReview" style="padding:5px 14px 14px"></div><div class="wizard-results" id="approvedDocsSummary"></div><p class="qhint" style="padding:0 14px">זיהוי PDF וטקסט מתבצע מקומית בדפדפן באמצעות PDF.js; עבור סריקות ותמונות ניתן להפעיל OCR מקומי באמצעות Tesseract.js. רכיבי הספרייה וקובצי השפה נטענים משירות CDN חיצוני, אך הקובץ עצמו אינו נשלח לשירות OCR. העלאת המקור ל־Google Drive מתבצעת רק לאחר לחיצה על ״אשר״. המסמך אינו מהווה אישור לסיווג מס.</p></section><section class="section" id="pensionWithdrawalSection"><h2>משיכות כספים מפנסיה / קופת גמל / פיצויים</h2><div class="wizard-intro">פרטי האישורים נשמרים בטיוטה. סיווג המס של משיכות שלא אומתו נשאר פתוח ולא מחושב אוטומטית.</div><details id="pensionWithdrawalDetails" class="pension-collapse"><summary id="pensionWithdrawalDetailsTitle">הצגת פירוט רכיבי המשיכה</summary><div id="pensionWithdrawalContent" style="padding:14px"></div></details></section><section class="section" id="cashflowImportBox"><h2>נתונים מהתזרים</h2><div class="wizard-results" id="cashflowImport">ממתין לנתונים...</div></section><section class="section" id="estimate"><h2>תמונת מצב ואומדן מס — טרם אומת לכל המסלולים</h2><div id="estimateContent" class="wizard-results"></div></section><details class="section" id="advanced"><summary class="advanced-title">הצגת שדות טופס 1301 המלאים ובקרה מקצועית</summary><div id="sections"></div></details><section class="section" id="summaryPanel" hidden><h2>סיכום שדות להכנה ולהעתקה</h2><div id="summaryContent" style="padding:14px"></div></section><div class="footer">הטיוטה נשמרת בחשבון המשתמש ב-Firebase, בנפרד לכל שנת מס. אין שינוי בספרי העסק, בתזרים או בסגירת השנה. השמירה תלויה בהרשאות מסד הנתונים.</div></main>
+
+/* V16.4: brief, expandable tax bracket breakdown */
+.tax-ladder-details{margin:10px 0;border:1px solid #dbe4f5;border-radius:12px;background:#fff;overflow:hidden}
+.tax-ladder-details>summary{padding:13px 15px;cursor:pointer;font-weight:700;background:#f5f8ff;color:#224a91}
+.tax-ladder-details>p{margin:9px 15px;line-height:1.55}
+.tax-ladder-table{width:100%;border-collapse:collapse;font-size:13px}
+.tax-ladder-table th,.tax-ladder-table td{text-align:right;padding:10px 8px;border-bottom:1px solid #e8edf5}
+.tax-ladder-table th{background:#f8fafc}
+@media(max-width:650px){.tax-ladder-table{font-size:11px}.tax-ladder-table th,.tax-ladder-table td{padding:7px 4px}}
+</style><script src="https://accounts.google.com/gsi/client" async defer></script></head><body><main><div class="top"><div><h1>הכנה לדוח שנתי 1301</h1><p class="muted">עצמאי פלוס · V16.4 אומדן מס כולל משיכות ומדרגות · טיוטת הכנה בלבד</p></div><div class="toolbar"><label>שנת מס <select id="year"><option selected>2026</option><option>2025</option></select></label><button id="reload" class="alt">רענון נתונים</button><button id="summary" class="alt">סיכום שדות</button><button id="print" class="alt">הדפסה / PDF</button></div></div><nav class="report-jump" aria-label="ניווט בדוח"><a href="#generalWizard">פרטים כלליים</a><a href="#wizard">שאלון זכאות</a><a href="#documentImportSection">קליטת אישורים</a><a href="#pensionWithdrawalSection">משיכות פנסיה</a><a href="#cashflowImportBox">נתונים מהתזרים</a><a href="#estimate">אומדן מס</a><a href="#advanced">שדות 1301</a></nav><aside class="doc-sidebar" id="docChecklist" aria-label="רשימת מסמכים לדוח השנתי"><h2>המסמכים שלי לדוח השנתי</h2><p>רשימה אישית שמתעדכנת בהתאם לנתונים שלך. וי ירוק מציין שהמסמך ברשותך, לא שהוא אומת.</p><div id="docProgressLabel"></div><div class="doc-progress"><div id="docProgressBar"></div></div><div id="docList" class="doc-list"></div><p class="doc-note">הסימונים נשמרים בטיוטה של שנת המס.</p></aside><div class="notice"><b>חשוב:</b> זהו מסך הכנה, לא הגשה לרשות המסים. מספרי השדות המוצגים הם שדות עזר לטיוטה ויש לבדוק אותם מול הטופס הרשמי לשנת הדיווח. סכומי הפקדות אישיות אינם סכומי ניכוי או זיכוי מאושרים. אין לראות במסך זה אישור להכרה בהוצאה או תחליף לאישור רשות המסים.</div><div class="status" id="status">ממתין לכניסה לחשבון...</div><section class="section" id="generalWizard"><h2>פרטים כלליים לדוח השנתי</h2><div class="wizard-intro">הפרטים שכבר קיימים בפרופיל העסק יישאבו אוטומטית; כאן משלימים פרטים אישיים. סעיף א׳ בדוח מתמלא מהשאלון ואינו דורש הקלדה כפולה.</div><div class="fields" id="generalFields"></div></section><section class="section" id="wizard"><h2>בדיקת זכאות אישית — שאלות פשוטות</h2><div class="wizard-intro">אפשר לסמן כמה זכאויות במקביל. הנתונים נשמרים בטיוטה לכל שנת מס; רק זכאות שניתנת לחישוב בביטחון תיכלל באומדן. רשימת 491 יישובים מלוח הניכויים הרשמי (אפריל 2026). הוראות מאוחרות מיוני 2026 עשויות להוסיף זכאויות שטרם נכללו בלוח. <a href="https://www.gov.il/BlobFolder/generalpage/income-tax-monthly-deductions-booklet/he/generalInformation_income-tax-monthly-deductions-booklet_monthly-deductions-booklet-2026.pdf" target="_blank" rel="noopener noreferrer">לוח הניכויים הרשמי, פרק ח׳</a>.</div><div class="fields" id="wizardFields"></div><div id="eligibilityResults" class="wizard-results"></div></section><section class="section" id="documentImportSection"><h2>קליטת אישורים — חילוץ נתונים ובקרת משתמש</h2><div class="wizard-intro">PDF או תמונה. קריאה וחילוץ מתבצעים בדפדפן. <strong>לא מועבר שום מסמך לענן ולא משתנה חישוב המס לפני אישור מפורש.</strong> לאחר אישור, המקור יישמר ב־Google Drive הפרטי שלך בתיקיית ״עצמאי פלוס / מסמכים לדוח שנתי [שנה]״. הנתונים שאישרת יישמרו בטיוטת השנה ב־Firestore. לא ניתנת הרשאת שיתוף לקובץ.</div><div class="import-controls"><label>סוג האישור <select id="documentImportType"><option value="pension">משיכת פנסיה / גמל / פיצויים</option><option value="106">טופס 106</option><option value="study">קרן השתלמות</option><option value="national">ביטוח לאומי</option><option value="donation">תרומות</option><option value="867">טופס 867</option><option value="other">אישור אחר</option></select></label><label>בחירת קובץ <input type="file" id="documentImportFile" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp"></label><button type="button" id="documentImportRead">חלץ נתונים לבדיקה</button><button type="button" class="alt" id="documentImportCancel">בטל בחירה</button></div><div id="docExtractStatus" aria-live="polite" style="padding:0 15px"></div><div id="docImportReview" style="padding:5px 14px 14px"></div><div class="wizard-results" id="approvedDocsSummary"></div><p class="qhint" style="padding:0 14px">זיהוי PDF וטקסט מתבצע מקומית בדפדפן באמצעות PDF.js; עבור סריקות ותמונות ניתן להפעיל OCR מקומי באמצעות Tesseract.js. רכיבי הספרייה וקובצי השפה נטענים משירות CDN חיצוני, אך הקובץ עצמו אינו נשלח לשירות OCR. העלאת המקור ל־Google Drive מתבצעת רק לאחר לחיצה על ״אשר״. המסמך אינו מהווה אישור לסיווג מס.</p></section><section class="section" id="pensionWithdrawalSection"><h2>משיכות כספים מפנסיה / קופת גמל / פיצויים</h2><div class="wizard-intro">פרטי האישורים נשמרים בטיוטה. רכיבים מאומתים נכנסים לחישוב; רכיבים שלא סווגו יוצגו באומדן תרחישים מותנה, ללא כתיבה לשדות החייב/פטור.</div><details id="pensionWithdrawalDetails" class="pension-collapse"><summary id="pensionWithdrawalDetailsTitle">הצגת פירוט רכיבי המשיכה</summary><div id="pensionWithdrawalContent" style="padding:14px"></div></details></section><section class="section" id="cashflowImportBox"><h2>נתונים מהתזרים</h2><div class="wizard-results" id="cashflowImport">ממתין לנתונים...</div></section><section class="section" id="estimate"><h2>תמונת מצב ואומדן מס — טרם אומת לכל המסלולים</h2><div id="estimateContent" class="wizard-results"></div></section><details class="section" id="advanced"><summary class="advanced-title">הצגת שדות טופס 1301 המלאים ובקרה מקצועית</summary><div id="sections"></div></details><section class="section" id="summaryPanel" hidden><h2>סיכום שדות להכנה ולהעתקה</h2><div id="summaryContent" style="padding:14px"></div></section><div class="footer">הטיוטה נשמרת בחשבון המשתמש ב-Firebase, בנפרד לכל שנת מס. אין שינוי בספרי העסק, בתזרים או בסגירת השנה. השמירה תלויה בהרשאות מסד הנתונים.</div></main>
 <script type="module">
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js';
 import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js';
@@ -1340,66 +1349,149 @@ function calculateTax2026(input){
 // V14.2: Restricted historical 2025 comparison. Does not alter 2026 engine or financial ledgers.
 // Official 2025 brackets: https://www.gov.il/BlobFolder/generalpage/income-tax-guide-knowyourright/he/Guides_IncomeTax_da-2025.pdf
 const TAX_2025_COMPARISON=Object.freeze({point:2904,studyIncomeCap:293397,brackets:[[84120,.10],[120720,.14],[193800,.20],[269280,.31],[560280,.35],[Infinity,.47]]});
+// V16.4 — a transparent conditional ESTIMATE, not an automatic tax classification.
+// Withholding certificates establish withdrawn amounts and tax withheld, but not the taxable
+// / exempt status of a particular withdrawal. This layer never writes assumed amounts
+// back to the user's 1301 fields or to their year-specific draft.
+function unverifiedImportedPensionSummary(){
+ const approved=new Set(registeredImports().filter(x=>x.docType==='pension'&&!x.pendingDelete).map(x=>x.hash));
+ const result={files:approved.size,rewards:0,severance:0,other:0,withheld:0,rows:0};
+ for(const row of pensionImportReconciliation().rows){
+  if(!row.importHash||!approved.has(row.importHash))continue;
+  const gross=finiteOrNull(row.gross),taxWithheld=finiteOrNull(row.withheld);
+  if(gross===null||gross<=0||taxWithheld===null)continue;
+  // A verified, fully classified record is already handled in calculateWithdrawalTaxes.
+  const actuallyClassified=row.verified==='yes'&&row.taxable!==''&&row.exempt!==''&&
+   Math.abs(Number(row.taxable)+Number(row.exempt)-gross)<.02&&
+   ['no','yes'].includes(row.incomeIncluded)&&['severance','approved_ordinary','invalid_annuity','invalid_provident'].includes(row.kind)&&
+   (row.kind!=='invalid_annuity'||['pre2000','post2000'].includes(row.period));
+  if(actuallyClassified)continue;
+  result.rows++;result.withheld+=taxWithheld;
+  const group=pensionComponentFamily(row);
+  if(group==='rewards')result.rewards+=gross;
+  else if(group==='severance')result.severance+=gross;
+  else result.other+=gross;
+ }
+ return result;
+}
+function taxLadder(income,brackets){
+ const out=[];let low=0;
+ for(const [cap,rate] of brackets){
+  if(income<=low)break;
+  const amount=Math.min(income,cap)-low;
+  if(amount>0)out.push({from:low,to:cap,rate,amount,tax:amount*rate});
+  low=cap;
+ }
+ return out;
+}
+function provisionalPensionScenario(year,baseEarned,baseGrossTax,pointsCredit,alreadyWithheld,manualOtherWithheld,approvedWithdrawalWithheld=0){
+ const rule=year===2025?TAX_2025_COMPARISON.brackets:TAX_RULES_2026.bracketsEarned;
+ const pending=unverifiedImportedPensionSummary();
+ if(!pending.rows)return null;
+ const baseTaxAfterCredits=baseGrossTax; // The caller supplies the tax AFTER basic credits.
+ // Conditional working assumption only: all reward withdrawals are unauthorized, 35% taxable.
+ const rewardsTax=pending.rewards*.35;
+ const severanceOrdinaryTax=progressiveTax(baseEarned+pending.severance,rule)-progressiveTax(baseEarned,rule);
+ // Source is ambiguous when a separate manually entered other-withholding value exists.
+ // Never add the same Harel withholding to the manually entered total twice.
+ const alreadyCovers=manualOtherWithheld>0;
+ const withhold=pending.withheld;
+ const credited=alreadyWithheld+(alreadyCovers?0:withhold);
+ const min=baseTaxAfterCredits+rewardsTax-credited;
+ const middle=min+severanceOrdinaryTax;
+ const max=min+pending.severance*.35;
+ return {pending,rewardsTax,severanceOrdinaryTax,low:min,illustration:middle,high:max,credited,
+  usesManualOther:alreadyCovers,missingOther:pending.other>0,
+  approvedWithdrawalWithheld};
+}
+function addTaxLadderDetails(host,amount,brackets,label){
+ const details=document.createElement('details');details.className='tax-ladder-details';
+ const heading=document.createElement('summary');heading.textContent=label;details.append(heading);
+ const table=document.createElement('table');table.className='tax-ladder-table';
+ const thead=document.createElement('thead'),hr=document.createElement('tr');
+ for(const t of ['מדרגה שנתית','מס בשיעור','סכום במדרגה','מס על המדרגה']){const th=document.createElement('th');th.textContent=t;hr.append(th)}
+ thead.append(hr);table.append(thead);const tbody=document.createElement('tbody');
+ for(const tier of taxLadder(amount,brackets)){
+  const tr=document.createElement('tr');
+  const vals=[`${fmt(tier.from)}–${Number.isFinite(tier.to)?fmt(tier.to):'ומעלה'}`,`${fmt(tier.rate*100)}%`,`₪${fmt(tier.amount)}`,`₪${fmt(tier.tax)}`];
+  for(const val of vals){const td=document.createElement('td');td.textContent=val;tr.append(td)}tbody.append(tr);
+ }
+ table.append(tbody);details.append(table);host.append(details);
+}
 function render2025Diagnostic(points,add,get){
  const n=k=>positive(get(k)),known=k=>finiteOrNull(get(k))!==null;
- add('בדיקת השוואה לשנת 2025 — כעת כוללת גם מסלול משיכות פנסיה מסווגות לפי אישורים. עדיין אין להשתמש בתוצאה לדיווח או לתשלום.','warnmsg');
  const profit=finiteOrNull(get('profit'));
- if(profit===null){add('לא הוזן רווח עסקי לשנת 2025; לא ניתן לחשב אפילו את בסיס המס.','badmsg');return}
+ if(profit===null){add('חסר רווח עסקי לשנת 2025 — לא ניתן להפיק אומדן מס.','badmsg');return}
  const salary=n('salary');
  const study=Math.min(n('study'),Math.max(0,profit)*.045,TAX_2025_COMPARISON.studyIncomeCap*.045);
  const ni=n('nationalInsuranceOnly');
  const socialDed=known('nationalInsuranceOnly')?Math.min(n('national'),ni)*.52:0;
- if(n('national')>0&&!known('nationalInsuranceOnly'))add('נדרש סכום ביטוח לאומי ללא דמי ביטוח בריאות מתוך האישור השנתי.','warnmsg');
- const specialIncomeKeys=['otherOrdinaryTaxable','rentalOrdinary','rentalTenPercent','foreignRental15','interestTaxable','interestReal','dividends25','dividends30','capitalGain15','capitalGain25','capitalGain30','foreignEmployment','benefitSelf'];
- const hasSpecial=specialIncomeKeys.some(key=>n(key)>0)||String(get('otherIncome')||'').trim()!==''||String(get('capital')||'').trim()!=='';
  const earned=Math.max(0,profit+salary-study-socialDed);
-  const wd=calculateWithdrawalTaxes(2025,pensionImportReconciliation().rows,earned,TAX_2025_COMPARISON.brackets,{answer:wizardVal('pensionWithdrawalsYes')});
-  const receiptAudit=pensionReceiptAudit(),reconcile=pensionImportReconciliation();
-  if(receiptAudit.docs){
-   add(`בקרת אישורי משיכה שנשמרו: ${receiptAudit.docs} קבצים · ${receiptAudit.parts} רכיבים · ברוטו ₪${fmt(receiptAudit.gross)} (תגמולים ₪${fmt(receiptAudit.rewards)}, פיצויים ₪${fmt(receiptAudit.severance)}) · מס שנוכה לפי האישורים ₪${fmt(receiptAudit.withheld)}.`,'goodmsg');
-   if(reconcile.matches.length)add(`נוטרלו מהסיכום ${reconcile.matches.length} רישומים ידניים חופפים בסך ₪${fmt(reconcile.matches.reduce((a,r)=>a+r.gross,0))} — הרשומות נשמרו ואפשר לעיין בהן.`, 'qhint');
-   const otherWithheld=n('otherWithheld');
-   if(otherWithheld>0&&receiptAudit.withheld>0&&Math.abs(otherWithheld-receiptAudit.withheld)>.5)
-    add(`שימי לב: במסמכי המשיכה מופיע מס שנוכה ₪${fmt(receiptAudit.withheld)}, ובשדה "מס במקור מהכנסות אחרות" הוזנו ₪${fmt(otherWithheld)}. הפער ₪${fmt(Math.abs(otherWithheld-receiptAudit.withheld))} דורש התאמה; אין לקזז אוטומטית את הסכומים פעמיים.`, 'warnmsg');
-  }
-
+ const rows=pensionImportReconciliation().rows;
+ const wd=calculateWithdrawalTaxes(2025,rows,earned,TAX_2025_COMPARISON.brackets,{answer:wizardVal('pensionWithdrawalsYes')});
+ const receiptAudit=pensionReceiptAudit();const reconcile=pensionImportReconciliation();
  const regularWithWithdrawals=earned+wd.ordinaryTaxable;
  const basicTax=progressiveTax(regularWithWithdrawals,TAX_2025_COMPARISON.brackets);
- const grossTaxWithWithdrawals=basicTax+wd.fixedTax;
- const pointCredit=Math.max(0,Number(points)||0)*TAX_2025_COMPARISON.point;
- const ordinaryAfterPoints=Math.max(0,basicTax-pointCredit);
- const fullPartialAfterCredits=ordinaryAfterPoints+wd.fixedTax;
- if(wd.fixedTax>0&&basicTax<pointCredit)wd.issues.push('חישוב 2025: ייתכן ניצול של נקודות זיכוי בסיסיות כנגד מס 35%; תוצאה זו אינה מקצה זיכוי כזה ונדרש חישוב רשות המסים.');
- const withheldTotal=n('otherWithheld')+n('salaryWithheld')+n('interestWithheld')+n('dividendWithheld')+wd.withheld;
- add(`הכנסה עסקית שהוזנה: ₪${fmt(profit)} · שכר: ₪${fmt(salary)}`);
- add(`ניכוי קרן השתלמות מחושב: ₪${fmt(study)} · ניכוי ביטוח לאומי (52% מדמי ביטוח בלבד): ₪${fmt(socialDed)}`);
- add(`בסיס הכנסה חייבת לחישוב הרגיל בלבד: ₪${fmt(earned)}`);
- add(`מס לפי מדרגות 2025 על הכנסה רגילה (כולל רכיבי משיכה שסווגו במס שולי): ₪${fmt(basicTax)}`);
-  add(`משיכות שניתן לחשב כעת לאחר סיווג ואימות: ברוטו ₪${fmt(wd.totalGross)} · חייב במס ₪${fmt(wd.totalTaxable)} · במס קבוע 35% ₪${fmt(wd.fixedTaxable)}. סכומי אישורים שטרם סווגו אינם נכללים במספרים האלה.`);
- add(`מס קבוע ממשיכות שלא כדין: ₪${fmt(wd.fixedTax)} · מס ברוטו כולל רכיבי משיכה שסווגו: ₪${fmt(grossTaxWithWithdrawals)}`);
- add(`נקודות זיכוי מחושבות: ${fmt(points)} × ₪2,904 = ₪${fmt(pointCredit)}`);
- add(`מס על ההכנסה הרגילה אחרי נקודות בלבד: ₪${fmt(ordinaryAfterPoints)}`);
- add(`ניכוי מס במקור כולל מהמשיכות (ללא כפל לפי הצהרתך): ₪${fmt(withheldTotal)} (לבקרה בלבד; לא קוזז מתחשיב סופי)`);
- add(`מס אחרי נקודות זיכוי והמס הקבוע (לפני התאמות נוספות): ₪${fmt(fullPartialAfterCredits)}`);
- for(const line of wd.lines)add(`${line.label}: ברוטו ₪${fmt(line.gross)}, חייב ₪${fmt(line.taxable)}, פטור ₪${fmt(line.exempt)}, מס שנוכה ₪${fmt(line.withheld)} · ${line.method==='fixed35'?'מס קבוע 35%':line.method==='marginal'?'מס שולי (גבוה מ־35%)':line.method==='ordinary'?'מס שולי רגיל':'לא נוסף לחישוב'}`,'qhint');
+ const pointsCredit=Math.max(0,Number(points)||0)*TAX_2025_COMPARISON.point;
+ const grossTax=basicTax+wd.fixedTax;
+ const afterCredits=Math.max(0,basicTax-pointsCredit)+wd.fixedTax;
+ const otherWithheld=n('otherWithheld');
+ const otherCredited=n('salaryWithheld')+n('interestWithheld')+n('dividendWithheld')+otherWithheld+wd.withheld;
+ const estimated=provisionalPensionScenario(2025,regularWithWithdrawals,afterCredits,0,otherCredited,otherWithheld,wd.withheld);
+ const advancedExclusions=['otherOrdinaryTaxable','otherPassiveTaxable','rentalOrdinary','rentalTenPercent','foreignRental15','interestTaxable','interestReal','dividends25','dividends30','capitalGain15','capitalGain25','capitalGain30','foreignEmployment','benefitSelf'].some(k=>n(k)>0)||String(get('otherIncome')||'').trim()||String(get('capital')||'').trim();
+ const caveats=[];
+ if(n('national')>0&&!known('nationalInsuranceOnly'))caveats.push('חסרים דמי הביטוח הלאומי ללא ביטוח בריאות מתוך האישור השנתי.');
+ if(advancedExclusions)caveats.push('הוזנו הכנסות נוספות/מיוחדות שאינן מחושבות עדיין במודל ההשוואה ל־2025.');
+ if(n('pension')>0||n('employeePensionEmployee')>0)caveats.push('הטבות בגין הפקדות פנסיוניות לא נכללו במודל 2025.');
+ if(n('donations')>0)caveats.push('זיכוי תרומות לא נכלל במודל 2025.');
+ if(wizardYes('locality'))caveats.push('זיכוי יישוב לפי שנת 2025 אינו מחושב במודל.');
+ if(generalValue('marital')==='נשוי/אה')caveats.push('חישוב בני זוג אינו נכלל במודל 2025.');
+ if(receiptAudit.docs){
+  add(`אישורי פנסיה שנשמרו: ${receiptAudit.docs} מסמכים, ${receiptAudit.parts} רכיבים · סך ברוטו ₪${fmt(receiptAudit.gross)} (תגמולים ₪${fmt(receiptAudit.rewards)}, פיצויים ₪${fmt(receiptAudit.severance)}) · ניכוי במקור ₪${fmt(receiptAudit.withheld)}.`,'goodmsg');
+  if(reconcile.matches.length)add(`זוהו ${reconcile.matches.length} רישומים ידניים חופפים שלא נספרים שוב; המסמכים נשמרו.`, 'qhint');
+ }
+ add(`רווח עסקי ₪${fmt(profit)} + משכורת ₪${fmt(salary)} − ניכוי קרן השתלמות ₪${fmt(study)} − ניכוי ביטוח לאומי ₪${fmt(socialDed)} = בסיס מס רגיל ₪${fmt(earned)}.`);
+ add(`מס על ההכנסה הרגילה לפי מדרגות 2025: ₪${fmt(basicTax)} · נקודות זיכוי ${fmt(points)} × ₪2,904 = ₪${fmt(pointsCredit)}.`);
+ addTaxLadderDetails(el('estimateContent'),regularWithWithdrawals,TAX_2025_COMPARISON.brackets,'איך חושבו מדרגות המס על ההכנסה הרגילה?');
+ if(estimated){
+  const {pending}=estimated;
+  add('אומדן מס כולל משיכות — תרחישים מותנים (לא סיווג מס מאושר)','summary-num');
+  add(`לצורך תרחיש בלבד: תגמולים ₪${fmt(pending.rewards)} × 35% = ₪${fmt(estimated.rewardsTax)} מס; אין באישורי הניכוי לבדם הוכחה שזו משיכה שלא כדין.`,'warnmsg');
+  if(estimated.usesManualOther&&Math.abs(otherWithheld-pending.withheld)<=5&&Math.abs(otherWithheld-pending.withheld)>.01)add(`פער של ₪${fmt(Math.abs(otherWithheld-pending.withheld))} בין האישורים לבין הסכום הידני — פער קטן שעשוי לנבוע מעיגול; השתמשנו בסכום הידני ללא כפל.`, 'qhint');
+  if(pending.severance>0){
+   add(`פיצויים ₪${fmt(pending.severance)}: ייתכן פטור, חיוב לפי מדרגות מס או סיווג אחר. לכן מוצגים שלושה תרחישים, ללא בקשה שתבחרי בעצמך.`,'qhint');
+  }
+  add(`ניכוי מס במקור שהובא בחשבון האומדן: ₪${fmt(estimated.credited)}${estimated.usesManualOther?' (השדה הידני קודם לאישורים, כדי למנוע כפל)':' (כולל אישורי המשיכה שאושרו ולא הוקלדו בנפרד)'}.`);
+  if(estimated.usesManualOther&&Math.abs(otherWithheld-pending.withheld)>5){
+   add(`בקרה: הוזנו ידנית ₪${fmt(otherWithheld)} ניכויי מס אחרים, ובאישורים הנוספים ₪${fmt(pending.withheld)}. ייתכן חפיפה; לא חיברנו ביניהם. נדרש בירור של המקורות.`, 'warnmsg');
+  }
+  if(pending.severance){
+   add(`אם כל הפיצויים פטורים: ${estimated.low>=0?'יתרה לתשלום':'יתרה לזכות'} ₪${fmt(Math.abs(estimated.low))}.`);
+   add(`אם כל הפיצויים חייבים במס שולי רגיל: ${estimated.illustration>=0?'יתרה לתשלום':'יתרה לזכות'} ₪${fmt(Math.abs(estimated.illustration))} (תרחיש המחשה, לא הבחירה האוטומטית בדוח).`,'goodmsg');
+   add(`אם כל הפיצויים חייבים ב־35%: ${estimated.high>=0?'יתרה לתשלום':'יתרה לזכות'} ₪${fmt(Math.abs(estimated.high))}.`);
+  }else add(`תרחיש 35% לתגמולים בלבד: יתרה ${estimated.low>=0?'לתשלום':'לזכות'} ₪${fmt(Math.abs(estimated.low))}.`,'goodmsg');
+  if(estimated.missingOther)caveats.push(`נוספו אישורים בסך ₪${fmt(pending.other)} ללא חלוקה ברורה לתגמולים/פיצויים; הם אינם כלולים בתרחישים.`);
+  caveats.push('התרחישים כוללים הנחות לגבי מיסוי משיכות שלא סווגו. ניכוי המס במקור אינו ראיה לסכום החייב. כדי לקבוע מס סופי יש לבדוק גם טופס 161/אישור פקיד שומה או סיווג משיכה לפי העניין.');
+ }else{
+  const remaining=afterCredits-otherCredited-n('taxAdvances');
+  add(`אומדן יתרה ${remaining>=0?'לתשלום':'לזכות'} על סמך הרכיבים שסווגו: ₪${fmt(Math.abs(remaining))}`,'summary-num');
+  add(`מס לאחר זיכויים ₪${fmt(afterCredits)} − ניכוי במקור ₪${fmt(otherCredited)} − מקדמות ₪${fmt(n('taxAdvances'))}.`);
+  if(wd.issues.length)caveats.push('יש אישורי משיכה שלא סווגו ולא ניתן לתת להם אומדן מספרי בלא נתוני המקור.');
+ }
  if(wd.issues.length){
   const details=document.createElement('details');details.className='pension-issue-collapse';
-  const sum=document.createElement('summary');sum.textContent=`⚠ ${wd.issues.length} פרטי משיכה עדיין דורשים סיווג/אימות — לחצי לפירוט`;details.append(sum);
-  const intro=document.createElement('p');intro.className='qhint';intro.textContent='הקבצים נשמרו, אך המס על המשיכות שלא סווגו אינו מחושב. אין להזין אפס כחייב או פטור ללא אישור.';details.append(intro);
-  for(const issue of wd.issues){const p=document.createElement('p');p.className='badmsg';p.textContent='משיכות — נדרשת השלמה: '+issue;details.append(p)}
+  const summary=document.createElement('summary');summary.textContent=`בדיקות פתוחות לאימות מס של ${wd.issues.length} רכיבים — לחצי לפירוט`;details.append(summary);
+  for(const issue of wd.issues){const p=document.createElement('p');p.className='qhint';p.textContent=issue;details.append(p)}
   el('estimateContent').append(details);
  }
- for(const note of wd.notes)add('הערת משיכה: '+note,'qhint');
- if(wd.issues.length)add('ההשוואה ל־1301 של 2025 עדיין מותנית באימות משיכות/פיצויים ושאר ההכנסות לפי האישורים. אין לראות בתחשיב יתרת מס רשמית.','badmsg');
- else add('ההשוואה ל־2025 כוללת רכיבי משיכה שסווגו, אך נדרשת התאמה לאישורי הקופה ולסעיפי הדיווח ברשות המסים.','warnmsg');
- if(n('pension')>0||n('employeePensionEmployee')>0)add('קיימות הפקדות פנסיוניות שהוזנו; הטבות 2025 אינן מחושבות בסימולציית הבסיס.','warnmsg');
- if(hasSpecial)add('זוהו מקורות הכנסה מיוחדים בטיוטה; הם לא חושבו בסימולציית 2025 המצומצמת.','warnmsg');
- if(wizardYes('locality'))add('רשימת היישובים של 2026 אינה מתאימה ל־2025, ולכן לא חושב זיכוי יישוב.','warnmsg');
- if(generalValue('marital')==='נשוי/אה')add('חישוב בני זוג אינו נכלל בסימולציית 2025.','warnmsg');
- if(n('donations')>0)add('תרומות לפי סעיף 46 לא נכללו בסימולציית 2025.','warnmsg');
- if(!Object.hasOwn(values,'turnover')||!known('turnover'))add('לא נקלט ערך מחזור ידני לשנת 2025; הנתון האוטומטי הוא 0 כי אין עסקאות בספרים. יש להקליד את המחזור בדוח 1301 המתקדם.','warnmsg');
- else add(`מחזור עסקי שהוזן ידנית: ₪${fmt(n('turnover'))}. הוא נשמר בטיוטה ואינו תלוי בקיום תנועות 2025 בספרים.`,'qhint');
- add('נוסחאות מדרגות 2025 וערך נקודת הזיכוי נבדקו מול מדריך רשות המסים לשנת 2025. כל יתר רכיבי המס ההיסטוריים אינם מאומתים בסימולציה זו.','qhint');
+ if(!Object.hasOwn(values,'turnover')||!known('turnover'))caveats.push('מחזור ידני לשנת 2025 לא הוזן; נתוני הספרים עשויים להתייחס לשנה אחרת.');
+ if(caveats.length){
+  const details=document.createElement('details');details.className='tax-ladder-details';
+  const heading=document.createElement('summary');heading.textContent=`חשוב לדעת: ${caveats.length} הסתייגויות לחישוב — הצגת פירוט`;details.append(heading);
+  for(const c of caveats){const p=document.createElement('p');p.className='qhint';p.textContent='• '+c;details.append(p)}
+  el('estimateContent').append(details);
+ }
+ add('ההערכה מציגה תוצאה מספרית שימושית, אך רק אישור סיווג ופטור מתאים מאפשר להפוך תרחיש מותנה לחישוב מבוסס לדוח 1301. אין להשתמש בתרחיש להבטחת גובה מס או לצורכי דיווח בלי אישורים.','qhint');
 }
 function renderEstimate(points=0,messages=[]){
  const host=el('estimateContent');host.replaceChildren();const year=el('year').value;
@@ -1458,6 +1550,22 @@ function renderEstimate(points=0,messages=[]){
  if(spouse&&separate==='כן, מקור הכנסה נפרד')calc.notes.push('מבחן זכאות לחישוב נפרד טעון אימות לפי מסמכי העסק/המעסיק; הבחירה בשאלון אינה אישור רשות המסים.');
  if(blockers.length)add('תחשיב מותנה — עדיין קיימים נתונים/אישורים להשלמה','summary-num');
  else add('אומדן מס שנתי ללא חסרים מזוהים בבדיקות האוטומטיות: ₪'+fmt(combined),'summary-num');
+ const tentative2026=provisionalPensionScenario(2026,calc.taxableEarned,combined,0,calc.withheld+calc.advances+(spouse?spouseWithheld:0),positive(get('otherWithheld')),calc.withdrawals.withheld);
+ if(tentative2026){
+   const pend=tentative2026.pending;
+   add('אומדן תרחישים למשיכות שלא סווגו (2026) — לתכנון בלבד','summary-num');
+   add(`תגמולים ₪${fmt(pend.rewards)} × 35% בהנחה של משיכה שלא כדין = ₪${fmt(tentative2026.rewardsTax)}. אין לראות בכך קביעה שזו אכן משיכה שלא כדין.`,'warnmsg');
+   add(`ניכויים ומקדמות שהובאו בחשבון התרחישים: ₪${fmt(tentative2026.credited)}${tentative2026.usesManualOther?' (לא הוספנו שוב ניכוי מהאישורים משום שקיים ערך ידני)':''}.`);
+   if(pend.severance){
+     add(`תרחיש פיצויים פטורים: ${tentative2026.low>=0?'לתשלום':'לזכות'} ₪${fmt(Math.abs(tentative2026.low))}.`);
+     add(`תרחיש פיצויים חייבים לפי מדרגות: ${tentative2026.illustration>=0?'לתשלום':'לזכות'} ₪${fmt(Math.abs(tentative2026.illustration))}.`,'goodmsg');
+     add(`תרחיש פיצויים בשיעור 35% (להמחשה בלבד): ${tentative2026.high>=0?'לתשלום':'לזכות'} ₪${fmt(Math.abs(tentative2026.high))}.`);
+   }else add(`תרחיש 35% לתגמולים בלבד: ${tentative2026.low>=0?'לתשלום':'לזכות'} ₪${fmt(Math.abs(tentative2026.low))}.`);
+   if(tentative2026.missingOther)add('קיימים רכיבי משיכה שאינם מזוהים כתשלומי תגמולים או פיצויים ואינם נכללים בתרחישים.','warnmsg');
+   add('זה אומדן מותנה שמוסיף משיכות לא מסווגות לחישוב הקיים, ולא חישוב המס הסופי. הוא אינו בודק השפעת המשיכות על כל הטבות המס, מס יסף, חלוקת זיכויים או הכנסות מיוחדות.','qhint');
+ }
+ addTaxLadderDetails(el('estimateContent'),calc.taxableEarned,TAX_RULES_2026.bracketsEarned,'פירוט מדרגות 2026 על הכנסה מיגיעה אישית');
+
  const lines=[
   ['הכנסה חייבת ביגיעה אישית אחרי ניכויים',calc.taxableEarned],
   ['הכנסה רגילה/פסיבית לפי מס שולי',calc.taxableRental],
