@@ -129,6 +129,20 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>מע״מ ששולם בפועל</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
 
+  <section class="card" id="forecastCard">
+    <div class="card-hd"><h2>תחזית שנתית · הכנסות, הוצאות ותזרים</h2><span class="tiny muted">בפועל עד החודש הנוכחי · תחזית לחודשים הבאים</span></div>
+    <div class="card-bd">
+      <div class="inline" style="margin-bottom:12px"><label for="forecastMethod">בסיס תחזית:</label><select id="forecastMethod" style="border:1px solid var(--line);border-radius:10px;padding:8px"><option value="average">ממוצע חודשי השנה עד כה</option><option value="last3">ממוצע שלושת החודשים האחרונים שהסתיימו</option></select><span class="tiny muted">ניתן לשנות סכומים עתידיים בטבלה; נשמר בענן.</span></div>
+      <div class="dashboard" id="forecastKpis"></div>
+      <div class="table-wrap" style="max-height:none"><table><thead><tr><th>חודש</th><th>מצב</th><th>הכנסות כולל מע״מ</th><th>הוצאות עסקיות כולל מע״מ</th><th>תשלומים אישיים בפועל</th><th>התחייבויות מתוכננות</th><th>הפרשות משוערות לרשויות</th><th>יתרה תזרימית משוערת</th></tr></thead><tbody id="forecastTbody"></tbody></table></div>
+      <p class="footer-note">התחזית היא כלי תכנוני בלבד ולא רווח חייב במס. בחודשים עתידיים התחייבויות מוצגות בנוסף להוצאות הצפויות, וייתכן חפיפה ביניהן. מע״מ ומקדמות הם אומדני הפרשה, לא תשלומים מוכחים.</p>
+    </div>
+  </section>
+  <section class="card" id="taxClassificationCard">
+    <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>תנועות ששולמו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">תשלום בפועל אינו אישור אוטומטי לניכוי. הסכומים משמשים תשתית לבדיקה מול אישורים שנתיים ותקרות מס. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
+  </section>
+
   <div class="grid" id="monthlyGrid">
     <div>
       <section class="card">
@@ -175,8 +189,9 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
             <button class="btn small" id="addObligation">הוספה</button>
           </div>
           <datalist id="obPresets">
-            <option value="ביטוח לאומי עצמאי"><option value="פנסיה / קופת גמל לעצמאי"><option value="קרן השתלמות לעצמאי"><option value="ביטוח אובדן כושר עבודה"><option value="הלוואה עסקית"><option value="ביטוח אחריות מקצועית"><option value="אחר">
+            <option value="ביטוח לאומי עצמאי"><option value="פנסיה / קופת גמל לעצמאי"><option value="קופת גמל להשקעה"><option value="קרן השתלמות לעצמאי"><option value="ביטוח אובדן כושר עבודה"><option value="הלוואה עסקית"><option value="ביטוח אחריות מקצועית"><option value="אחר">
           </datalist>
+          <div class="field" style="margin-top:10px;max-width:440px"><label>סיווג לצורך תזרים ודוח שנתי</label><select id="obTaxClass"><option value="auto">זיהוי לפי שם ההתחייבות</option><option value="pension">פנסיה / קופת גמל לקצבה</option><option value="study">קרן השתלמות לעצמאי</option><option value="investment">קופת גמל להשקעה — ללא ניכוי בהפקדה</option><option value="national">ביטוח לאומי עצמאי (יש להפריד דמי בריאות)</option><option value="tax">מקדמות מס הכנסה</option><option value="donation">תרומה מוכרת — בכפוף לאישור</option><option value="disability">ביטוח אובדן כושר עבודה</option><option value="business">התחייבות עסקית אחרת</option><option value="other">אחר / דורש בדיקה</option></select></div>
           <div class="table-wrap" style="margin-top:12px">
             <table><thead><tr><th>התחייבות</th><th>סכום</th><th>תדירות</th><th>מועד</th><th>אופן רישום</th><th></th></tr></thead><tbody id="obTbody"></tbody></table>
           </div>
@@ -321,7 +336,8 @@ const EXPENSE_ITEMS = [
   { item: "ביגוד מקצועי / ממותג", category: "ביגוד מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
 
   // תשלומים אישיים/סטטוטוריים — נשמרים בתנועות לצורך תמונת תזרים, אך אינם הוצאות 1320.
-  { item: "קרן השתלמות לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
+  { item: "קופת גמל להשקעה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
+   { item: "קרן השתלמות לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "פנסיה / קופת גמל לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "ביטוח אובדן כושר עבודה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "ביטוח לאומי עצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
@@ -676,7 +692,7 @@ function render(){
   advanceDesc.textContent=`שיעור בפרופיל: ${c.advanceRate}% · בסיס חישוב משוער: מחזור הכנסות ללא מע״מ ${money(c.incomeNet)}`;
   vatAmount.textContent=money(c.vatReserve);personalPaidAmount.textContent=money(c.personalPaid);
   monthPicker.value=monthKey();
-  renderDonut(c);renderObligations(c);renderRows(c);
+  renderDonut(c);renderObligations(c);renderRows(c);renderForecast();renderTaxSummary();
   chartCaption.textContent="מבוסס על נתונים בפועל והתחייבויות שהוגדרו";
   if(annualView.classList.contains("open"))renderAnnual();
   if(biMonthlyMode)renderBiMonthly();
@@ -740,6 +756,7 @@ function renderObligations(c){
     obFreq.value=ob.freq||"monthly";
     obDay.value=Number(ob.day)||15;
     obType.value=ob.type||"fixed";
+    obTaxClass.value=ob.taxClass||"auto";
     addObligation.textContent="שמירת שינוי";
     obName.focus();
     document.querySelector("#addObligation")?.scrollIntoView({behavior:"smooth",block:"center"});
@@ -755,7 +772,7 @@ function renderObligations(c){
 
 function resetObligationForm(){
   editingObligationId=null;
-  obName.value="";obAmount.value="";obFreq.value="monthly";obDay.value=15;obType.value="fixed";
+  obName.value="";obAmount.value="";obFreq.value="monthly";obDay.value=15;obType.value="fixed";obTaxClass.value="auto";
   addObligation.textContent="הוספה";
 }
 
@@ -795,7 +812,7 @@ async function loadData(user){
   config=ledger.cashflowConfigV1||local||{obligations:[],monthlyAdjustments:{},paymentStatus:{},yearReviews:{}};
   config.obligations=Array.isArray(config.obligations)?config.obligations:[];config.obligations.forEach(ensureAmountHistory);config.monthlyAdjustments=config.monthlyAdjustments||{};config.paymentStatus=config.paymentStatus||{};config.yearReviews=config.yearReviews||{};
   readOnly=profile.isExemptFromBilling!==true&&profile.isPaid!==true&&profile.trialEndsAt&&Date.parse(profile.trialEndsAt)<=Date.now();
-  readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#obName,#obAmount,#obFreq,#obDay,#obType").forEach(el=>el.disabled=readOnly);
+  readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#obName,#obAmount,#obFreq,#obDay,#obType,#obTaxClass").forEach(el=>el.disabled=readOnly);
   bizLabel.textContent=`${profile.businessName||profile.displayName||"העסק שלי"} · תכנון חודשי, התחייבויות ותשלומים לרשויות`;
   render();maybePromptYearReview();
 }
@@ -823,7 +840,7 @@ addObligation.onclick=async()=>{
     const previousFreq=ob.freq||"monthly";
     const previousDay=Number(ob.day)||15;
     const previousType=ob.type||"fixed";
-    ob.name=name;ob.freq=obFreq.value;ob.day=Number(obDay.value)||15;ob.type=obType.value;
+    ob.name=name;ob.freq=obFreq.value;ob.day=Number(obDay.value)||15;ob.type=obType.value;ob.taxClass=obTaxClass.value;
 
     const applyForward=confirm(
       `לשנות את הסכום של "${name}" גם בחודשים הבאים?\n\n`+
@@ -851,12 +868,12 @@ addObligation.onclick=async()=>{
       `במקום ליצור רשומה כפולה, לעדכן אותה ל-${money(amount)} החל מ-${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected)}?`
     );
     if(!ok)return;
-    existing.freq=obFreq.value;existing.day=Number(obDay.value)||15;existing.type=obType.value;
+    existing.freq=obFreq.value;existing.day=Number(obDay.value)||15;existing.type=obType.value;existing.taxClass=obTaxClass.value;
     setObligationAmountFrom(existing,effectiveMonth,amount);
     await saveConfig();resetObligationForm();render();return;
   }
 
-  const ob={id:crypto.randomUUID(),name,amount,freq:obFreq.value,day:Number(obDay.value)||15,type:obType.value,startMonth:effectiveMonth,active:true,amountHistory:[{fromMonth:effectiveMonth,amount}]};
+  const ob={id:crypto.randomUUID(),name,amount,freq:obFreq.value,day:Number(obDay.value)||15,type:obType.value,taxClass:obTaxClass.value,startMonth:effectiveMonth,active:true,amountHistory:[{fromMonth:effectiveMonth,amount}]};
   config.obligations.push(ob);resetObligationForm();await saveConfig();render();
 };
 
@@ -910,6 +927,81 @@ async function saveYearReview(keepAll=false){
 confirmYearReview.onclick=()=>saveYearReview(false);
 keepYearReview.onclick=()=>saveYearReview(true);
 
+
+
+// Tax classification is intentionally separate from deductibility: a cash payment is not a tax certificate.
+const TAX_CLASSES={pension:["פנסיה / קופת גמל לקצבה","נדרש אישור הפקדות שנתי; לא כולל גמל להשקעה"],study:["קרן השתלמות לעצמאי","בכפוף לתקרות ולנתוני הכנסה"],investment:["קופת גמל להשקעה","לא מעניקה ניכוי או זיכוי במס בעת ההפקדה"],national:["ביטוח לאומי עצמאי","נדרש אישור שנתי והפרדה מדמי ביטוח בריאות"],tax:["מקדמות מס הכנסה","זיכוי תשלומים בפועל בלבד"],donation:["תרומות לפי סעיף 46","נדרש אישור תקף"],disability:["אובדן כושר עבודה","כפוף לתנאי פוליסה ותקרות"],business:["התחייבות עסקית","נבחנת בסגירת השנה ולא כניכוי אישי"],other:["אחר / לא מסווג","נדרשת בדיקה"]};
+function classifyTax(name,explicit="auto"){
+  if(explicit && explicit!=="auto" && TAX_CLASSES[explicit])return explicit;
+  const n=norm(name).replace(/[-–/]/g," ");
+  if(n.includes("גמל להשקעה")||n.includes("קופת השקעה"))return "investment";
+  if(n.includes("השתלמות"))return "study";
+  if(n.includes("פנסיה")||n.includes("גמל לקצבה")||n.includes("גמל לעצמאי"))return "pension";
+  if(n.includes("ביטוח לאומי") && !n.includes("מעסיק"))return "national";
+  if(n.includes("מקדמות מס")||n.includes("מס הכנסה"))return "tax";
+  if(n.includes("תרומ"))return "donation";
+  if(n.includes("אובדן כושר"))return "disability";
+  return "other";
+}
+function renderTaxSummary(){
+  const year=selected.getFullYear(),summary={};
+  for(const key of Object.keys(TAX_CLASSES))summary[key]={planned:0,paid:0,count:0};
+  for(let m=0;m<12;m++){
+    const d=new Date(year,m,1);
+    for(const ob of selectedObligations(d)){
+      const key=classifyTax(ob.name,ob.taxClass);
+      summary[key].planned+=Math.max(0,Number(ob.displayAmount)||0);
+    }
+  }
+  for(const r of rows){
+    if(r.type!=="expense"||String(r.date||"").slice(0,4)!==String(year))continue;
+    const key=classifyTax(r.category && norm(r.category)!==norm("תשלומי מס וניכויים אישיים")?r.category:r.desc);
+    if(key!=="other") {summary[key].paid+=Math.abs(Number(r.amount)||0);summary[key].count++;}
+    else if(isPersonal(r))summary.other.count++;
+  }
+  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].count?money(summary[key].paid):"לא זוהה תשלום"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
+  taxUnclassified.textContent=summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שאינן מסווגות חד־משמעית. יש לסווג אותן בספרים כדי שיופיעו תחת הסוג המתאים.`:"תשלומים שמוגדרים רק כהתחייבות אינם נחשבים לתשלומים שבוצעו.";
+}
+function forecastBase(year,month,method){
+  const now=new Date(),end=(year===now.getFullYear()?now.getMonth():year<now.getFullYear()?12:0);
+  const completed=Array.from({length:end},(_,m)=>calcMonth(new Date(year,m,1)));
+  const recent=method==="last3"?completed.slice(-3):completed;
+  const avg=k=>recent.length?recent.reduce((sum,x)=>sum+(Number(x[k])||0),0)/recent.length:0;
+  return {income:avg("incomeGross"),expense:avg("businessExpenseGross")};
+}
+function renderForecast(){
+  const year=selected.getFullYear(),now=new Date(),method=config.forecastMethod||"average";
+  forecastMethod.value=method;
+  const base=forecastBase(year,0,method),overrides=config.forecastOverrides?.[year]||{};
+  const totals={income:0,expense:0,personal:0,commit:0,reserve:0,balance:0};
+  const table=[];
+  for(let m=0;m<12;m++){
+    const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d);
+    const future=(year>now.getFullYear() || (year===now.getFullYear() && m>now.getMonth()));
+    const v=overrides[key]||{};
+    const income=future?(v.income!==undefined?Number(v.income):base.income):c.incomeGross;
+    const expense=future?(v.expense!==undefined?Number(v.expense):base.expense):c.businessExpenseGross;
+    const personal=future?0:c.personalPaid;
+    const commit=future?c.commitments:0;
+    const reserve=future?Math.max(0,income/(1+vatRate()/100)*profileAdvanceRate()/100)+Math.max(0,income/(1+vatRate()/100)*vatRate()/100):c.authorityReserve;
+    const balance=income-expense-personal-commit-reserve;
+    for(const [k,val] of Object.entries({income,expense,personal,commit,reserve,balance}))totals[k]+=val;
+    const edit=(field,value)=>`<input type="number" min="0" step="0.01" data-forecast-month="${key}" data-forecast-field="${field}" value="${Number(value).toFixed(2)}" style="width:112px;border:1px solid var(--line);border-radius:8px;padding:5px" ${readOnly?"disabled":""}>`;
+    table.push(`<tr><td>${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d)}</td><td>${future?"תחזית":"בפועל / נרשם"}</td><td>${future?edit("income",income):money(income)}</td><td>${future?edit("expense",expense):money(expense)}</td><td>${money(personal)}</td><td>${money(commit)}</td><td>${money(reserve)}</td><td><b>${money(balance)}</b></td></tr>`);
+  }
+  forecastTbody.innerHTML=table.join("");
+  forecastKpis.innerHTML=[['הכנסות שנתיות',totals.income],['הוצאות עסקיות',totals.expense],['תשלומים אישיים שנרשמו',totals.personal],['התחייבויות עתידיות',totals.commit],['יתרה תזרימית משוערת',totals.balance]].map(([label,val])=>`<div class="kpi"><div class="label">${label}</div><div class="value">${money(val)}</div></div>`).join("");
+  forecastTbody.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('change',async()=>{
+    if(readOnly)return;
+    config.forecastOverrides=config.forecastOverrides||{};
+    config.forecastOverrides[year]=config.forecastOverrides[year]||{};
+    const record=config.forecastOverrides[year][el.dataset.forecastMonth]||{};
+    record[el.dataset.forecastField]=Math.max(0,Number(el.value)||0);
+    config.forecastOverrides[year][el.dataset.forecastMonth]=record;
+    await saveConfig();renderForecast();
+  }));
+}
+forecastMethod.addEventListener('change',async()=>{config.forecastMethod=forecastMethod.value;if(!readOnly)await saveConfig();renderForecast()});
 
 function exportAnnualCashflowExcel(){
   if(typeof XLSX==="undefined"){alert("רכיב הייצוא לאקסל אינו זמין כרגע.");return;}
