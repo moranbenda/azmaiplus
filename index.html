@@ -6586,6 +6586,22 @@ function build1320Summary(from, to) {
   return { rows:rows1320, total, depreciablePurchases };
 }
 
+// V7.1 — presentation-only classification; no stored records are changed.
+function personalPaymentSection(label) {
+  const n = String(label || "").toLowerCase().replace(/[\"'׳״]/g, "").replace(/\s+/g, " ").trim();
+  if (/גמל\s*להשקעה|קופת\s*גמל\s*להשקעה/.test(n)) return "savings";
+  if (/ביטוח\s*לאומי|מס\s*בריאות|קרן\s*השתלמות|פנסיה|גמל\s*לקצבה|קופת\s*גמל\s*לעצמאי|אובדן\s*כושר|תרומ|מקדמות\s*מס\s*הכנסה/.test(n)) return "potential";
+  // Ambiguous items must not be silently counted as tax-eligible.
+  return "review";
+}
+function personalPaymentSectionLabel(section) {
+  return section === "savings" ? "חיסכון אישי — ללא הטבת מס בהפקדה" :
+    section === "potential" ? "תשלומים שעשויים להיות רלוונטיים למס" : "לבדיקת סיווג";
+}
+function personalPaymentCsvCell(value) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
 async function buildPersonalTaxPayments(from, to) {
   const data = [];
   const today = new Date();
@@ -6606,14 +6622,15 @@ async function buildPersonalTaxPayments(from, to) {
     "ביטוח אובדן כושר עבודה",
     "ביטוח לאומי עצמאי",
     "מקדמות מס הכנסה",
-    "תרומות למוסדות מוכרים"
+    "תרומות למוסדות מוכרים",
+    "קופת גמל להשקעה"
   ].map(normTaxText);
 
   filterByDateAndType("expense", effectiveFrom, effectiveTo).forEach(r => {
     const rawLabel = String(r.category || r.desc || "").trim();
     const normalized = normTaxText(rawLabel);
     const isLegacyPersonal = legacyPersonalTaxLabels.some(x =>
-      normalized.includes(x) || x.includes(normalized)
+      normalized === x
     );
     if (!isLegacyPersonal) return;
     const { gross } = splitVAT(r.amount, r.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
@@ -6741,7 +6758,7 @@ async function buildPersonalTaxPayments(from, to) {
           data.push({
             date,
             category:"מקדמות מס הכנסה",
-            desc:`לפי שיעור מקדמות בפרופיל: ${advanceRate}%`,
+            desc:`אומדן בלבד לפי שיעור מקדמות בפרופיל: ${advanceRate}% — אינו אישור תשלום`,
             gross:amount,
             docNumber:"",
             source:"cashflow", verification:"estimated"
@@ -6753,6 +6770,7 @@ async function buildPersonalTaxPayments(from, to) {
     cursor.setMonth(cursor.getMonth()+1);
   }
 
+  data.forEach(r => { r.taxSection = personalPaymentSection(r.category); });
   data.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category), "he"));
   return {
     rows:data,
@@ -6897,9 +6915,10 @@ btnReportCsv.onclick = async () => {
     const report = await buildPersonalTaxPayments(from, to);
     if (!report.rows.length) return alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
     const csv = [
-      "date,category,description,document_number,amount",
-      ...report.rows.map(r => [r.date,r.category,r.desc,r.docNumber,r.gross].map(v=>`"${String(v ?? "").replace(/"/g,'""')}"`).join(",")),
-      `"TOTAL","","","",${report.total}`
+      "date,section,category,description,document_number,verification,amount",
+      ...report.rows.map(r => [r.date,personalPaymentSectionLabel(r.taxSection),r.category,r.desc,r.docNumber,r.source === "ledger" ? "רישום בספרים" : r.verification === "user-confirmed" ? "אישור ידני" : "אומדן",r.gross].map(personalPaymentCsvCell).join(",")),
+      ...["potential","savings","review"].map(section => ["SUBTOTAL",personalPaymentSectionLabel(section),"","","","",report.rows.filter(r=>r.taxSection===section).reduce((t,r)=>t+Number(r.gross||0),0)].map(personalPaymentCsvCell).join(",")),
+      ["TOTAL","","","","","",report.total].map(personalPaymentCsvCell).join(",")
     ];
     downloadFile("personal-tax-payments.csv", csv.join("\n"));
     return;
@@ -7130,21 +7149,36 @@ btnReportPdf.onclick = async () => {
   if (type === "personalTax") {
     const report = await buildPersonalTaxPayments(from, to);
     if (!report.rows.length) {
-      alert("אין תשלומי מס או ניכויים אישיים בטווח שנבחר");
+      alert("אין תשלומים אישיים בטווח שנבחר");
       return;
     }
-    const rowsHtml = report.rows.map(r => `
-      <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${escapeHtml(r.source === "ledger" ? "תנועה בספרים" : r.verification === "user-confirmed" ? "אושר כתשלום בתזרים · ללא אסמכתא" : "לפי מועד · לא אומת")}</td><td>${toMoney(r.gross)}</td></tr>
-    `).join("");
-    openReportWindow('תשלומי מס וניכויים אישיים', `
-      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מציג בנפרד תנועות בספרים, תשלומים שאושרו ידנית בתזרים ואומדנים לפי מועד. אישור ידני אינו אסמכתא בנקאית או אישור הפקדות שנתי. מע״מ אינו נכלל בדוח זה.</p>
+    const sectionOrder = ["potential", "savings", "review"];
+    const rowsHtml = sectionOrder.map(section => {
+      const items = report.rows.filter(r => r.taxSection === section);
+      if (!items.length) return "";
+      const total = items.reduce((sum,r)=>sum+Number(r.gross||0),0);
+      const estimated = items.filter(r=>r.verification==="estimated").reduce((sum,r)=>sum+Number(r.gross||0),0);
+      const lines = items.map(r => `
+        <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${escapeHtml(r.source === "ledger" ? "תנועה בספרים" : r.verification === "user-confirmed" ? "אישור ידני · ללא אסמכתא" : "לפי מועד · לא אומת")}</td><td>${toMoney(r.gross)}</td></tr>
+      `).join("");
+      return `<tr style="background:#edf2f8"><td colspan="6"><b>${escapeHtml(personalPaymentSectionLabel(section))}</b></td></tr>
+        ${lines}
+        <tr style="background:#f8fafc"><td colspan="5"><b>סיכום חלק זה</b> (מתוכו אומדן לא מאומת: ${toMoney(estimated)})</td><td><b>${toMoney(total)}</b></td></tr>`;
+    }).join("");
+    const potentialTotal = report.rows.filter(r=>r.taxSection==="potential").reduce((sum,r)=>sum+Number(r.gross||0),0);
+    const savingsTotal = report.rows.filter(r=>r.taxSection==="savings").reduce((sum,r)=>sum+Number(r.gross||0),0);
+    const reviewTotal = report.rows.filter(r=>r.taxSection==="review").reduce((sum,r)=>sum+Number(r.gross||0),0);
+    openReportWindow('תשלומי מס, הפקדות וחיסכון אישי', `
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מפריד בין תשלומים שעשויים להיות רלוונטיים למס לבין חיסכון אישי ללא הטבת מס על ההפקדה. <b>הסכומים אינם ניכוי מס מאושר.</b> יש לאמת תשלומים מול אסמכתאות ואישורים שנתיים. סכומים לפי מועד הם אומדן בלבד. אין כאן שינוי של רישומים קיימים.</p>
       <table>
         <thead><tr><th>תאריך</th><th>סוג תשלום</th><th>תיאור</th><th>אסמכתא</th><th>מצב אימות</th><th>סכום</th></tr></thead>
         <tbody>
           ${rowsHtml}
-          <tr><td colspan="5"><b>סה״כ כולל אומדנים</b></td><td><b>${toMoney(report.total)}</b></td></tr>
-          <tr><td colspan="5">מתוכו לפי מועד, ללא אישור</td><td>${toMoney(report.estimatedTotal)}</td></tr>
-          <tr><td colspan="5">תנועות בספרים או תשלומים שסומנו כאושרו ידנית</td><td>${toMoney(report.confirmedTotal)}</td></tr>
+          <tr><td colspan="5">תשלומים שעשויים להיות רלוונטיים למס (לפני אימות ותקרות)</td><td>${toMoney(potentialTotal)}</td></tr>
+          <tr><td colspan="5">חיסכון אישי ללא הטבת מס בהפקדה</td><td>${toMoney(savingsTotal)}</td></tr>
+          ${reviewTotal ? `<tr><td colspan="5">תשלומים הדורשים בדיקת סיווג</td><td>${toMoney(reviewTotal)}</td></tr>` : ""}
+          <tr><td colspan="5"><b>סה״כ תנועות ואומדנים — למעקב בלבד</b></td><td><b>${toMoney(report.total)}</b></td></tr>
+          <tr><td colspan="5">מתוך הסכום הכולל: אומדן לפי מועד, ללא אישור</td><td>${toMoney(report.estimatedTotal)}</td></tr>
         </tbody>
       </table>`);
     return;
@@ -8022,6 +8056,24 @@ function showToast(msg, isErr=false){
   if (typeof mobileQuery.addEventListener === "function") mobileQuery.addEventListener("change", sync);
   else if (typeof mobileQuery.addListener === "function") mobileQuery.addListener(sync);
   sync();
+})();
+</script>
+<script>
+/* Open requested dashboard dialog when arriving from another page. */
+(function(){
+  let completed=false;
+  function openRequestedReport(){
+    if(completed || location.hash!=="#reportsSection")return;
+    const dialog=document.getElementById("reportsDialog");
+    if(!dialog || typeof dialog.showModal!=="function")return;
+    completed=true;
+    if(!dialog.open)dialog.showModal();
+    history.replaceState(null,"",location.pathname+location.search);
+  }
+  window.addEventListener("load",openRequestedReport);
+  window.addEventListener("hashchange",openRequestedReport);
+  document.addEventListener("DOMContentLoaded",openRequestedReport);
+  openRequestedReport();
 })();
 </script>
 
