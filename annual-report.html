@@ -19,23 +19,61 @@ const SECTIONS=[
 ['ט״ז — שדות נוספים שאינם נמצאים בדוח', [['additional','שדות מיוחדים / מידע נוסף לפי הצורך','', 'textarea']]]
 ];
 const AUTO_KEYS=new Set(['turnover','advanceTurnover','study','pension','national','disability','donations','business','taxid','address','phone','taxAdvances']);
-let uid=null,profile={},ledger={},values={},auto={},rows=[],saveTimer=null,revision=0,loading=false,loadedYear="2026";
+let uid=null,profile={},ledger={},values={},auto={},rows=[],saveTimer=null,revision=0,loading=false,loadedYear="2026",pendingSave=null,loadSequence=0;
 const el=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString('he-IL',{maximumFractionDigits:2}),norm=s=>String(s||'').trim().toLowerCase().replace(/["'׳״]/g,'').replace(/\s+/g,' ');
 function draftRef(){return doc(db,'users',uid,'annualReportDrafts',String(el('year').value))}
 function saveState(msg){el('status').textContent=msg}
 async function loadDraft(){values={};const target=uid,year=el('year').value;const snap=await getDoc(draftRef());if(uid!==target||el('year').value!==year)return false;values=snap.exists()?(snap.data().fields||{}):{};return true}
-function saveDraft(){if(!uid||loading)return;const rev=++revision;clearTimeout(saveTimer);saveState('שינויים ממתינים לשמירה בענן…');const user=uid,year=el('year').value,payload=JSON.parse(JSON.stringify(values));saveTimer=setTimeout(async()=>{try{await setDoc(doc(db,'users',user,'annualReportDrafts',year),{fields:payload,taxYear:year,form:'1301',updatedAt:serverTimestamp()},{merge:true});if(uid===user&&el('year').value===year&&revision===rev)saveState('✓ הטיוטה נשמרה בענן · שנת מס '+year)}catch(e){if(uid===user&&el('year').value===year)saveState('⚠ השמירה בענן נכשלה: '+e.message+' · אל תסגרו את הדף לפני פתרון התקלה')}} ,650)}
-async function flushDraft(yearOverride){if(!uid||!saveTimer)return;clearTimeout(saveTimer);saveTimer=null;const user=uid,year=yearOverride||el('year').value,payload=JSON.parse(JSON.stringify(values));try{await setDoc(doc(db,'users',user,'annualReportDrafts',year),{fields:payload,taxYear:year,form:'1301',updatedAt:serverTimestamp()},{merge:true});saveState('✓ הטיוטה נשמרה בענן · שנת מס '+year)}catch(e){saveState('⚠ השמירה בענן נכשלה: '+e.message);throw e}}
+function writeDraft(user,year,payload){
+ const operation=()=>setDoc(doc(db,'users',user,'annualReportDrafts',year),{fields:payload,taxYear:year,form:'1301',updatedAt:serverTimestamp()},{merge:true});
+ // Serialize writes so a delayed older snapshot cannot overwrite a newer one.
+ const task=(pendingSave||Promise.resolve()).catch(()=>{}).then(operation);
+ pendingSave=task;return task;
+}
+function saveDraft(){
+ if(!uid||loading)return;
+ const rev=++revision;clearTimeout(saveTimer);
+ saveState('שינויים ממתינים לשמירה בענן…');
+ const user=uid,year=loadedYear,payload=JSON.parse(JSON.stringify(values));
+ saveTimer=setTimeout(async()=>{
+  saveTimer=null;
+  try{await writeDraft(user,year,payload);if(uid===user&&loadedYear===year&&revision===rev)saveState('✓ הטיוטה נשמרה בענן · שנת מס '+year)}
+  catch(e){if(uid===user&&loadedYear===year)saveState('⚠ השמירה בענן נכשלה: '+e.message+' · אין לסגור את הדף')}
+ },650);
+}
+async function flushDraft(yearOverride){
+ if(!uid)return;
+ const user=uid,year=yearOverride||loadedYear;
+ if(saveTimer){clearTimeout(saveTimer);saveTimer=null;const payload=JSON.parse(JSON.stringify(values));try{await writeDraft(user,year,payload)}catch(e){saveState('⚠ השמירה בענן נכשלה: '+e.message);throw e}}
+ else if(pendingSave){try{await pendingSave}catch(e){saveState('⚠ השמירה בענן נכשלה: '+e.message);throw e}}
+}
 function splitNet(r){let n=Number(r.amount)||0;if(!r.incVat)return n;let type=norm(profile.businessType),rate=type==='ptor'?0:Number(profile.vatRate||18);return n/(1+rate/100)}
 function compute(){let year=el('year').value;const list=rows.filter(r=>String(r.date||'').slice(0,4)===year);const sums={study:0,pension:0,national:0,disability:0,donations:0,taxAdvances:0};let income=0;
 for(const r of list){if(r.type==='income'){income+=splitNet(r);continue}if(r.type!=='expense')continue;let t=norm(r.category)+' '+norm(r.desc),n=Math.abs(Number(r.amount)||0);if(t.includes(norm('קרן השתלמות לעצמאי')))sums.study+=n;else if(t.includes(norm('פנסיה / קופת גמל לעצמאי')))sums.pension+=n;else if(t.includes(norm('ביטוח לאומי עצמאי')))sums.national+=n;else if(t.includes(norm('ביטוח אובדן כושר עבודה')))sums.disability+=n;else if(t.includes(norm('תרומות למוסדות מוכרים')))sums.donations+=n;else if(t.includes(norm('מקדמות מס הכנסה')))sums.taxAdvances+=n}
 auto={turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
 }
-function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft()});return input}
+function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft()});input.addEventListener('change',()=>{if(values[id]!==input.value){values[id]=input.value;saveDraft()}});return input}
 function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';box.append(makeInput(id,type,v));let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'תשלומים שאותרו בספרים בלבד; אינם ניכוי/זיכוי מחושב. יש לבדוק אישורים, תקרות וזכאות.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'להזין רק אחרי התאמת נספח 1320 והפחת; לא מועתק מהרווח הגולמי.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
-async function load(){if(!uid)return;loading=true;saveState('טוען נתונים וטיוטה מהענן…');try{const [p,l]=await Promise.all([getDoc(doc(db,'users',uid)),getDoc(doc(db,'ledgers',uid))]);profile=p.exists()?p.data():{};ledger=l.exists()?l.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];compute();if(await loadDraft()){loadedYear=el('year').value;render()}}catch(e){saveState('לא ניתן לטעון נתונים או טיוטה: '+e.message)}finally{loading=false}}
-el('year').addEventListener('change',async()=>{try{await flushDraft(loadedYear)}catch{}await load()});
-el('reload').onclick=async()=>{try{await flushDraft()}catch{}await load()};el('print').onclick=()=>window.print();
+async function load(){
+ if(!uid)return;
+ const request=++loadSequence,user=uid,year=el('year').value;
+ loading=true;saveState('טוען נתונים וטיוטה מהענן…');
+ try{
+  const [p,l,d]=await Promise.all([getDoc(doc(db,'users',user)),getDoc(doc(db,'ledgers',user)),getDoc(doc(db,'users',user,'annualReportDrafts',year))]);
+  if(request!==loadSequence||uid!==user||el('year').value!==year)return;
+  profile=p.exists()?p.data():{};ledger=l.exists()?l.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];
+  values=d.exists()?(d.data().fields||{}):{};loadedYear=year;compute();render();
+ }catch(e){if(request===loadSequence)saveState('לא ניתן לטעון נתונים או טיוטה: '+e.message)}
+ finally{if(request===loadSequence)loading=false}
+}
+el('year').addEventListener('change',async()=>{
+ const newYear=el('year').value,previous=loadedYear;
+ el('year').disabled=true;
+ try{await flushDraft(previous)}catch(e){el('year').value=previous;el('year').disabled=false;return}
+ el('year').value=newYear;el('year').disabled=false;await load();
+});
+el('reload').onclick=async()=>{try{await flushDraft()}catch{return}await load()};
+el('print').onclick=()=>window.print();
 el('summary').onclick=()=>{const panel=el('summaryPanel');panel.hidden=!panel.hidden;if(panel.hidden)return;const target=el('summaryContent');target.replaceChildren();const p=document.createElement('p');p.textContent='שדות שהוזנו או חושבו כנתוני עזר; יש לאמת כל שדה מול טופס שנת המס והאישורים. הפקדות אישיות אינן סכומי ניכוי/זיכוי מאושרים.';target.append(p);for(const [,fields] of SECTIONS){for(const [id,label,code,type] of fields){if(!code)continue;const val=Object.hasOwn(values,id)?values[id]:AUTO_KEYS.has(id)?auto[id]:undefined;if(val===undefined||val===null||val==='')continue;const line=document.createElement('p');line.textContent=`${code} · ${label}: ${type==='number'?fmt(val):val}`;target.append(line)}}panel.scrollIntoView({behavior:'smooth',block:'start'})};
-onAuthStateChanged(auth,u=>{clearTimeout(saveTimer);saveTimer=null;revision++;if(!u){uid=null;values={};el('sections').replaceChildren();saveState('יש להתחבר לעצמאי פלוס כדי לטעון את נתוני העסק.');return}uid=u.uid;load()});
+onAuthStateChanged(auth,u=>{if(uid&&(!u||u.uid!==uid)){flushDraft().catch(()=>{});}revision++;if(!u){uid=null;values={};el('sections').replaceChildren();saveState('יש להתחבר לעצמאי פלוס כדי לטעון את נתוני העסק.');return}uid=u.uid;load()});
 </script></body></html>
