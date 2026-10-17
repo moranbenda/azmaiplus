@@ -227,6 +227,20 @@ html,body{max-width:100%;overflow-x:hidden}
       <p class="footer-note">התחזית היא כלי תכנוני בלבד ולא רווח חייב במס. בחודשים עתידיים התחייבויות מוצגות בנוסף להוצאות הצפויות, וייתכן חפיפה ביניהן. מע״מ ומקדמות הם אומדני הפרשה, לא תשלומים מוכחים.</p>
     </div>
   </section>
+  <section class="card" id="paymentVerificationCard">
+    <div class="card-hd"><h2>אישור תשלומים מחודשים קודמים</h2><span class="tiny muted">רישום אישור ידני לתשלומים קבועים · ללא שינוי בתנועות הספרים</span></div>
+    <div class="card-bd">
+      <p class="footer-note">ניתן לאשר תשלומים קבועים שמועדם חלף, לאחר בדיקה מול חשבון הבנק או הגוף המקבל. הפעולה אינה יוצרת הוצאה עסקית ואינה מחליפה אישור הפקדות שנתי.</p>
+      <div class="form-grid">
+        <div class="field"><label for="verifyFromMonth">מחודש</label><input id="verifyFromMonth" type="month"></div>
+        <div class="field"><label for="verifyToMonth">עד חודש</label><input id="verifyToMonth" type="month"></div>
+        <div class="field"><label for="verifyObligation">סוג תשלום</label><select id="verifyObligation"><option value="all">כל ההתחייבויות הקבועות</option></select></div>
+        <button type="button" class="btn small" id="verifyPreviewBtn">הצגת תשלומים לאישור</button>
+      </div>
+      <div id="verifyPreview" class="footer-note" aria-live="polite"></div>
+      <button type="button" class="btn small" id="verifyApplyBtn" hidden>אישור התשלומים שנבחרו</button>
+    </div>
+  </section>
   <section class="card" id="taxClassificationCard">
     <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>תשלומים אישיים שסווגו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
@@ -852,7 +866,9 @@ async function loadData(user){
   readOnly=profile.isExemptFromBilling!==true&&profile.isPaid!==true&&profile.trialEndsAt&&Date.parse(profile.trialEndsAt)<=Date.now();
   readOnlyNotice.hidden=!readOnly;document.querySelectorAll("#addObligation,#obName,#obAmount,#obFreq,#obDay,#obType,#obTaxClass").forEach(el=>el.disabled=readOnly);
   bizLabel.textContent=`${profile.businessName||profile.displayName||"העסק שלי"} · תכנון חודשי, התחייבויות ותשלומים לרשויות`;
-  render();maybePromptYearReview();
+  render();refreshVerificationOptions();
+  const currentMonth=monthKey(new Date());verifyToMonth.value=currentMonth;verifyFromMonth.value=`${new Date().getFullYear()}-01`;
+  maybePromptYearReview();
 }
 
 addObligation.onclick=async()=>{
@@ -990,6 +1006,56 @@ function taxClassForLedgerRow(r){
   // Legacy ambiguous categories require manual review, not automatic tax credit.
   return "other";
 }
+
+// אישור תשלומים היסטוריים. נשמר באותו paymentStatus שבו משתמש התזרים.
+const verifyFromMonth=document.getElementById("verifyFromMonth");
+const verifyToMonth=document.getElementById("verifyToMonth");
+const verifyObligation=document.getElementById("verifyObligation");
+const verifyPreview=document.getElementById("verifyPreview");
+const verifyApplyBtn=document.getElementById("verifyApplyBtn");
+let verificationCandidates=[];
+function refreshVerificationOptions(){
+  const previous=verifyObligation.value;
+  verifyObligation.innerHTML='<option value="all">כל ההתחייבויות הקבועות</option>'+(config.obligations||[]).filter(o=>o.active!==false).map(o=>`<option value="${esc(o.id)}">${esc(o.name)}</option>`).join("");
+  if([...verifyObligation.options].some(o=>o.value===previous))verifyObligation.value=previous;
+}
+function previewHistoricPayments(){
+  verificationCandidates=[];verifyApplyBtn.hidden=true;
+  const from=verifyFromMonth.value,to=verifyToMonth.value;
+  if(!/^\d{4}-\d{2}$/.test(from)||!/^\d{4}-\d{2}$/.test(to)||from>to){verifyPreview.textContent="יש לבחור טווח חודשים תקין.";return}
+  const [fy,fm]=from.split("-").map(Number),[ty,tm]=to.split("-").map(Number);
+  if((ty-fy)*12+tm-fm>119){verifyPreview.textContent="ניתן לבדוק עד 10 שנים בכל פעם.";return}
+  const now=new Date();
+  // Walk over month indices to avoid calendar rollover edge cases.
+  for(let i=0;i<=(ty-fy)*12+tm-fm;i++){
+    const d=new Date(fy,fm-1+i,1),month=monthKey(d);
+    for(const ob of selectedObligations(d)){
+      if(verifyObligation.value!=="all"&&ob.id!==verifyObligation.value)continue;
+      const day=Math.min(Math.max(1,Number(ob.day)||15),new Date(d.getFullYear(),d.getMonth()+1,0).getDate());
+      const due=new Date(d.getFullYear(),d.getMonth(),day,23,59,59);
+      const key=paymentKey(ob.id,d);
+      if(due>now||config.paymentStatus?.[key]===true||config.paymentStatus?.[key]===false)continue;
+      verificationCandidates.push({key,month,name:ob.name,amount:Math.max(0,Number(ob.displayAmount)||0)});
+    }
+  }
+  if(!verificationCandidates.length){verifyPreview.textContent="לא נמצאו תשלומים שלא אושרו בטווח שנבחר. תשלומים שסומנו כלא שולמו אינם נכללים באישור גורף.";return}
+  const total=verificationCandidates.reduce((s,x)=>s+x.amount,0);
+  verifyPreview.textContent=`נמצאו ${verificationCandidates.length} תשלומים שמועדם חלף וטרם אושרו, בסכום ${money(total)}. יש לבדוק את כולם מול רישומי הבנק לפני אישור.`;
+  verifyApplyBtn.hidden=readOnly;
+}
+document.getElementById("verifyPreviewBtn").onclick=()=>{refreshVerificationOptions();previewHistoricPayments()};
+verifyObligation.onchange=()=>{verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
+verifyFromMonth.onchange=verifyToMonth.onchange=()=>{verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="יש להציג מחדש את התשלומים לאישור."};
+verifyApplyBtn.onclick=async()=>{
+  if(readOnly||!verificationCandidates.length)return;
+  if(!confirm(`לאשר ידנית ${verificationCandidates.length} תשלומים לאחר בדיקה מול אסמכתאות?\n\nאישור זה אינו מהווה אישור הפקדות שנתי ואינו יוצר תנועה בספרים.`))return;
+  const previous={...config.paymentStatus};
+  config.paymentStatus=config.paymentStatus||{};
+  for(const x of verificationCandidates)config.paymentStatus[x.key]=true;
+  try{await saveConfig();verificationCandidates=[];verifyApplyBtn.hidden=true;verifyPreview.textContent="האישורים נשמרו. לצורכי מס נדרש אימות מול האישורים השנתיים.";render()}
+  catch(err){config.paymentStatus=previous;alert("שמירת האישורים נכשלה. יש לנסות שוב.");console.error(err)}
+};
+
 function renderTaxSummary(){
   const year=selected.getFullYear(),summary={};
   const now=new Date();
