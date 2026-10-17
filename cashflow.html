@@ -229,7 +229,7 @@ html,body{max-width:100%;overflow-x:hidden}
   </section>
   <section class="card" id="taxClassificationCard">
     <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
-    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>תנועות שזוהו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>תשלומים אישיים שסווגו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
   </section>
 
   <div class="footer-note">
@@ -806,7 +806,7 @@ function resetObligationForm(){
 cancelObligation.onclick=resetObligationForm;
 
 function renderRows(c){
-  const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.displayAmount??o.amount)||0}});
+  const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(new Date(selected.getFullYear(),selected.getMonth()+1,0).getDate(),Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",obId:o.id,desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.displayAmount??o.amount)||0}});
   if(c.advanceRate>0) planned.push({date:`${monthKey()}-15`,type:"planned",desc:"מקדמות מס הכנסה",category:"מחושב אוטומטית",amount:c.advanceReserve});
   if(c.vatPlan?.configured && c.vatPlan?.period && c.vatPlan?.remaining>0){
     planned.push({date:`${monthKey()}-19`,type:"planned",desc:`תשלום מע״מ – ${c.vatPlan.period.label}`,category:"רשות המסים · מחושב אוטומטית",amount:c.vatPlan.remaining});
@@ -821,8 +821,17 @@ function renderRows(c){
   }
 
   const combined=[...c.list,...planned].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  rowsCount.textContent=`${combined.length} תנועות ותשלומים מתוכננים`;
-  rowsTbody.innerHTML=combined.length?combined.map(r=>`<tr><td>${esc(r.date||"")}</td><td>${r.type==="income"?"הכנסה":r.type==="planned"?"תשלום מתוכנן":"הוצאה"}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
+  rowsCount.textContent=`${combined.length} תנועות ותשלומים`;
+  const paymentLabel=r=>{
+    if(r.type!=="planned")return r.type==="income"?"הכנסה":"הוצאה";
+    if(r.paidVat)return "שולם לפי רישום מע״מ";
+    if(!r.obId)return "תשלום מתוכנן (חישוב)";
+    const status=config.paymentStatus?.[`${monthKey()}:${r.obId}`];
+    if(status===true)return "סומן כשולם";
+    if(status===false)return "סומן כלא שולם";
+    return new Date(`${r.date}T23:59:59`)<new Date()?"בוצע משוער · לא אומת":"מתוכנן";
+  };
+  rowsTbody.innerHTML=combined.length?combined.map(r=>`<tr><td>${esc(r.date||"")}</td><td>${paymentLabel(r)}</td><td>${esc(r.desc||"")}</td><td>${esc(r.category||"")}</td><td>${money(r.amount)}</td></tr>`).join(""):'<tr><td colspan="5" class="empty">אין תנועות בחודש זה.</td></tr>';
 }
 
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m]))}
@@ -970,21 +979,16 @@ function classifyTax(name,explicit="auto"){
   return "other";
 }
 function taxClassForLedgerRow(r){
-  // Use the specific expense item, not the umbrella personal-payments category.
-  const category=norm(r.category),desc=norm(r.desc||r.description||""),item=norm(r.item||r.expenseItem||r.subcategory||"");
-  const generic=norm("תשלומי מס וניכויים אישיים");
-  if(category && category!==generic){const c=classifyTax(category);if(c!=="other")return c;}
-  if(item){const c=classifyTax(item);if(c!=="other")return c;}
-  // Ambiguous legacy 'pension / provident fund' is NOT automatically eligible.
-  const combined=category+" "+item+" "+desc;
-  if(combined.includes("גמל להשקעה"))return "investment";
-  if(combined.includes("השתלמות"))return "study";
-  if(combined.includes("ביטוח לאומי"))return "national";
-  if(combined.includes("מקדמות מס"))return "tax";
-  if(combined.includes("תרומ"))return "donation";
-  if(combined.includes("אובדן כושר"))return "disability";
-  if(combined.includes("פנסיה / קופת גמל") || combined.includes("פנסיה וקופת גמל"))return "other";
-  return classifyTax(desc);
+  // Never infer a tax payment from free-text descriptions alone. Require an
+  // explicit personal-tax category/item; otherwise unrelated invoices can match.
+  const category=norm(r.category), item=norm(r.item||r.expenseItem||r.subcategory||"");
+  const personalUmbrella=norm("תשלומי מס וניכויים אישיים");
+  const personalCategory=PERSONAL_CATEGORIES.has(category)||PERSONAL_ITEMS.has(category)||category===personalUmbrella;
+  if(!personalCategory && !isPersonal(r))return "other";
+  const specific=[item,category].filter(v=>v && v!==personalUmbrella);
+  for(const v of specific){const result=classifyTax(v);if(result!=="other")return result;}
+  // Legacy ambiguous categories require manual review, not automatic tax credit.
+  return "other";
 }
 function renderTaxSummary(){
   const year=selected.getFullYear(),summary={};
@@ -999,7 +1003,7 @@ function renderTaxSummary(){
       const due=new Date(year,m,day,23,59,59);
       const status=config.paymentStatus?.[paymentKey(ob.id,d)];
       // Explicit false means the user reported a failed or unpaid charge.
-      if(due<=now && status!==false){summary[key].assumed+=amount;summary[key].uncertain++}
+      if(due<=now && status!==false){summary[key].assumed+=amount;if(status!==true)summary[key].uncertain++}
     }
   }
   for(const r of rows){
@@ -1008,8 +1012,8 @@ function renderTaxSummary(){
     if(key!=="other") {summary[key].paid+=Math.abs(Number(r.amount)||0);summary[key].count++;}
     else if(isPersonal(r))summary.other.count++;
   }
-  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].uncertain?money(summary[key].assumed):"—"}</td><td>${summary[key].count?money(summary[key].paid):"לא נמצא רישום"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
-  taxUnclassified.textContent=(summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שלא זוהו בוודאות (לרבות קטגוריית פנסיה/גמל ישנה). יש לבדוק אותן לפני דוח המס. `:"")+"הסכום המשוער מחושב רק מהתחייבויות שמועדן חלף ולא סומנו כלא שולמו; הוא אינו אישור בנקאי ואינו נוסף לסכום שנרשם בספרים. אין לסכום את שתי העמודות.";
+  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].uncertain?money(summary[key].assumed):"—"}</td><td>${summary[key].count?money(summary[key].paid):"אין תנועה מסווגת"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
+  taxUnclassified.textContent=(summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שמחייבות סיווג ידני (לרבות קטגוריית פנסיה/גמל ישנה). יש לבדוק אותן לפני דוח המס. `:"")+"הסכום לפי מועד כולל הוראות קבע שמועדן חלף ושלא סומנו כלא שולמו. זהו אומדן בלבד ולא אישור בנקאי. תנועה מסווגת בספרים היא רישום נפרד, ואין לסכום את שתי העמודות. התאמה ואימות למס ייעשו מול אישורים שנתיים.";
 }
 
 function forecastBase(year,month,method){
