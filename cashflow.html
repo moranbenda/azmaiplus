@@ -129,20 +129,6 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <div class="card-bd"><div class="table-wrap" style="max-height:none"><table class="annual-table"><thead><tr><th>חודש</th><th>הכנסות</th><th>הוצאות בפועל</th><th>התחייבויות</th><th>מקדמות מס</th><th>מע״מ צפוי</th><th>מע״מ ששולם בפועל</th><th>יתרה לאחר התחייבויות והפרשות</th></tr></thead><tbody id="annualTbody"></tbody></table></div></div>
   </section>
 
-  <section class="card" id="forecastCard">
-    <div class="card-hd"><h2>תחזית שנתית · הכנסות, הוצאות ותזרים</h2><span class="tiny muted">בפועל עד החודש הנוכחי · תחזית לחודשים הבאים</span></div>
-    <div class="card-bd">
-      <div class="inline" style="margin-bottom:12px"><label for="forecastMethod">בסיס תחזית:</label><select id="forecastMethod" style="border:1px solid var(--line);border-radius:10px;padding:8px"><option value="average">ממוצע חודשי השנה עד כה</option><option value="last3">ממוצע שלושת החודשים האחרונים שהסתיימו</option></select><span class="tiny muted">ניתן לשנות סכומים עתידיים בטבלה; נשמר בענן.</span></div>
-      <div class="dashboard" id="forecastKpis"></div>
-      <div class="table-wrap" style="max-height:none"><table><thead><tr><th>חודש</th><th>מצב</th><th>הכנסות כולל מע״מ</th><th>הוצאות עסקיות כולל מע״מ</th><th>תשלומים אישיים בפועל</th><th>התחייבויות מתוכננות</th><th>הפרשות משוערות לרשויות</th><th>יתרה תזרימית משוערת</th></tr></thead><tbody id="forecastTbody"></tbody></table></div>
-      <p class="footer-note">התחזית היא כלי תכנוני בלבד ולא רווח חייב במס. בחודשים עתידיים התחייבויות מוצגות בנוסף להוצאות הצפויות, וייתכן חפיפה ביניהן. מע״מ ומקדמות הם אומדני הפרשה, לא תשלומים מוכחים.</p>
-    </div>
-  </section>
-  <section class="card" id="taxClassificationCard">
-    <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
-    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>תנועות ששולמו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">תשלום בפועל אינו אישור אוטומטי לניכוי. הסכומים משמשים תשתית לבדיקה מול אישורים שנתיים ותקרות מס. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
-  </section>
-
   <div class="grid" id="monthlyGrid">
     <div>
       <section class="card">
@@ -186,12 +172,13 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
             <div class="field"><label>תדירות</label><select id="obFreq"><option value="monthly">חודשי</option><option value="bimonthly">דו-חודשי</option><option value="quarterly">רבעוני</option><option value="yearly">שנתי</option><option value="once">חד-פעמי</option></select></div>
             <div class="field"><label>יום בחודש</label><input id="obDay" type="number" min="1" max="31" value="15"></div>
             <div class="field"><label>סוג</label><select id="obType"><option value="fixed">התחייבות קבועה</option><option value="authority">רשות / חיסכון לעצמאי</option></select></div>
-            <button class="btn small" id="addObligation">הוספה</button>
+            <button class="btn small" id="addObligation">הוספה</button><button type="button" class="btn ghost small" id="cancelObligation" hidden>סגירה ללא שמירה</button>
           </div>
           <datalist id="obPresets">
             <option value="ביטוח לאומי עצמאי"><option value="פנסיה / קופת גמל לעצמאי"><option value="קופת גמל להשקעה"><option value="קרן השתלמות לעצמאי"><option value="ביטוח אובדן כושר עבודה"><option value="הלוואה עסקית"><option value="ביטוח אחריות מקצועית"><option value="אחר">
           </datalist>
           <div class="field" style="margin-top:10px;max-width:440px"><label>סיווג לצורך תזרים ודוח שנתי</label><select id="obTaxClass"><option value="auto">זיהוי לפי שם ההתחייבות</option><option value="pension">פנסיה / קופת גמל לקצבה</option><option value="study">קרן השתלמות לעצמאי</option><option value="investment">קופת גמל להשקעה — ללא ניכוי בהפקדה</option><option value="national">ביטוח לאומי עצמאי (יש להפריד דמי בריאות)</option><option value="tax">מקדמות מס הכנסה</option><option value="donation">תרומה מוכרת — בכפוף לאישור</option><option value="disability">ביטוח אובדן כושר עבודה</option><option value="business">התחייבות עסקית אחרת</option><option value="other">אחר / דורש בדיקה</option></select></div>
+          <div id="editScopeWrap" class="field" hidden style="margin-top:10px;max-width:520px"><label>מתי יחול שינוי הסכום?</label><select id="editScope"><option value="forward">מהחודש המוצג ואילך</option><option value="single">בחודש המוצג בלבד</option></select><span class="tiny muted">שינוי השם והסיווג חל על כל ההתחייבות, כולל חודשים קודמים. סכומים היסטוריים נשמרים.</span></div>
           <div class="table-wrap" style="margin-top:12px">
             <table><thead><tr><th>התחייבות</th><th>סכום</th><th>תדירות</th><th>מועד</th><th>אופן רישום</th><th></th></tr></thead><tbody id="obTbody"></tbody></table>
           </div>
@@ -208,6 +195,20 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
       </section>
     </div>
   </div>
+
+  <section class="card" id="forecastCard">
+    <div class="card-hd"><h2>תחזית שנתית · הכנסות, הוצאות ותזרים</h2><span class="tiny muted">בפועל עד החודש הנוכחי · תחזית לחודשים הבאים</span></div>
+    <div class="card-bd">
+      <div class="inline" style="margin-bottom:12px"><label for="forecastMethod">בסיס תחזית:</label><select id="forecastMethod" style="border:1px solid var(--line);border-radius:10px;padding:8px"><option value="average">ממוצע חודשי השנה עד כה</option><option value="last3">ממוצע שלושת החודשים האחרונים שהסתיימו</option></select><span class="tiny muted">אפשר לערוך את התחזית לחודשים הבאים.</span></div>
+      <div class="dashboard" id="forecastKpis"></div><div class="card" style="box-shadow:none;margin:12px 0"><div class="card-hd"><h2 style="font-size:15px">הכנסות והוצאות — בפועל לעומת תחזית</h2><span class="tiny muted">עמודות מלאות: בפועל · עמודות בהירות: תחזית</span></div><div class="card-bd"><div id="forecastVisual" style="overflow-x:auto"></div></div></div>
+      <div class="table-wrap" style="max-height:none"><table><thead><tr><th>חודש</th><th>מצב</th><th>הכנסות כולל מע״מ</th><th>הוצאות עסקיות כולל מע״מ</th><th>תשלומים אישיים בפועל</th><th>התחייבויות מתוכננות</th><th>הפרשות משוערות לרשויות</th><th>יתרה תזרימית משוערת</th></tr></thead><tbody id="forecastTbody"></tbody></table></div>
+      <p class="footer-note">התחזית היא כלי תכנוני בלבד ולא רווח חייב במס. בחודשים עתידיים התחייבויות מוצגות בנוסף להוצאות הצפויות, וייתכן חפיפה ביניהן. מע״מ ומקדמות הם אומדני הפרשה, לא תשלומים מוכחים.</p>
+    </div>
+  </section>
+  <section class="card" id="taxClassificationCard">
+    <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>תנועות ששולמו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">תשלום בפועל אינו אישור אוטומטי לניכוי. הסכומים משמשים תשתית לבדיקה מול אישורים שנתיים ותקרות מס. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
+  </section>
 
   <div class="footer-note">
     מקדמות מס הכנסה מחושבות בעמוד זה לפי שיעור המקדמות שבפרופיל כפול מחזור ההכנסות ללא מע״מ. רשות המסים מתארת מקדמות לפי שיעור כמכפלת המחזור בשיעור שנקבע; מחזור העסקאות לצורכי מס אינו כולל מע״מ. בפועל יש לפעול לפי הדרישה והתדירות שנקבעו לעסק.
@@ -338,6 +339,7 @@ const EXPENSE_ITEMS = [
   // תשלומים אישיים/סטטוטוריים — נשמרים בתנועות לצורך תמונת תזרים, אך אינם הוצאות 1320.
   { item: "קופת גמל להשקעה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
    { item: "קרן השתלמות לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
+  { item: "קופת גמל להשקעה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "פנסיה / קופת גמל לעצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "ביטוח אובדן כושר עבודה", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
   { item: "ביטוח לאומי עצמאי", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
@@ -758,6 +760,8 @@ function renderObligations(c){
     obType.value=ob.type||"fixed";
     obTaxClass.value=ob.taxClass||"auto";
     addObligation.textContent="שמירת שינוי";
+    cancelObligation.hidden=false;
+    editScopeWrap.hidden=false;
     obName.focus();
     document.querySelector("#addObligation")?.scrollIntoView({behavior:"smooth",block:"center"});
   });
@@ -774,7 +778,10 @@ function resetObligationForm(){
   editingObligationId=null;
   obName.value="";obAmount.value="";obFreq.value="monthly";obDay.value=15;obType.value="fixed";obTaxClass.value="auto";
   addObligation.textContent="הוספה";
+  cancelObligation.hidden=true;
+  editScopeWrap.hidden=true;
 }
+cancelObligation.onclick=resetObligationForm;
 
 function renderRows(c){
   const planned=c.obs.map(o=>{const day=Math.max(1,Math.min(31,Number(o.day)||15));return{date:`${monthKey()}-${String(day).padStart(2,"0")}`,type:"planned",desc:o.name||"",category:o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה",amount:Number(o.displayAmount??o.amount)||0}});
@@ -842,11 +849,7 @@ addObligation.onclick=async()=>{
     const previousType=ob.type||"fixed";
     ob.name=name;ob.freq=obFreq.value;ob.day=Number(obDay.value)||15;ob.type=obType.value;ob.taxClass=obTaxClass.value;
 
-    const applyForward=confirm(
-      `לשנות את הסכום של "${name}" גם בחודשים הבאים?\n\n`+
-      `אישור = החל מ-${new Intl.DateTimeFormat("he-IL",{month:"long",year:"numeric"}).format(selected)} והלאה\n`+
-      `ביטול = החודש הזה בלבד`
-    );
+    const applyForward=editScope.value==="forward";
     if(applyForward){
       clearObligationAmountForMonth(ob,effectiveMonth);
       setObligationAmountFrom(ob,effectiveMonth,amount);
@@ -987,8 +990,10 @@ function renderForecast(){
     const balance=income-expense-personal-commit-reserve;
     for(const [k,val] of Object.entries({income,expense,personal,commit,reserve,balance}))totals[k]+=val;
     const edit=(field,value)=>`<input type="number" min="0" step="0.01" data-forecast-month="${key}" data-forecast-field="${field}" value="${Number(value).toFixed(2)}" style="width:112px;border:1px solid var(--line);border-radius:8px;padding:5px" ${readOnly?"disabled":""}>`;
-    table.push(`<tr><td>${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d)}</td><td>${future?"תחזית":"בפועל / נרשם"}</td><td>${future?edit("income",income):money(income)}</td><td>${future?edit("expense",expense):money(expense)}</td><td>${money(personal)}</td><td>${money(commit)}</td><td>${money(reserve)}</td><td><b>${money(balance)}</b></td></tr>`);
+    table.push(`<tr><td>${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d)}</td><td>${future?"תחזית":(year===now.getFullYear()&&m===now.getMonth()?"בפועל עד היום":"בפועל / נרשם")}</td><td>${future?edit("income",income):money(income)}</td><td>${future?edit("expense",expense):money(expense)}</td><td>${money(personal)}</td><td>${money(commit)}</td><td>${money(reserve)}</td><td><b>${money(balance)}</b></td></tr>`);
   }
+  const maxV=Math.max(1,...Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d),future=year>now.getFullYear()||(year===now.getFullYear()&&m>now.getMonth()),v=overrides[key]||{};return Math.max(future?(v.income??base.income):c.incomeGross,future?(v.expense??base.expense):c.businessExpenseGross)}));
+  forecastVisual.innerHTML=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:12px;font-size:12px"><span>🔵 הכנסות</span><span>🟠 הוצאות</span><span style="color:var(--muted)">בהיר = תחזית</span></div><div style="display:grid;grid-template-columns:repeat(12,minmax(58px,1fr));gap:8px;min-width:720px;align-items:end;height:185px;border-bottom:1px solid var(--line)">${Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d),future=year>now.getFullYear()||(year===now.getFullYear()&&m>now.getMonth()),v=overrides[key]||{},inc=future?(v.income??base.income):c.incomeGross,exp=future?(v.expense??base.expense):c.businessExpenseGross;return `<div style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px"><div style="display:flex;align-items:end;gap:3px;height:145px"><div title="הכנסות ${money(inc)}" style="width:17px;height:${Math.max(1,Number(inc)/maxV*140)}px;background:${future?'#a8c0ff':'#4277ee'};border-radius:4px 4px 0 0"></div><div title="הוצאות ${money(exp)}" style="width:17px;height:${Math.max(1,Number(exp)/maxV*140)}px;background:${future?'#ffdab0':'#f2a03b'};border-radius:4px 4px 0 0"></div></div><span style="font-size:11px">${new Intl.DateTimeFormat('he-IL',{month:'short'}).format(d)}</span></div>`}).join('')}</div>`;
   forecastTbody.innerHTML=table.join("");
   forecastKpis.innerHTML=[['הכנסות שנתיות',totals.income],['הוצאות עסקיות',totals.expense],['תשלומים אישיים שנרשמו',totals.personal],['התחייבויות עתידיות',totals.commit],['יתרה תזרימית משוערת',totals.balance]].map(([label,val])=>`<div class="kpi"><div class="label">${label}</div><div class="value">${money(val)}</div></div>`).join("");
   forecastTbody.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('change',async()=>{
