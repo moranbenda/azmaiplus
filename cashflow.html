@@ -105,9 +105,21 @@ html,body{max-width:100%;overflow-x:hidden}
   .year-review-row{grid-template-columns:1fr}
 }
 @media(max-width:440px){#forecastKpis{grid-template-columns:1fr 1fr}.card-bd{padding:10px}.dashboard .kpi .value{font-size:21px}}
+
+.history-overlay{position:fixed;inset:0;background:rgba(16,27,48,.55);z-index:10000;display:none;align-items:center;justify-content:center;padding:14px}
+.history-overlay.open{display:flex}.history-panel{background:#fff;border-radius:18px;width:min(920px,100%);max-height:90dvh;overflow:auto;padding:20px;box-shadow:0 20px 60px #0003;color:#172033}
+.history-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.history-controls{display:flex;flex-wrap:wrap;align-items:end;gap:12px;margin:15px 0}.history-controls label{display:block;font-size:13px;margin-bottom:5px}.history-controls input{max-width:180px;padding:10px;border:1px solid #d7deea;border-radius:9px}.history-table{width:100%;border-collapse:collapse;min-width:590px}.history-table th,.history-table td{padding:10px;border-bottom:1px solid #e5eaf2;text-align:right}.history-table th{background:#f3f6fa}.history-note{font-size:13px;color:#667085;margin:12px 0;line-height:1.7}.history-scroll{overflow-x:auto}@media(max-width:600px){.history-panel{padding:12px;max-height:94dvh}.history-controls input{max-width:150px}}
 </style>
 </head>
 <body>
+<div id="historyOverlay" class="history-overlay" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+ <div class="history-panel"><div class="history-head"><h2 id="historyTitle">היסטוריית התחייבות</h2><button type="button" class="btn secondary small" id="historyClose">סגירה</button></div>
+ <p class="history-note">הנתונים מציגים תכנון, סטטוס אישור ותנועות מזוהות בספרים בנפרד. תשלום שהגיע מועדו אינו נחשב מאומת ללא בדיקה.</p>
+ <div class="history-controls"><div><label for="historyFrom">מחודש</label><input type="month" id="historyFrom"></div><div><label for="historyTo">עד חודש</label><input type="month" id="historyTo"></div><button type="button" class="btn secondary small" id="historyRefresh">הצגת חודשים</button></div>
+ <div class="history-scroll"><table class="history-table"><thead><tr><th>חודש</th><th>סכום מתוכנן</th><th>אישור ידני</th><th>תנועה בספרים</th></tr></thead><tbody id="historyBody"></tbody></table></div>
+ <div class="history-controls"><div><label for="historyStart">תאריך תחילת ההתחייבות</label><input type="month" id="historyStart"></div><button type="button" class="btn small" id="historySaveStart">שמירת תאריך התחלה</button></div>
+ <p class="history-note">תיקון חודש ההתחלה משנה את חודשי התכנון בלבד, לא יוצר הוצאה בספרים, לא משנה אישורי תשלום קיימים ולא משנה את סכומי ההפקדות ההיסטוריים. חודשים חדשים יופיעו כלא מאומתים עד בדיקה.</p>
+ </div></div>
 <div class="wrap">
   <div class="topbar">
     <div class="brand">
@@ -762,7 +774,7 @@ function renderObligations(c){
       <td><b>${esc(o.name)}</b><div class="tiny muted">${o.type==="authority"?"רשות / חיסכון לעצמאי":"התחייבות קבועה"}</div></td>
       <td>${money(amount)}</td><td>${FREQ_LABEL[o.freq]||o.freq}</td><td>${day} בחודש</td>
       <td><span class="status paid">אוטומטי בתזרים</span></td>
-      <td><div class="inline"><button class="btn secondary small" data-edit="${o.id}" ${readOnly?"disabled":""}>עריכה</button><button class="btn ghost small" data-del="${o.id}" ${readOnly?"disabled":""}>מחיקה</button></div></td>
+      <td><div class="inline"><button class="btn secondary small" data-history="${esc(o.id)}">היסטוריה</button><button class="btn secondary small" data-edit="${o.id}" ${readOnly?"disabled":""}>עריכה</button><button class="btn ghost small" data-del="${o.id}" ${readOnly?"disabled":""}>מחיקה</button></div></td>
     </tr>`;
   });
 
@@ -787,6 +799,7 @@ function renderObligations(c){
   const all=[...systemRows,...manualRows];
   obTbody.innerHTML=all.length?all.join(""):'<tr><td colspan="6" class="empty">אין התחייבויות לחודש זה.</td></tr>';
 
+  obTbody.querySelectorAll("[data-history]").forEach(b=>b.onclick=()=>openObligationHistory(b.dataset.history));
   obTbody.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>{
     const ob=(config.obligations||[]).find(o=>o.id===b.dataset.edit);
     if(!ob)return;
@@ -811,6 +824,61 @@ function renderObligations(c){
     await saveConfig();render();
   });
 }
+
+let historyObligationId=null;
+const historyOverlay=document.getElementById("historyOverlay");
+function openObligationHistory(id){
+  const ob=(config.obligations||[]).find(x=>x.id===id);if(!ob)return;
+  historyObligationId=id;
+  document.getElementById("historyTitle").textContent=`היסטוריית תשלומים — ${ob.name}`;
+  const now=monthKey(new Date());
+  document.getElementById("historyFrom").value=ob.startMonth||`${new Date().getFullYear()}-01`;
+  document.getElementById("historyTo").value=now;
+  document.getElementById("historyStart").value=ob.startMonth||now;
+  historyOverlay.classList.add("open");renderObligationHistory();
+}
+function renderObligationHistory(){
+  const ob=(config.obligations||[]).find(x=>x.id===historyObligationId);if(!ob)return;
+  const from=document.getElementById("historyFrom").value,to=document.getElementById("historyTo").value;
+  const body=document.getElementById("historyBody");
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(from)||!/^\d{4}-(0[1-9]|1[0-2])$/.test(to)||from>to){body.innerHTML='<tr><td colspan="4">יש לבחור טווח חודשים תקין.</td></tr>';return}
+  const [fy,fm]=from.split("-").map(Number),[ty,tm]=to.split("-").map(Number);
+  const months=(ty-fy)*12+tm-fm;
+  if(months>119){body.innerHTML='<tr><td colspan="4">ניתן להציג עד 10 שנים בכל פעם.</td></tr>';return}
+  const result=[];
+  for(let i=0;i<=months;i++){
+    const d=new Date(fy,fm-1+i,1),mk=monthKey(d);
+    const occurs=obligationOccurs(ob,d),amount=occurs?obligationAmount(ob,d):0;
+    const confirmed=occurs&&isObPaid(ob,d);
+    const status=!occurs?'לא מתוכנן':confirmed?'אושר ידנית':mk>monthKey(new Date())?'עתידי':'לא אומת';
+    // Book entries are separate from the recurring obligation; never treat a forecast as a ledger entry.
+    const matches=monthRows(d).filter(r=>r.type==='expense'&&(sameObligation(r.desc,ob.name)||sameObligation(r.category,ob.name)));
+    const bookText=matches.length?`${matches.length} תנועות · ${money(matches.reduce((sum,r)=>sum+Math.abs(Number(r.amount)||0),0))}`:'לא זוהתה תנועה בשם זה';
+    result.push(`<tr><td>${esc(new Intl.DateTimeFormat('he-IL',{month:'long',year:'numeric'}).format(d))}</td><td>${occurs?money(amount):'—'}</td><td>${status}</td><td>${bookText}</td></tr>`);
+  }
+  body.innerHTML=result.join('')||'<tr><td colspan="4">אין חודשים בטווח.</td></tr>';
+}
+document.getElementById('historyClose').onclick=()=>historyOverlay.classList.remove('open');
+historyOverlay.addEventListener('click',e=>{if(e.target===historyOverlay)historyOverlay.classList.remove('open')});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')historyOverlay.classList.remove('open')});
+document.getElementById('historyRefresh').onclick=renderObligationHistory;
+document.getElementById('historySaveStart').onclick=async()=>{
+  if(readOnly)return;
+  const ob=(config.obligations||[]).find(x=>x.id===historyObligationId);if(!ob)return;
+  const newStart=document.getElementById('historyStart').value;
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(newStart)){alert('יש לבחור חודש התחלה תקין.');return}
+  const oldStart=ob.startMonth||'';
+  if(newStart===oldStart)return;
+  if(!confirm(`לשנות את תחילת ההתחייבות מ-${oldStart||'לא הוגדר'} ל-${newStart}?\n\nהתיקון ישפיע על חודשי התכנון בלבד. הוא לא יאמת תשלומים ולא ייצור תנועות בספרים.`))return;
+  // Keep the original baseline amount for newly included historical months.
+  ensureAmountHistory(ob);
+  if(newStart<oldStart){
+    const first=ob.amountHistory[0];
+    if(first&&first.fromMonth>newStart)ob.amountHistory.unshift({fromMonth:newStart,amount:first.amount});
+  }
+  ob.startMonth=newStart;
+  try{await saveConfig();document.getElementById('historyFrom').value=newStart;renderObligationHistory();render();alert('תאריך ההתחלה נשמר. יש לאמת הפקדות מול אסמכתאות.')}catch(e){alert('שמירת התאריך נכשלה. יש לבדוק חיבור והרשאות.');}
+};
 
 function resetObligationForm(){
   editingObligationId=null;
