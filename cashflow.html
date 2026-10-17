@@ -83,6 +83,28 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
   @media(max-width:800px){
     #biMonthlyPanel > div:last-child{grid-template-columns:1fr!important}
   }
+
+/* התאמות למסכים קטנים ללא גלילת רוחב של כל העמוד */
+html,body{max-width:100%;overflow-x:hidden}
+.wrap,.card,.card-bd,.grid,.dashboard{min-width:0}
+.table-wrap,#forecastVisual{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#forecastKpis .kpi .value{overflow-wrap:anywhere}
+@media(max-width:700px){
+  .topbar{align-items:stretch}
+  .topbar .actions{width:100%}
+  .topbar .actions .btn{flex:1}
+  .month-nav{grid-template-columns:38px minmax(0,1fr) 38px;padding:10px 6px}
+  .month-arrow{width:36px;height:36px}
+  .month-title strong{font-size:18px}
+  .month-tools{gap:5px}
+  .month-tools select,.month-tools button,.month-tools input{max-width:100%;font-size:12px}
+  .card-hd{align-items:flex-start}
+  #forecastKpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #forecastKpis .kpi{min-height:90px;padding:10px}
+  #forecastKpis .kpi .value{font-size:19px}
+  .year-review-row{grid-template-columns:1fr}
+}
+@media(max-width:440px){#forecastKpis{grid-template-columns:1fr 1fr}.card-bd{padding:10px}.dashboard .kpi .value{font-size:21px}}
 </style>
 </head>
 <body>
@@ -200,7 +222,7 @@ dialog.year-dialog::backdrop{background:rgba(20,30,55,.38)}
     <div class="card-hd"><h2>תחזית שנתית · הכנסות, הוצאות ותזרים</h2><span class="tiny muted">בפועל עד החודש הנוכחי · תחזית לחודשים הבאים</span></div>
     <div class="card-bd">
       <div class="inline" style="margin-bottom:12px"><label for="forecastMethod">בסיס תחזית:</label><select id="forecastMethod" style="border:1px solid var(--line);border-radius:10px;padding:8px"><option value="average">ממוצע חודשי השנה עד כה</option><option value="last3">ממוצע שלושת החודשים האחרונים שהסתיימו</option></select><span class="tiny muted">אפשר לערוך את התחזית לחודשים הבאים.</span></div>
-      <div class="dashboard" id="forecastKpis"></div><div class="card" style="box-shadow:none;margin:12px 0"><div class="card-hd"><h2 style="font-size:15px">הכנסות והוצאות — בפועל לעומת תחזית</h2><span class="tiny muted">עמודות מלאות: בפועל · עמודות בהירות: תחזית</span></div><div class="card-bd"><div id="forecastVisual" style="overflow-x:auto"></div></div></div>
+      <div class="dashboard" id="forecastKpis"></div><div class="card" style="box-shadow:none;margin:12px 0"><div class="card-hd"><h2 style="font-size:15px">הכנסות והוצאות — בפועל לעומת תחזית</h2><span class="tiny muted">עמודות מלאות: בפועל · עמודות עם מסגרת מקווקוות: תחזית</span></div><div class="card-bd"><div id="forecastVisual" style="overflow-x:auto"></div></div></div>
       <div class="table-wrap" style="max-height:none"><table><thead><tr><th>חודש</th><th>מצב</th><th>הכנסות כולל מע״מ</th><th>הוצאות עסקיות כולל מע״מ</th><th>תשלומים אישיים בפועל</th><th>התחייבויות מתוכננות</th><th>הפרשות משוערות לרשויות</th><th>יתרה תזרימית משוערת</th></tr></thead><tbody id="forecastTbody"></tbody></table></div>
       <p class="footer-note">התחזית היא כלי תכנוני בלבד ולא רווח חייב במס. בחודשים עתידיים התחייבויות מוצגות בנוסף להוצאות הצפויות, וייתכן חפיפה ביניהן. מע״מ ומקדמות הם אומדני הפרשה, לא תשלומים מוכחים.</p>
     </div>
@@ -993,7 +1015,7 @@ function renderForecast(){
     table.push(`<tr><td>${new Intl.DateTimeFormat("he-IL",{month:"long"}).format(d)}</td><td>${future?"תחזית":(year===now.getFullYear()&&m===now.getMonth()?"בפועל עד היום":"בפועל / נרשם")}</td><td>${future?edit("income",income):money(income)}</td><td>${future?edit("expense",expense):money(expense)}</td><td>${money(personal)}</td><td>${money(commit)}</td><td>${money(reserve)}</td><td><b>${money(balance)}</b></td></tr>`);
   }
   const maxV=Math.max(1,...Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d),future=year>now.getFullYear()||(year===now.getFullYear()&&m>now.getMonth()),v=overrides[key]||{};return Math.max(future?(v.income??base.income):c.incomeGross,future?(v.expense??base.expense):c.businessExpenseGross)}));
-  forecastVisual.innerHTML=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:12px;font-size:12px"><span>🔵 הכנסות</span><span>🟠 הוצאות</span><span style="color:var(--muted)">בהיר = תחזית</span></div><div style="display:grid;grid-template-columns:repeat(12,minmax(58px,1fr));gap:8px;min-width:720px;align-items:end;height:185px;border-bottom:1px solid var(--line)">${Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d),future=year>now.getFullYear()||(year===now.getFullYear()&&m>now.getMonth()),v=overrides[key]||{},inc=future?(v.income??base.income):c.incomeGross,exp=future?(v.expense??base.expense):c.businessExpenseGross;return `<div style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px"><div style="display:flex;align-items:end;gap:3px;height:145px"><div title="הכנסות ${money(inc)}" style="width:17px;height:${Math.max(1,Number(inc)/maxV*140)}px;background:${future?'#a8c0ff':'#4277ee'};border-radius:4px 4px 0 0"></div><div title="הוצאות ${money(exp)}" style="width:17px;height:${Math.max(1,Number(exp)/maxV*140)}px;background:${future?'#ffdab0':'#f2a03b'};border-radius:4px 4px 0 0"></div></div><span style="font-size:11px">${new Intl.DateTimeFormat('he-IL',{month:'short'}).format(d)}</span></div>`}).join('')}</div>`;
+  forecastVisual.innerHTML=`<div style="display:flex;gap:16px;align-items:center;margin-bottom:12px;font-size:12px"><span>🔵 הכנסות</span><span>🟠 הוצאות</span><span style="color:var(--muted)">מסגרת מקווקוות = תחזית</span></div><div style="display:grid;grid-template-columns:repeat(12,minmax(58px,1fr));gap:8px;min-width:720px;align-items:end;height:185px;border-bottom:1px solid var(--line)">${Array.from({length:12},(_,m)=>{const d=new Date(year,m,1),key=String(m+1).padStart(2,"0"),c=calcMonth(d),future=year>now.getFullYear()||(year===now.getFullYear()&&m>now.getMonth()),v=overrides[key]||{},inc=future?(v.income??base.income):c.incomeGross,exp=future?(v.expense??base.expense):c.businessExpenseGross;return `<div style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px"><div style="display:flex;align-items:end;gap:3px;height:145px"><div title="הכנסות ${money(inc)}" style="width:17px;height:${Math.max(1,Number(inc)/maxV*140)}px;background:${future?'rgba(49,94,251,.13)':'#315efb'};border:${future?'2px dashed #315efb':'2px solid #315efb'};border-radius:4px 4px 0 0"></div><div title="הוצאות ${money(exp)}" style="width:17px;height:${Math.max(1,Number(exp)/maxV*140)}px;background:${future?'rgba(242,160,59,.13)':'#f2a03b'};border:${future?'2px dashed #f2a03b':'2px solid #f2a03b'};border-radius:4px 4px 0 0"></div></div><span style="font-size:11px">${new Intl.DateTimeFormat('he-IL',{month:'short'}).format(d)}</span></div>`}).join('')}</div>`;
   forecastTbody.innerHTML=table.join("");
   forecastKpis.innerHTML=[['הכנסות שנתיות',totals.income],['הוצאות עסקיות',totals.expense],['תשלומים אישיים שנרשמו',totals.personal],['התחייבויות עתידיות',totals.commit],['יתרה תזרימית משוערת',totals.balance]].map(([label,val])=>`<div class="kpi"><div class="label">${label}</div><div class="value">${money(val)}</div></div>`).join("");
   forecastTbody.querySelectorAll('[data-forecast-month]').forEach(el=>el.addEventListener('change',async()=>{
