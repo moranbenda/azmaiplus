@@ -412,7 +412,7 @@ function compute(){
 }
 
 function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='foreignRentalPath'?['','נבחר מסלול 15% לאחר בדיקה','מסלול מס שולי - לא 15%','דורש בדיקה']:id==='benefitTaxClass'?['','חייבת ביגיעה אישית לפי אישור','פטורה לפי אישור','דורשת בדיקה']:id==='rentalTaxPath'?['','נבחר 10% בכפוף לעמידה בתנאים','נבחר מס שולי','נדרש לבדוק']:id==='pensionPlan'?['','חישוב אוטומטי - עצמאי ללא משכורת','חישוב משולב עצמאי ושכיר לפי 106','ניכוי וזיכוי מאושרים בלבד']:id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:id==='children'?['','אין ילדים מזכים','יש ילדים מזכים — נדרש פירוט גילאים ומשמורת','הורה יחיד / זכאות מיוחדת']:id==='service'?['','אין זכאות נוספת','שירות צבאי','שירות לאומי','תואר אקדמי / לימודים מזכים','מספר זכאויות — נדרש פירוט']:id==='credit'?['','אין זיכויים נוספים','יישוב מזכה','עולה חדש/ה','נכות / זכאות רפואית','זיכוי אחר','מספר זכאויות — נדרש פירוט']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft();renderWizard()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft();renderWizard()});return input}
-function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=GENERAL_KEYS.has(id)?generalValue(id):Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';const fieldInput=makeInput(id,type,v);fieldInput.dataset.fieldId=id;if(['children','service','credit'].includes(id)||GENERAL_KEYS.has(id)){fieldInput.disabled=true;fieldInput.title='שדה זה מתעדכן אוטומטית מהשאלון';}box.append(fieldInput);let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'סכום מוצע לבדיקה מהאינדקס או מהתזרים; אין לראות בו אישור ניכוי או זיכוי.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'חושב מנתוני סגירת שנה כולל הוצאות מוכרות ופחת; יש לאמת סיווגים והתאמות לפני הגשה.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}if(!saveTimer)saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
+function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined&&!Object.hasOwn(values,id); if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=GENERAL_KEYS.has(id)?generalValue(id):Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';const fieldInput=makeInput(id,type,v);fieldInput.dataset.fieldId=id;if(['children','service','credit'].includes(id)||GENERAL_KEYS.has(id)){fieldInput.disabled=true;fieldInput.title='שדה זה מתעדכן אוטומטית מהשאלון';}box.append(fieldInput);let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'סכום מוצע לבדיקה מהאינדקס או מהתזרים; אין לראות בו אישור ניכוי או זיכוי.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'חושב מנתוני סגירת שנה כולל הוצאות מוכרות ופחת; יש לאמת סיווגים והתאמות לפני הגשה.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';if(Object.hasOwn(values,id)&&AUTO_KEYS.has(id))note.textContent='ערך שהוזן ידנית בטיוטת שנת המס; הוא קודם להצעה מהספרים.';box.append(note);grid.append(box)}section.append(grid);host.append(section)}if(!saveTimer)saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
 
 // Eligibility wizard: separate from the original 1301 field definitions and saved in the same annual draft.
 const GENERAL_QUESTIONS=[
@@ -815,12 +815,48 @@ function calculateTax2026(input){
    donationAllowed,donationCredit,lifeCredit,localityCredit,localityResult,pointsCredit,personalCredits,
    grossTax,withheld,advances,owed,issues:[...new Set(issues)],notes:[...new Set(notes)]};
 }
+// V14.2: Restricted historical 2025 comparison. Does not alter 2026 engine or financial ledgers.
+// Official 2025 brackets: https://www.gov.il/BlobFolder/generalpage/income-tax-guide-knowyourright/he/Guides_IncomeTax_da-2025.pdf
+const TAX_2025_COMPARISON=Object.freeze({point:2904,studyIncomeCap:293397,brackets:[[84120,.10],[120720,.14],[193800,.20],[269280,.31],[560280,.35],[Infinity,.47]]});
+function render2025Diagnostic(points,add,get){
+ const n=k=>positive(get(k)),known=k=>finiteOrNull(get(k))!==null;
+ add('בדיקת השוואה לשנת 2025 — חישוב בסיס בלבד, ללא טיפול במשיכות פנסיה, מיסוי מיוחד וסיווגי הכנסות נוספים. אין להשתמש ביתרה לתשלום או החזר.','warnmsg');
+ const profit=finiteOrNull(get('profit'));
+ if(profit===null){add('לא הוזן רווח עסקי לשנת 2025; לא ניתן לחשב אפילו את בסיס המס.','badmsg');return}
+ const salary=n('salary');
+ const study=Math.min(n('study'),Math.max(0,profit)*.045,TAX_2025_COMPARISON.studyIncomeCap*.045);
+ const ni=n('nationalInsuranceOnly');
+ const socialDed=known('nationalInsuranceOnly')?Math.min(n('national'),ni)*.52:0;
+ if(n('national')>0&&!known('nationalInsuranceOnly'))add('נדרש סכום ביטוח לאומי ללא דמי ביטוח בריאות מתוך האישור השנתי.','warnmsg');
+ const specialIncomeKeys=['otherOrdinaryTaxable','rentalOrdinary','rentalTenPercent','foreignRental15','interestTaxable','interestReal','dividends25','dividends30','capitalGain15','capitalGain25','capitalGain30','foreignEmployment','benefitSelf'];
+ const hasSpecial=specialIncomeKeys.some(key=>n(key)>0)||String(get('otherIncome')||'').trim()!==''||String(get('capital')||'').trim()!=='';
+ const earned=Math.max(0,profit+salary-study-socialDed);
+ const basicTax=progressiveTax(earned,TAX_2025_COMPARISON.brackets);
+ const pointCredit=Math.max(0,Number(points)||0)*TAX_2025_COMPARISON.point;
+ const ordinaryAfterPoints=Math.max(0,basicTax-pointCredit);
+ add(`הכנסה עסקית שהוזנה: ₪${fmt(profit)} · שכר: ₪${fmt(salary)}`);
+ add(`ניכוי קרן השתלמות מחושב: ₪${fmt(study)} · ניכוי ביטוח לאומי (52% מדמי ביטוח בלבד): ₪${fmt(socialDed)}`);
+ add(`בסיס הכנסה חייבת לחישוב הרגיל בלבד: ₪${fmt(earned)}`);
+ add(`מס לפי מדרגות 2025 על הבסיס הרגיל: ₪${fmt(basicTax)}`);
+ add(`נקודות זיכוי מחושבות: ${fmt(points)} × ₪2,904 = ₪${fmt(pointCredit)}`);
+ add(`מס על ההכנסה הרגילה אחרי נקודות בלבד: ₪${fmt(ordinaryAfterPoints)}`);
+ add(`ניכוי מס במקור שנרשם בטיוטה: ₪${fmt(n('otherWithheld')+n('salaryWithheld')+n('interestWithheld')+n('dividendWithheld'))} (מוצג לבקרה בלבד; לא קוזז מהחישוב החלקי)`);
+ add('ההשוואה לתוצאת 1301 של שנת 2025 אינה מלאה כל עוד לא סווגו משיכות פנסיה/פיצויים והכנסות נוספות לפי האישורים. המס שחושב כאן הוא רק רכיב המס הרגיל.','badmsg');
+ if(n('pension')>0||n('employeePensionEmployee')>0)add('קיימות הפקדות פנסיוניות שהוזנו; הטבות 2025 אינן מחושבות בסימולציית הבסיס.','warnmsg');
+ if(hasSpecial)add('זוהו מקורות הכנסה מיוחדים בטיוטה; הם לא חושבו בסימולציית 2025 המצומצמת.','warnmsg');
+ if(wizardYes('locality'))add('רשימת היישובים של 2026 אינה מתאימה ל־2025, ולכן לא חושב זיכוי יישוב.','warnmsg');
+ if(generalValue('marital')==='נשוי/אה')add('חישוב בני זוג אינו נכלל בסימולציית 2025.','warnmsg');
+ if(n('donations')>0)add('תרומות לפי סעיף 46 לא נכללו בסימולציית 2025.','warnmsg');
+ if(!Object.hasOwn(values,'turnover')||!known('turnover'))add('לא נקלט ערך מחזור ידני לשנת 2025; הנתון האוטומטי הוא 0 כי אין עסקאות בספרים. יש להקליד את המחזור בדוח 1301 המתקדם.','warnmsg');
+ else add(`מחזור עסקי שהוזן ידנית: ₪${fmt(n('turnover'))}. הוא נשמר בטיוטה ואינו תלוי בקיום תנועות 2025 בספרים.`,'qhint');
+ add('נוסחאות מדרגות 2025 וערך נקודת הזיכוי נבדקו מול מדריך רשות המסים לשנת 2025. כל יתר רכיבי המס ההיסטוריים אינם מאומתים בסימולציה זו.','qhint');
+}
 function renderEstimate(points=0,messages=[]){
  const host=el('estimateContent');host.replaceChildren();const year=el('year').value;
  const add=(str,kind='')=>{const p=document.createElement('p');p.textContent=str;if(kind)p.className=kind;host.append(p)};
  const get=id=>Object.hasOwn(values,id)?values[id]:auto[id];
- add(`שנת מס ${year}${year==='2026'?' — נתונים זמניים לפני סוף השנה':''} · מחזור עסקי ₪${fmt(auto.turnover)} · רווח לפני ניכויים אישיים ₪${fmt(get('profit'))}`);
- if(year!=='2026'){add('המנוע החדש מוגדר ל־2026 בלבד. לא מבצעים חישוב שנתי לפי כללים של שנה אחרת.','badmsg');return}
+ add(`שנת מס ${year}${year==='2026'?' — נתונים זמניים לפני סוף השנה':''} · מחזור עסקי ₪${fmt(get('turnover'))} · רווח לפני ניכויים אישיים ₪${fmt(get('profit'))}`);
+ if(year==='2025'){render2025Diagnostic(lastWizardPoints,add,get);return}
  const kidYears=String(wizardVal('childDetails')||'').split(/[,\s;]+/).filter(Boolean).map(Number);
  const role=String(wizardVal('childRole')||'');
  const kidsNeeded=wizardYes('hasChildren')&&(!role.startsWith('עמודה ')||kidYears.length===0||kidYears.some(y=>!Number.isInteger(y)||y<Number(year)-25||y>Number(year))||wizardYes('singleParent')||wizardYes('childDeferral'));
