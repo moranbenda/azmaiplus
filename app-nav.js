@@ -22,7 +22,7 @@
     { section: 'ניהול שוטף', label: 'מסמכים', href: '/documents.html' },
     { section: 'ניהול שוטף', label: 'לקוחות', href: '/customers.html' },
     { section: 'ניהול שוטף', label: 'הכנסות והוצאות', href: '/#ledgerSection' },
-    { section: 'ניהול שוטף', label: 'תזרים ותכנון פיננסי', href: '/cashflow.html' },
+    { section: 'ניהול שוטף', label: 'תזרים, קרנות והתחייבויות', href: '/cashflow.html' },
     { section: 'דוחות ומסים', label: 'דוחות', href: '/#reportsSection' },
     { section: 'דוחות ומסים', label: 'דיווח מע״מ', href: '/vat-report.html' },
     { section: 'דוחות ומסים', label: 'קבצים במבנה אחיד', href: '/open-format.html' },
