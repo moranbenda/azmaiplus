@@ -229,7 +229,7 @@ html,body{max-width:100%;overflow-x:hidden}
   </section>
   <section class="card" id="taxClassificationCard">
     <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
-    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>תנועות ששולמו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">תשלום בפועל אינו אישור אוטומטי לניכוי. הסכומים משמשים תשתית לבדיקה מול אישורים שנתיים ותקרות מס. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>תנועות שזוהו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
   </section>
 
   <div class="footer-note">
@@ -961,6 +961,7 @@ function classifyTax(name,explicit="auto"){
   const n=norm(name).replace(/[-–/]/g," ");
   if(n.includes("גמל להשקעה")||n.includes("קופת השקעה"))return "investment";
   if(n.includes("השתלמות"))return "study";
+  if(n.includes("פנסיה / קופת גמל")||n.includes("פנסיה וקופת גמל"))return "other";
   if(n.includes("פנסיה")||n.includes("גמל לקצבה")||n.includes("גמל לעצמאי"))return "pension";
   if(n.includes("ביטוח לאומי") && !n.includes("מעסיק"))return "national";
   if(n.includes("מקדמות מס")||n.includes("מס הכנסה"))return "tax";
@@ -968,25 +969,49 @@ function classifyTax(name,explicit="auto"){
   if(n.includes("אובדן כושר"))return "disability";
   return "other";
 }
+function taxClassForLedgerRow(r){
+  // Use the specific expense item, not the umbrella personal-payments category.
+  const category=norm(r.category),desc=norm(r.desc||r.description||""),item=norm(r.item||r.expenseItem||r.subcategory||"");
+  const generic=norm("תשלומי מס וניכויים אישיים");
+  if(category && category!==generic){const c=classifyTax(category);if(c!=="other")return c;}
+  if(item){const c=classifyTax(item);if(c!=="other")return c;}
+  // Ambiguous legacy 'pension / provident fund' is NOT automatically eligible.
+  const combined=category+" "+item+" "+desc;
+  if(combined.includes("גמל להשקעה"))return "investment";
+  if(combined.includes("השתלמות"))return "study";
+  if(combined.includes("ביטוח לאומי"))return "national";
+  if(combined.includes("מקדמות מס"))return "tax";
+  if(combined.includes("תרומ"))return "donation";
+  if(combined.includes("אובדן כושר"))return "disability";
+  if(combined.includes("פנסיה / קופת גמל") || combined.includes("פנסיה וקופת גמל"))return "other";
+  return classifyTax(desc);
+}
 function renderTaxSummary(){
   const year=selected.getFullYear(),summary={};
-  for(const key of Object.keys(TAX_CLASSES))summary[key]={planned:0,paid:0,count:0};
+  const now=new Date();
+  for(const key of Object.keys(TAX_CLASSES))summary[key]={planned:0,assumed:0,paid:0,count:0,uncertain:0};
   for(let m=0;m<12;m++){
     const d=new Date(year,m,1);
     for(const ob of selectedObligations(d)){
-      const key=classifyTax(ob.name,ob.taxClass);
-      summary[key].planned+=Math.max(0,Number(ob.displayAmount)||0);
+      const key=classifyTax(ob.name,ob.taxClass),amount=Math.max(0,Number(ob.displayAmount)||0);
+      summary[key].planned+=amount;
+      const day=Math.min(Math.max(1,Number(ob.day)||15),new Date(year,m+1,0).getDate());
+      const due=new Date(year,m,day,23,59,59);
+      const status=config.paymentStatus?.[paymentKey(ob.id,d)];
+      // Explicit false means the user reported a failed or unpaid charge.
+      if(due<=now && status!==false){summary[key].assumed+=amount;summary[key].uncertain++}
     }
   }
   for(const r of rows){
     if(r.type!=="expense"||String(r.date||"").slice(0,4)!==String(year))continue;
-    const key=classifyTax(r.category && norm(r.category)!==norm("תשלומי מס וניכויים אישיים")?r.category:r.desc);
+    const key=taxClassForLedgerRow(r);
     if(key!=="other") {summary[key].paid+=Math.abs(Number(r.amount)||0);summary[key].count++;}
     else if(isPersonal(r))summary.other.count++;
   }
-  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].count?money(summary[key].paid):"לא זוהה תשלום"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
-  taxUnclassified.textContent=summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שאינן מסווגות חד־משמעית. יש לסווג אותן בספרים כדי שיופיעו תחת הסוג המתאים.`:"תשלומים שמוגדרים רק כהתחייבות אינם נחשבים לתשלומים שבוצעו.";
+  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].uncertain?money(summary[key].assumed):"—"}</td><td>${summary[key].count?money(summary[key].paid):"לא נמצא רישום"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
+  taxUnclassified.textContent=(summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שלא זוהו בוודאות (לרבות קטגוריית פנסיה/גמל ישנה). יש לבדוק אותן לפני דוח המס. `:"")+"הסכום המשוער מחושב רק מהתחייבויות שמועדן חלף ולא סומנו כלא שולמו; הוא אינו אישור בנקאי ואינו נוסף לסכום שנרשם בספרים. אין לסכום את שתי העמודות.";
 }
+
 function forecastBase(year,month,method){
   const now=new Date(),end=(year===now.getFullYear()?now.getMonth():year<now.getFullYear()?12:0);
   const completed=Array.from({length:end},(_,m)=>calcMonth(new Date(year,m,1)));
