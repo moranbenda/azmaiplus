@@ -221,9 +221,12 @@ function getVatDeductibleFactorForRow(row) {
 function getTaxDeductibleExpenseAmount(row, amounts) {
   if (!row || row.type !== 'expense') return 0;
   const meta = getExpenseMeta(row);
+  // Audit: never treat an unlinked capital asset as an immediate expense.
+  // Unclassified transactions cannot safely default to a 100% tax deduction.
+  if (meta?.depreciable || !meta) return 0;
   const pct = getRecognitionPctForRow(row);
   const resolved = amounts || splitVAT(row.amount, row.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
-  const base = meta ? (meta.vatAllowed ? resolved.net : resolved.gross) : resolved.net;
+  const base = meta.vatAllowed ? resolved.net : resolved.gross;
   return base * pct;
 }
 function parseLocalDate(value) {
@@ -400,7 +403,7 @@ function compute(){
  for(const key of Object.keys(sums))sums[key]=(key==='donations'?fromBooks[key]:confirmed[key]||fromBooks[key]);
  let yearEnd=null;try{yearEnd=computeYearEndSnapshot(profile,ledger,year,uid)}catch(e){console.warn('Year-end calculation unavailable',e)}
  auto={...(yearEnd?{profit:Number(yearEnd.operatingProfit.toFixed(2))}:{}),turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
- importInfo={fromBooks,confirmed,planned:cash.planned,confirmedRows:cash.confirmed};
+ importInfo={fromBooks,confirmed,planned:cash.planned,confirmedRows:cash.confirmed,yearEndAudit:yearEnd};
  const host=el('cashflowImport');if(host){host.replaceChildren();const p=document.createElement('p');p.textContent=`אישורים ידניים בתזרים: ${cash.confirmed.length} · התחייבויות מתוכננות: ${cash.planned.length}. רק תשלומים שאושרו נכללים כמועמדים לבדיקה בדוח.`;host.append(p);
   const table=document.createElement('table');table.innerHTML='<thead><tr><th>סוג</th><th>נרשם באינדקס</th><th>אושר בתזרים</th><th>סכום מוצע לבדיקה</th></tr></thead>';
   const body=document.createElement('tbody');for(const [key,label] of Object.entries({study:'קרן השתלמות',pension:'פנסיה לקצבה',national:'ביטוח לאומי',disability:'אובדן כושר עבודה',donations:'תרומות לפי סעיף 46',taxAdvances:'מקדמות מס'})){const tr=document.createElement('tr');for(const val of [label,fmt(fromBooks[key]),fmt(confirmed[key]),fmt(sums[key])]){const td=document.createElement('td');td.textContent=val;tr.append(td)}body.append(tr)}table.append(body);host.append(table);
@@ -618,6 +621,7 @@ function localityEstimate2026(income){
  // that earned income is accurately classified per statutory rules.
  return {amount:potential,issue:null,locality:item.name,rate:item.rate,cap:item.cap,earnings:earned};
 }
+// V14.1 audited calculations; sources and known assumptions documented in separate QA report.
 // V13 tax rules, frozen per tax year. Sources: Israeli Tax Authority April 2026
 // monthly deductions booklet pp. 10-13; 2025 "Know Your Rights" for pension logic;
 // 2025 instruction 05/2025 for surtax. No silent fallback to another tax year.
@@ -716,6 +720,8 @@ function calculateTax2026(input){
    }
  }
  notes.push(...(pension.notes||[]));
+ if((pensionPaid>0 || get('employeePensionEmployee')>0) && pension.mode!=='reviewed')
+   issues.push('פנסיה: ניכוי וזיכוי חושבו כאומדן בלבד. יש לאמת את התקרות, הכנסה מבוטחת, מעמד עמית מוטב, יתר הפקדות לפי 106 ואת בחירת סעיפים 45א/47.');
  if(pensionPaid>0&&pension.mode==='reviewed'&&reviewedPensionDed===null&&reviewedPensionCredit===null)issues.push('מסלול פנסיה מאושר נבחר, אך לא הוזנו סכומי ניכוי וזיכוי מאושרים.');
  if((pensionPaid>0||get('employeePensionEmployee')>0)&&!input.pensionPlan&&!reviewedPensionDed&&!reviewedPensionCredit)notes.push('הטבת הקצבה מחושבת כטיוטה מנתוני 106 והפקדות. יש לאמת תקרות ומסלול נבחר לפני שימוש בדוח.');
  const nationalActual=get('nationalInsuranceOnly');
@@ -729,9 +735,12 @@ function calculateTax2026(input){
  const otherDeduction=get('otherDeductionApproved');
  if(otherDeduction>0&&!String(input.creditApprovalReference||'').trim())issues.push('ניכוי מיוחד: יש לפרט אסמכתה ותנאי זכאות.');
  const deductions=study+nationalDeduction+pensionDeduction+approvedDisability+lossApproved+otherDeduction;
+ if(deductions>earned+.01)
+  issues.push('סך הניכויים גבוה מההכנסה שסווגה למנוע; אין להניח שכל ניכוי ניתן להעברה או לקיזוז בלי אישור של בסיס ההכנסה.');
  const taxableEarned=positive(earned-deductions),taxableRental=rentalNormal;
  const age=Number(input.birthYear)>1900?(2026-Number(input.birthYear)):0;
  if(rentalNormal>0&&!age)issues.push('הכנסה שאינה מיגיעה אישית: שנת הלידה דרושה לקביעת מדרגות מס לפני/אחרי גיל 60.');
+ if(rentalNormal>0&&age===60)issues.push('הכנסה פסיבית וגיל 60: נדרשים תאריך לידה ואישור תחילת תחולת מדרגות המס בשנת המס, לא רק שנת לידה.');
  const otherBracketsTax=taxEarnedUnearned2026(taxableEarned,taxableRental,age>=60);
  const specials=[['שכירות במסלול 10%','rentalTenPercent',.10],['שכירות חו״ל במסלול 15%','foreignRental15',.15],['ריבית במסלול 15%','interestTaxable',.15],['ריבית במסלול 25%','interestReal',.25],['דיבידנד 25%','dividends25',.25],['דיבידנד 30%','dividends30',.30],['רווח הון 15%','capitalGain15',.15,'capitalLoss15Approved'],['רווח הון 25%','capitalGain25',.25,'capitalLoss25Approved'],['רווח הון 30%','capitalGain30',.30,'capitalLoss30Approved']];
  const specialLines=specials.map(([label,key,rate,lossKey])=>{
@@ -746,7 +755,7 @@ function calculateTax2026(input){
  const capitalTaxable=taxableRental+specialGross;
  const surtax=extraSurtax2026(taxableEarned,capitalTaxable);
  const donation=get('donations'),totalTaxable=taxableEarned+capitalTaxable;
- const donationAllowed=donation>=r.donationsMin?Math.min(donation,r.donationsAbsoluteMax,totalTaxable*r.donationsIncomeShare):0;
+ const donationAllowed=donation>r.donationsMin?Math.min(donation,r.donationsAbsoluteMax,totalTaxable*r.donationsIncomeShare):0;
  const donationCredit=donationAllowed*.35;
  // 45A cap is shared by life insurance and pension premiums. Do not allow it to be used twice.
  const lifePaid=get('life')+get('mortgageLife');
@@ -769,17 +778,33 @@ function calculateTax2026(input){
  const personalCredits=pointsCredit+donationCredit+pensionCredit+lifeCredit+get('taxCreditsApproved')+get('foreignCreditApproved')+localityCredit;
  // No personal credits applied against flat-rate rental/capital tax: in particular
  // section 122 rental 10% does not allow personal tax credits or deductions.
+ if(specialTax>0 && personalCredits>otherBracketsTax+.01){
+  issues.push('זיכויים אישיים מול הכנסה במס מיוחד: הזיכויים לא הוקצו אוטומטית למס הון/ריבית/דיבידנד. נדרשת בדיקה של ההטבה שניתן לנצל; בשכירות 10% לא מבוצע קיזוז.');
+ }
  const afterCredits=positive(otherBracketsTax-personalCredits);
  const grossTax=afterCredits+specialTax+surtax.general+surtax.capital;
  const withheld=get('salaryWithheld')+get('otherWithheld')+get('interestWithheld')+get('dividendWithheld')+get('landTax');
+ if(get('interestWithheld')>0 && !(get('interestTaxable')+get('interestReal')+get('otherPassiveTaxable')>0))
+  issues.push('ניכוי מס במקור מריבית הוזן ללא הכנסת ריבית מקבילה. ודאו שההכנסה אינה חסרה או פטורה לפי מסמך מתאים.');
+ if(get('dividendWithheld')>0 && !(get('dividends25')+get('dividends30')>0))
+  issues.push('ניכוי מס במקור מדיבידנד הוזן ללא הכנסת דיבידנד. יש להתאים את טופס 867.');
+ if(get('salaryWithheld')>0 && salary===0)
+  issues.push('מס שנוכה משכר הוזן ללא הכנסת משכורת. יש לבדוק טופס 106.');
  const advances=get('taxAdvances');
  const owed=grossTax-withheld-advances;
  if(profit<0)issues.push('הפסד עסקי: נדרש סיווג מקורות וקיזוזים; אין לחשב אותו אוטומטית מול מקורות אחרים.');
  if(get('foreign')>0||String(input.otherIncome||'').trim()||String(input.capital||'').trim())issues.push('הכנסות חוץ/הון בפירוט חופשי: יש לסווג לכל שדה/נספח. טקסט חופשי אינו נכנס לחישוב.');
+ if(get('capitalLoss15Approved')+get('capitalLoss25Approved')+get('capitalLoss30Approved')>0)
+  issues.push('הפסדי הון: קיזוז מול רווחי הון וריבית/דיבידנד מצריך בדיקת שנת היווצרות, רציפות וסדר קיזוז לפי אישורים ונספחים.');
+ if(get('rentalTenPercent')>0 && get('foreignRental15')>0)
+  notes.push('נרשמו שתי הכנסות שכירות במסלולים מיוחדים: יש לוודא שכל נכס עומד במסלול שנבחר ושאין כפילות בהכנסות.');
  if(get('foreignRental15')>0&&get('foreignCreditApproved')>0)issues.push('שכירות חו״ל במסלול 15% אינה מאפשרת זיכוי מס זר בגין הכנסה זו; יש לאמת שהזיכוי שייך להכנסה זרה אחרת.');
  if(get('foreignEmployment')>0&&!has('foreignCreditApproved'))notes.push('הכנסת עבודה מחו״ל נכללה במס רגיל; יש לבדוק מס זר וקיזוז אמנות בנספח 1324.');
  if(input.smallbusiness==='כן')issues.push('עסק זעיר: ניכוי נורמטיבי 30% וביטול כפל ניכויים מחייבים בדיקת תנאי המסלול.');
- if(get('donations')>0)notes.push('תרומות: בהנחה שכל התרומות נתמכות באישור סעיף 46 ולא נוצלו כבר כניכוי משכר.');
+ if(get('donations')>0){
+  notes.push('תרומות: הזיכוי מחושב רק עבור קבלות מוכרות לפי סעיף 46, ויש לאמת נתונים מול מערכת התרומות ואישור שנתי.');
+  if(salary>0)issues.push('שכר ותרומות: יש לבדוק בטופס 106 אם זיכוי סעיף 46 כבר נוצל דרך תלוש השכר. ללא התאמה הזיכוי עלול להיספר פעמיים.');
+ }
  if(input.resident!=='כן')issues.push('תושבות ישראל לא אושרה; כללי נקודות הזיכוי והניכויים עלולים להיות שונים.');
  if(!input.sex||input.sex==='אחר / לבדיקה')issues.push('יש לבחור בסיס נקודות זיכוי מתאים, או להזין אישור זכאות פרטני.');
  if(input.specialCreditUnresolved)issues.push('קיימת זכאות מיוחדת שלא חושבה אוטומטית: יש להשתמש באישור ולקבוע ניכוי/זיכוי מתאים.');
@@ -806,6 +831,12 @@ function renderEstimate(points=0,messages=[]){
  const spouseUnresolved=spouse&&(!incomeKind||!separate||!generalValue('spouseSex')||generalValue('spouseResident')!=='כן'||wizardYes('hasChildren')||(separate==='לא / מקור משותף'&&finiteOrNull(generalValue('spouseTaxCalculationApproved'))===null)); 
  const inp={...auto,...values,alsoEmployee:wizardVal('alsoEmployee'),resident:generalValue('resident'),smallbusiness:generalValue('smallbusiness'),sex:wizardVal('sex'),birthYear:wizardVal('birthYear'),creditPoints:points,spouseUnresolved,childUnresolved:kidsNeeded,specialCreditUnresolved:specialNeeded};
  const calc=calculateTax2026(inp);
+ const bookAudit=importInfo.yearEndAudit;
+ if(bookAudit){
+  if(bookAudit.unclassified>0)calc.issues.push(`סיווג הוצאות: ${bookAudit.unclassified} תנועות אינן משויכות לקטגוריה מוכרת; לא נוכו מההכנסה עד סיווג ואימות.`);
+  if(bookAudit.unlinkedAssets>0)calc.issues.push(`רכוש קבוע: ${bookAudit.unlinkedAssets} רכישות הוניות אינן מקושרות לנכס בפנקס הפחת; לא נרשמה עבורן הוצאה מיידית, ויש להשלים פחת.`);
+  if(bookAudit.manualFound&&bookAudit.manualDepreciation>0)calc.notes.push('פחת ידני מתקופה קודמת נטען מהדפדפן; יש להשוות לדוח נכסים ולאישורי הפחת לפני שימוש בחישוב.');
+ }else calc.issues.push('לא התקבל פירוט סגירת שנה לספרי העסק; יש לאמת את הרווח העסקי מול נספח 1320.');
  const spouseIncome=positive(generalValue('spouseIncome'));
  let spouseTax=0,spouseWithheld=positive(generalValue('spouseTaxWithheld'));
  if(spouse&&!spouseUnresolved){
@@ -840,7 +871,7 @@ function renderEstimate(points=0,messages=[]){
  if(!wizardVal('alsoEmployee')&&positive(get('salary'))>0)blockers.push('יש להשיב בשאלון אם הייתה לך הכנסה כשכיר/ה; לא ניתן להסתמך רק על שדות מתקדמים.');
  if(spouse&&separate==='כן, מקור הכנסה נפרד')calc.notes.push('מבחן זכאות לחישוב נפרד טעון אימות לפי מסמכי העסק/המעסיק; הבחירה בשאלון אינה אישור רשות המסים.');
  if(blockers.length)add('תחשיב מותנה — עדיין קיימים נתונים/אישורים להשלמה','summary-num');
- else add('אומדן מס שנתי לפי הנתונים שהוזנו: ₪'+fmt(combined),'summary-num');
+ else add('אומדן מס שנתי ללא חסרים מזוהים בבדיקות האוטומטיות: ₪'+fmt(combined),'summary-num');
  const lines=[
   ['הכנסה חייבת ביגיעה אישית אחרי ניכויים',calc.taxableEarned],
   ['הכנסה רגילה/פסיבית לפי מס שולי',calc.taxableRental],
