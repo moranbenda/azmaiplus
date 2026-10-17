@@ -257,7 +257,7 @@ html,body{max-width:100%;overflow-x:hidden}
   </section>
   <section class="card" id="taxClassificationCard">
     <div class="card-hd"><h2>סיווג תשלומים וסיכום שנתי לדוח</h2><span class="tiny muted">מפריד תכנון, תשלום בפועל וזכאות להטבת מס</span></div>
-    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>תשלומים אישיים שסווגו בספרים</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
+    <div class="card-bd"><div class="table-wrap" style="max-height:none"><table><thead><tr><th>סוג תשלום</th><th>התחייבויות מתוכננות לשנה</th><th>בוצע משוער לפי מועד</th><th>הערה לדוח השנתי</th></tr></thead><tbody id="taxSummaryTbody"></tbody></table></div><p class="footer-note" id="taxUnclassified"></p><p class="footer-note">בוצע משוער פירושו שמועד הוראת הקבע חלף, לא שהתשלום אומת. בדוח השנתי נדרשים אישורי ההפקדות והתשלומים. אין העברה אוטומטית לסעיפי 1301 ללא אימות.</p></div>
   </section>
 
   <div class="footer-note">
@@ -1145,7 +1145,7 @@ verifyApplyBtn.onclick=async()=>{
 function renderTaxSummary(){
   const year=selected.getFullYear(),summary={};
   const now=new Date();
-  for(const key of Object.keys(TAX_CLASSES))summary[key]={planned:0,assumed:0,paid:0,count:0,uncertain:0};
+  for(const key of Object.keys(TAX_CLASSES))summary[key]={planned:0,assumed:0,uncertain:0};
   for(let m=0;m<12;m++){
     const d=new Date(year,m,1);
     for(const ob of selectedObligations(d)){
@@ -1158,14 +1158,8 @@ function renderTaxSummary(){
       if(due<=now && status!==false){summary[key].assumed+=amount;if(status!==true)summary[key].uncertain++}
     }
   }
-  for(const r of rows){
-    if(r.type!=="expense"||String(r.date||"").slice(0,4)!==String(year))continue;
-    const key=taxClassForLedgerRow(r);
-    if(key!=="other") {summary[key].paid+=Math.abs(Number(r.amount)||0);summary[key].count++;}
-    else if(isPersonal(r))summary.other.count++;
-  }
-  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].uncertain?money(summary[key].assumed):"—"}</td><td>${summary[key].count?money(summary[key].paid):"אין תנועה מסווגת"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
-  taxUnclassified.textContent=(summary.other.count?`נמצאו ${summary.other.count} תנועות אישיות שמחייבות סיווג ידני (לרבות קטגוריית פנסיה/גמל ישנה). יש לבדוק אותן לפני דוח המס. `:"")+"הסכום לפי מועד כולל הוראות קבע שמועדן חלף ושלא סומנו כלא שולמו. זהו אומדן בלבד ולא אישור בנקאי. תנועה מסווגת בספרים היא רישום נפרד, ואין לסכום את שתי העמודות. התאמה ואימות למס ייעשו מול אישורים שנתיים.";
+  taxSummaryTbody.innerHTML=Object.entries(TAX_CLASSES).map(([key,[label,note]])=>`<tr><td><b>${esc(label)}</b></td><td>${money(summary[key].planned)}</td><td>${summary[key].uncertain?money(summary[key].assumed):"—"}</td><td class="tiny muted">${esc(note)}</td></tr>`).join("");
+  taxUnclassified.textContent="הסכום לפי מועד כולל הוראות קבע שמועדן חלף ושלא סומנו כלא שולמו. זהו אומדן בלבד, ואינו אישור בנקאי או אישור זכאות להטבת מס. תשלומים שאושרו ידנית בתזרים ייבדקו במסגרת הדוח השנתי מול האישורים הנדרשים.";
 }
 
 function forecastBase(year,month,method){
