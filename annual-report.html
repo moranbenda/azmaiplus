@@ -334,17 +334,61 @@ async function flushDraft(yearOverride){
  }
 }
 function splitNet(r){let n=Number(r.amount)||0;if(!r.incVat)return n;let type=norm(profile.businessType),rate=type==='ptor'?0:Number(profile.vatRate||18);return n/(1+rate/100)}
-function compute(){let year=el('year').value;const list=rows.filter(r=>String(r.date||'').slice(0,4)===year);const sums={study:0,pension:0,national:0,disability:0,donations:0,taxAdvances:0};let income=0;
-for(const r of list){if(r.type==='income'){income+=splitNet(r);continue}if(r.type!=='expense')continue;let t=norm(r.category)+' '+norm(r.desc),n=Math.abs(Number(r.amount)||0);if(t.includes(norm('קרן השתלמות לעצמאי')))sums.study+=n;else if(t.includes(norm('פנסיה / קופת גמל לעצמאי')))sums.pension+=n;else if(t.includes(norm('ביטוח לאומי עצמאי')))sums.national+=n;else if(t.includes(norm('ביטוח אובדן כושר עבודה')))sums.disability+=n;else if(t.includes(norm('תרומות למוסדות מוכרים')))sums.donations+=n;else if(t.includes(norm('מקדמות מס הכנסה')))sums.taxAdvances+=n}
-let yearEnd=null;
-const cf=ledger.cashflowConfigV1||{};const obligations=Array.isArray(cf.obligations)?cf.obligations:[];
-const plan=obligations.filter(x=>/פנסיה|גמל|השתלמות|ביטוח לאומי|מקדמות מס/.test(String(x.name||''))).map(x=>`${x.name}: ₪${Number(x.amount||0).toFixed(2)} (${x.frequency||x.freq||'לפי הגדרה'})`);
-const cashflowHost=el('cashflowImport');if(cashflowHost){cashflowHost.textContent=plan.length?'התחייבויות מתוכננות מהתזרים (לא תשלומים מוכחים): '+plan.join(' · '):'לא נמצאו התחייבויות אישיות מתוכננות בתזרים. תשלומים בפועל נבדקים מתוך הספרים.';}
-try{yearEnd=computeYearEndSnapshot(profile,ledger,year,uid)}catch(e){console.warn('Year-end calculation unavailable',e)}
-auto={...(yearEnd?{profit:Number(yearEnd.operatingProfit.toFixed(2))}:{}),turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
+function taxCategory(r){
+ const cat=norm(r.category||''), item=norm(r.item||r.expenseItem||r.subcategory||'');
+ const explicit=[cat,item].join(' ');
+ if(explicit.includes(norm('תרומות למוסדות מוכרים')))return 'donations';
+ if(explicit.includes(norm('קרן השתלמות לעצמאי')))return 'study';
+ if(explicit.includes(norm('קופת גמל להשקעה')))return 'investment';
+ if(explicit.includes(norm('פנסיה / קופת גמל לעצמאי'))||explicit.includes(norm('פנסיה / קופת גמל לקצבה')))return 'pension';
+ if(explicit.includes(norm('ביטוח לאומי עצמאי')))return 'national';
+ if(explicit.includes(norm('ביטוח אובדן כושר עבודה')))return 'disability';
+ if(explicit.includes(norm('מקדמות מס הכנסה')))return 'taxAdvances';
+ return null;
 }
-function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:id==='children'?['','אין ילדים מזכים','יש ילדים מזכים — נדרש פירוט גילאים ומשמורת','הורה יחיד / זכאות מיוחדת']:id==='service'?['','אין זכאות נוספת','שירות צבאי','שירות לאומי','תואר אקדמי / לימודים מזכים','מספר זכאויות — נדרש פירוט']:id==='credit'?['','אין זיכויים נוספים','יישוב מזכה','עולה חדש/ה','נכות / זכאות רפואית','זיכוי אחר','מספר זכאויות — נדרש פירוט']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft();if(id==='profit'||id==='taxAdvances'||id==='salary'||id==='salaryWithheld'||id==='otherWithheld')renderEstimate()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft();if(id==='profit'||id==='taxAdvances'||id==='salary'||id==='salaryWithheld'||id==='otherWithheld')renderEstimate()});return input}
-function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';const fieldInput=makeInput(id,type,v);fieldInput.dataset.fieldId=id;if(['children','service','credit'].includes(id)){fieldInput.disabled=true;fieldInput.title='שדה זה מתעדכן אוטומטית מהשאלון';}box.append(fieldInput);let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'תשלומים בפועל שאותרו בספרים (לא מהתחייבויות התזרים). יש לבדוק אישורים, תקרות וזכאות.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'חושב מנתוני סגירת שנה כולל הוצאות מוכרות ופחת; יש לאמת סיווגים והתאמות לפני הגשה.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
+function cashflowOccurrences(year){
+ const cf=ledger.cashflowConfigV1||{},obs=Array.isArray(cf.obligations)?cf.obligations:[],status=cf.paymentStatus||{},adjust=cf.monthlyAdjustments||{};
+ const result=[],plan=[];
+ for(const ob of obs){
+  const name=String(ob.name||''),cls=String(ob.taxClass||'auto');
+  let type=cls!=='auto'?cls: /גמל להשקעה/.test(name)?'investment':/השתלמות/.test(name)?'study':/פנסיה|גמל לקצבה|גמל לעצמאי/.test(name)?'pension':/ביטוח לאומי/.test(name)?'national':/אובדן כושר/.test(name)?'disability':/מקדמות מס|מס הכנסה/.test(name)?'tax':/תרומ/.test(name)?'donation':'other';
+  const start=String(ob.startMonth||`${year}-01`),end=String(ob.endMonth||'');
+  const [sy,sm]=start.split('-').map(Number),freq=ob.freq||ob.frequency||'monthly',step={monthly:1,bimonthly:2,quarterly:3,yearly:12,once:9999}[freq]||1;
+  for(let m=1;m<=12;m++){
+   const mk=`${year}-${String(m).padStart(2,'0')}`,diff=(year-sy)*12+(m-sm);
+   if(diff<0||mk<start||(end&&mk>end)||diff%step!==0)continue;
+   let amount=Number(ob.amount)||0;
+   for(const h of [...(Array.isArray(ob.amountHistory)?ob.amountHistory:[])].sort((a,b)=>String(a.fromMonth).localeCompare(String(b.fromMonth))))if(h.fromMonth<=mk)amount=Number(h.amount)||0;
+   const override=adjust[mk]?.[ob.id];if(override!==undefined&&override!==null&&Number.isFinite(Number(override)))amount=Number(override);
+   const entry={month:mk,name,type,amount:Math.max(0,amount),confirmed:status[`${mk}:${ob.id}`]===true};
+   plan.push(entry);if(entry.confirmed)result.push(entry);
+  }
+ }
+ return {confirmed:result,planned:plan};
+}
+let importInfo={};
+function compute(){
+ const year=el('year').value,list=rows.filter(r=>String(r.date||'').slice(0,4)===year),sums={study:0,pension:0,national:0,disability:0,donations:0,taxAdvances:0};
+ let income=0;const fromBooks={...sums};
+ for(const r of list){if(r.type==='income'){income+=splitNet(r);continue}if(r.type!=='expense')continue;const type=taxCategory(r);if(type&&Object.hasOwn(fromBooks,type))fromBooks[type]+=Math.abs(Number(r.amount)||0)}
+ const cash=cashflowOccurrences(Number(year)),confirmed={...sums};
+ const types={study:'study',pension:'pension',national:'national',disability:'disability',donation:'donations',tax:'taxAdvances'};
+ for(const r of cash.confirmed){const type=types[r.type];if(type)confirmed[type]+=r.amount}
+ // Cashflow confirmations are personal cash movements, not new business expenses.
+ // For types recorded in both places, use the larger aggregate provisionally rather than adding both.
+ for(const key of Object.keys(sums))sums[key]=Math.max(fromBooks[key],confirmed[key]);
+ let yearEnd=null;try{yearEnd=computeYearEndSnapshot(profile,ledger,year,uid)}catch(e){console.warn('Year-end calculation unavailable',e)}
+ auto={...(yearEnd?{profit:Number(yearEnd.operatingProfit.toFixed(2))}:{}),turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
+ importInfo={fromBooks,confirmed,planned:cash.planned,confirmedRows:cash.confirmed};
+ const host=el('cashflowImport');if(host){host.replaceChildren();const p=document.createElement('p');p.textContent=`אישורים ידניים בתזרים: ${cash.confirmed.length} · התחייבויות מתוכננות: ${cash.planned.length}. רק תשלומים שאושרו נכללים כמועמדים לבדיקה בדוח.`;host.append(p);
+  const table=document.createElement('table');table.innerHTML='<thead><tr><th>סוג</th><th>נרשם באינדקס</th><th>אושר בתזרים</th><th>סכום מוצע לבדיקה</th></tr></thead>';
+  const body=document.createElement('tbody');for(const [key,label] of Object.entries({study:'קרן השתלמות',pension:'פנסיה לקצבה',national:'ביטוח לאומי',disability:'אובדן כושר עבודה',donations:'תרומות לפי סעיף 46',taxAdvances:'מקדמות מס'})){const tr=document.createElement('tr');for(const val of [label,fmt(fromBooks[key]),fmt(confirmed[key]),fmt(sums[key])]){const td=document.createElement('td');td.textContent=val;tr.append(td)}body.append(tr)}table.append(body);host.append(table);
+  const note=document.createElement('p');note.className='qhint';note.textContent='למניעת ספירה כפולה, כאשר אותו סוג תשלום מופיע בשני מקורות מוצג הגבוה מבין הסכומים, ולא סכומם. במקרה של תשלומים שונים מאותו סוג בשני המקורות יש לבצע התאמה ידנית מול אישור שנתי. סכום מתוכנן בלבד אינו נחשב תשלום.';host.append(note);
+ }
+}
+
+function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:id==='children'?['','אין ילדים מזכים','יש ילדים מזכים — נדרש פירוט גילאים ומשמורת','הורה יחיד / זכאות מיוחדת']:id==='service'?['','אין זכאות נוספת','שירות צבאי','שירות לאומי','תואר אקדמי / לימודים מזכים','מספר זכאויות — נדרש פירוט']:id==='credit'?['','אין זיכויים נוספים','יישוב מזכה','עולה חדש/ה','נכות / זכאות רפואית','זיכוי אחר','מספר זכאויות — נדרש פירוט']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft();if(['profit','taxAdvances','salary','salaryWithheld','otherWithheld','study','donations','national','pension'].includes(id))renderWizard()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft();if(['profit','taxAdvances','salary','salaryWithheld','otherWithheld','study','donations','national','pension'].includes(id))renderWizard()});return input}
+function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';const fieldInput=makeInput(id,type,v);fieldInput.dataset.fieldId=id;if(['children','service','credit'].includes(id)){fieldInput.disabled=true;fieldInput.title='שדה זה מתעדכן אוטומטית מהשאלון';}box.append(fieldInput);let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'סכום מוצע מהאינדקס ומאישורים ידניים בתזרים, ללא ספירה כפולה; יש לאמת מול אישור שנתי.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'חושב מנתוני סגירת שנה כולל הוצאות מוכרות ופחת; יש לאמת סיווגים והתאמות לפני הגשה.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
 
 // Eligibility wizard: separate from the original 1301 field definitions and saved in the same annual draft.
 const QUESTIONS=[
@@ -426,13 +470,21 @@ function renderWizard(){
  const hint=document.createElement('p');hint.className='qhint';hint.textContent='נקודות מחושבות אינן אישור זכאות. הטבות לא מאומתות אינן מתווספות לאומדן. נקודות זיכוי אינן יוצרות החזר מעבר למס החל.';result.append(hint);
  renderEstimate(total,messages);
 }
+function annualTax2026(income){const brackets=[[84120,.10],[120720,.14],[228000,.20],[301200,.31],[560280,.35],[Infinity,.47]];let previous=0,total=0;for(const [cap,rate] of brackets){if(income<=previous)break;total+=(Math.min(income,cap)-previous)*rate;previous=cap}return total}
 function renderEstimate(points=0,issues=[]){const host=el('estimateContent');host.replaceChildren();const year=el('year').value;
- const profit=Object.hasOwn(values,'profit')?Number(values.profit):Number(auto.profit);const income=Number.isFinite(profit)?profit:null;
- const advances=Object.hasOwn(values,'taxAdvances')?Number(values.taxAdvances):Number(auto.taxAdvances);
- const lines=[`שנת מס ${year}${year==='2026'?' — השנה טרם הסתיימה, הנתונים חלקיים':''}`,`מחזור ללא מע״מ: ₪${fmt(auto.turnover)}`,`רווח עסקי לפני ניכויים אישיים והתאמות נוספות: ${income===null?'ממתין לנתונים':'₪'+fmt(income)}`,`מקדמות שנמצאו בספרים: ₪${fmt(advances)} (לא כולל תשלומים שלא נרשמו)`];
- for(const txt of lines){const p=document.createElement('p');p.textContent=txt;host.append(p)}
- const p=document.createElement('p');p.className='warnmsg';p.textContent='אומדן מס לתשלום/החזר עדיין לא ניתן להציג באמינות: נדרש חישוב מדרגות מס שנתיות, ניכויים אישיים, זיכויים נוספים, הכנסות אחרות ומס שנוכה במקור. לא נציג מספר שעלול להטעות.';host.append(p);
- const p2=document.createElement('p');p2.className='qhint';p2.textContent='הרווח נשען על כללי סגירת השנה. תוספת פחת ידנית שנשמרה בדפדפן אחר לא תופיע כאן; הרשאות Firestore אינן מעבירות localStorage לענן.';host.append(p2);
+ const get=id=>Object.hasOwn(values,id)?Number(values[id]):Number(auto[id]);const profit=get('profit'),salary=Number(values.salary||0),advances=get('taxAdvances');
+ const lines=[`שנת מס ${year}${year==='2026'?' — השנה טרם הסתיימה, הנתונים חלקיים':''}`,`מחזור ללא מע״מ: ₪${fmt(auto.turnover)}`,`רווח עסקי לפני ניכויים אישיים: ₪${fmt(profit)}`,`מקדמות מס שזוהו: ₪${fmt(advances)} (יש לאמת מול רשות המסים)`];
+ for(const line of lines){const p=document.createElement('p');p.textContent=line;host.append(p)}
+ if(year!=='2026'){const p=document.createElement('p');p.className='warnmsg';p.textContent='חישוב מדרגות המס האוטומטי בגרסה זו מוגדר ל־2026 בלבד. אין להשתמש בו עבור 2025.';host.append(p);return}
+ const resident=values.resident,unresolved=issues.length>0||!wizardVal('sex')||resident==='לא';
+ const deductionStudy=Math.min(Math.max(0,get('study')),Math.max(0,profit)*.045,293397*.045);
+ const taxable=Math.max(0,profit+salary-deductionStudy),gross=annualTax2026(taxable),creditPoints=Math.max(0,points)*2904;
+ const donation=Math.max(0,get('donations')),donationCredit=donation>=207?donation*.35:0;
+ const estimated=Math.max(0,gross-creditPoints-donationCredit);
+ const p=document.createElement('p');p.className='summary-num';p.textContent=`אומדן מס חלקי לשנת 2026: ₪${fmt(estimated)}`;host.append(p);
+ const detail=document.createElement('p');detail.textContent=`מס לפי מדרגות: ₪${fmt(gross)} · ניכוי השתלמות ראשוני: ₪${fmt(deductionStudy)} · נקודות זיכוי: ₪${fmt(creditPoints)} · זיכוי תרומות ראשוני: ₪${fmt(donationCredit)}`;host.append(detail);
+ const warning=document.createElement('p');warning.className='warnmsg';warning.textContent='זהו אומדן חלקי בלבד, לא חבות מס סופית ולא חישוב החזר: טרם חושבו ניכויי פנסיה, החלק המותר מביטוח לאומי, תקרות תרומות, זיכויים פנסיוניים, מס יסף, הכנסות אחרות וניכויים במקור. סכומי תזרים דורשים אישורים שנתיים. אין להסיק מהאומדן סכום לתשלום או להחזר.';host.append(warning);
+ if(unresolved){const w=document.createElement('p');w.className='warnmsg';w.textContent='חלק מפרטי הזכאות האישית או התושבות אינם מאומתים; אומדן המס עשוי להשתנות משמעותית.';host.append(w)}
 }
 
 async function load(){if(!uid)return;loading=true;saveState('טוען נתונים וטיוטה מהענן…');try{const [p,l]=await Promise.all([getDoc(doc(db,'users',uid)),getDoc(doc(db,'ledgers',uid))]);profile=p.exists()?p.data():{};ledger=l.exists()?l.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];compute();if(await loadDraft()){loadedYear=el('year').value;render();renderWizard()}}catch(e){saveState('לא ניתן לטעון נתונים או טיוטה: '+e.message)}finally{loading=false}}
