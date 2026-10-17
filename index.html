@@ -6711,13 +6711,15 @@ async function buildPersonalTaxPayments(from, to) {
       if (!dateInRange(date)) continue;
       const amount = Math.abs(Number(obligationAmount(ob, cursor))||0);
       if (!amount || looksDuplicate(ob.name||"", amount, date)) continue;
+      const paymentState = cashflowConfig?.paymentStatus?.[`${mk}:${ob.id}`];
+      if (paymentState === false) continue; // דווח במפורש שלא שולם
       data.push({
         date,
         category:ob.name || "תשלום אישי/סטטוטורי",
         desc:"מתזרים העסק",
         gross:amount,
         docNumber:"",
-        source:"cashflow"
+        source:"cashflow", verification:paymentState === true ? "user-confirmed" : "estimated"
       });
     }
 
@@ -6742,7 +6744,7 @@ async function buildPersonalTaxPayments(from, to) {
             desc:`לפי שיעור מקדמות בפרופיל: ${advanceRate}%`,
             gross:amount,
             docNumber:"",
-            source:"cashflow"
+            source:"cashflow", verification:"estimated"
           });
         }
       }
@@ -6752,7 +6754,12 @@ async function buildPersonalTaxPayments(from, to) {
   }
 
   data.sort((a,b)=>String(a.date).localeCompare(String(b.date)) || String(a.category).localeCompare(String(b.category), "he"));
-  return { rows:data, total:data.reduce((s,r)=>s+Number(r.gross||0),0) };
+  return {
+    rows:data,
+    total:data.reduce((s,r)=>s+Number(r.gross||0),0),
+    confirmedTotal:data.filter(r=>r.source==="ledger" || r.verification==="user-confirmed").reduce((s,r)=>s+Number(r.gross||0),0),
+    estimatedTotal:data.filter(r=>r.verification==="estimated").reduce((s,r)=>s+Number(r.gross||0),0)
+  };
 }
 
 
@@ -7127,15 +7134,17 @@ btnReportPdf.onclick = async () => {
       return;
     }
     const rowsHtml = report.rows.map(r => `
-      <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${toMoney(r.gross)}</td></tr>
+      <tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.desc)}</td><td>${escapeHtml(r.docNumber || "")}</td><td>${escapeHtml(r.source === "ledger" ? "תנועה בספרים" : r.verification === "user-confirmed" ? "אושר כתשלום בתזרים · ללא אסמכתא" : "לפי מועד · לא אומת")}</td><td>${toMoney(r.gross)}</td></tr>
     `).join("");
     openReportWindow('תשלומי מס וניכויים אישיים', `
-      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מרכז תשלומי מס וניכויים אישיים שנרשמו באינדקס או בתזרים בטווח שנבחר. מע״מ אינו נכלל בדוח זה.</p>
+      <p style="margin:0 0 10px;color:#555;line-height:1.6">הדוח מציג בנפרד תנועות בספרים, תשלומים שאושרו ידנית בתזרים ואומדנים לפי מועד. אישור ידני אינו אסמכתא בנקאית או אישור הפקדות שנתי. מע״מ אינו נכלל בדוח זה.</p>
       <table>
-        <thead><tr><th>תאריך</th><th>סוג תשלום</th><th>תיאור</th><th>אסמכתא</th><th>סכום</th></tr></thead>
+        <thead><tr><th>תאריך</th><th>סוג תשלום</th><th>תיאור</th><th>אסמכתא</th><th>מצב אימות</th><th>סכום</th></tr></thead>
         <tbody>
           ${rowsHtml}
-          <tr><td colspan="4"><b>סה״כ</b></td><td><b>${toMoney(report.total)}</b></td></tr>
+          <tr><td colspan="5"><b>סה״כ כולל אומדנים</b></td><td><b>${toMoney(report.total)}</b></td></tr>
+          <tr><td colspan="5">מתוכו לפי מועד, ללא אישור</td><td>${toMoney(report.estimatedTotal)}</td></tr>
+          <tr><td colspan="5">תנועות בספרים או תשלומים שסומנו כאושרו ידנית</td><td>${toMoney(report.confirmedTotal)}</td></tr>
         </tbody>
       </table>`);
     return;
