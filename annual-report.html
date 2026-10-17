@@ -7,18 +7,291 @@ import {getAuth,onAuthStateChanged} from 'https://www.gstatic.com/firebasejs/11.
 import {getFirestore,doc,getDoc,setDoc,serverTimestamp} from 'https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js';
 const firebaseConfig={apiKey:'AIzaSyDtMcQNNvB65mhzmSVO1hkQ2Z3Snp-uITE',authDomain:'freelance-accounting-6c3bb.firebaseapp.com',projectId:'freelance-accounting-6c3bb',storageBucket:'freelance-accounting-6c3bb.firebasestorage.app',messagingSenderId:'196974556694',appId:'1:196974556694:web:60ba710567f2a7c67c6737'};
 const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getFirestore(app);
+function computeYearEndSnapshot(profileData,ledgerData,year,userId){
+const userProfile=profileData,ledgerSettings=ledgerData.settings||{},fixedAssets=Array.isArray(ledgerData.fixedAssets)?ledgerData.fixedAssets:[];
+const DEFAULT_VAT=18;
+const EXPENSE_ITEMS = [
+  // רכב — שורת 7 בנספח 1320. האחוז כאן הוא ברירת מחדל תפעולית בלבד וניתן לשינוי בתנועה.
+  { item: "דלק", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "ביטוח רכב", category: "רכב", incomeTaxPct: 45, vatAllowed: false, report1320: "7-הוצאות רכב" },
+  { item: "טיפולים במוסך", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "רישיון רכב", category: "רכב", incomeTaxPct: 45, vatAllowed: false, report1320: "7-הוצאות רכב" },
+  { item: "חנייה / כבישי אגרה", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+  { item: "שטיפת רכב ותחזוקה שוטפת", category: "רכב", incomeTaxPct: 45, vatAllowed: true, report1320: "7-הוצאות רכב" },
+
+  // שכירות ואחזקת מקום העסק
+  { item: "שכירות משרד / קליניקה / סטודיו", category: "שכירות משרד / חדר עבודה", incomeTaxPct: 100, vatAllowed: true, report1320: "11-שכירות וחכירה" },
+  { item: "דמי ניהול / ועד בית עסקי", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "תיקונים ותחזוקת משרד / עסק", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "ארנונה עסקית", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
+
+  // משרד ביתי — נשמרים כרישום עסקי; אחוז ההכרה הוא ברירת מחדל הניתנת לשינוי.
+  { item: "חשמל - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "מים - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "ארנונה - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אינטרנט - משרד ביתי", category: "הוצאות ביתיות (אם אין משרד)", incomeTaxPct: 25, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+
+  { item: "טלפון נייד", category: "טלפון ותקשורת", incomeTaxPct: 50, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אינטרנט עסקי", category: "טלפון ותקשורת", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+
+  // ציוד ומשרד
+  { item: "ציוד משרדי ומתכלה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "דואר / שליחויות", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "הדפסות / צילום / כריכה", category: "הוצאות משרדיות", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "מחשב / טאבלט", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד אלקטרוני", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "מדפסת", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "טלפון נייד (מכשיר)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ריהוט וציוד קבוע", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "17-פחת", depreciable: true, vatInputType: "asset" },
+  { item: "ציוד (כללי)", category: "ציוד ונכסים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות", vatInputType: "asset" },
+
+  // תוכנה, פרסום ואינטרנט
+  { item: "CANVA", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "ZOOM", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "GOOGLE ONE", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "OPEN AI", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "Microsoft 365", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: false, report1320: "9-הוצאות משרדיות" },
+  { item: "תוכנות ומנויים אחרים", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "פייסבוק, אינסטגרם", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: false, report1320: "16-הוצאות אחרות" },
+  { item: "Google Ads", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: false, report1320: "16-הוצאות אחרות" },
+  { item: "רב מסר", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" },
+  { item: "פרסום ושיווק", category: "קידום ממומן / פרסום", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" },
+  { item: "אחסון אתר / דומיין", category: "אחסון מידע ואתר", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+  { item: "תוכנת ניהול", category: "תוכנות ומנויים", incomeTaxPct: 100, vatAllowed: true, report1320: "9-הוצאות משרדיות" },
+
+  // שירותים מקצועיים, עורכי דין וקבלני משנה
+  { item: "רו״ח / יועץ מס", category: "הנהלת חשבונות ודוח שנתי", incomeTaxPct: 100, vatAllowed: true, report1320: "10-הנהלת חשבונות והגשת הדוח" },
+  { item: "הנהלת חשבונות", category: "הנהלת חשבונות ודוח שנתי", incomeTaxPct: 100, vatAllowed: true, report1320: "10-הנהלת חשבונות והגשת הדוח" },
+  { item: "עורך דין / ייעוץ משפטי", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "ייעוץ עסקי / פיתוח עסקי", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "שירותים מקצועיים אחרים", category: "ייעוץ מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "5-שירותים אחרים" },
+  { item: "קבלני משנה / שירותים חיצוניים", category: "שירותים חיצוניים וקבלני משנה", incomeTaxPct: 100, vatAllowed: true, report1320: "4-עבודות חוץ וקבלנות משנה" },
+
+  // עובדים — רישום בלבד, לא מערכת שכר
+  { item: "שכר עובדים", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-משכורת ושכר עבודה" },
+  { item: "הוצאות נלוות לשכר", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
+  { item: "הפרשות מעסיק לפנסיה / פיצויים", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
+  { item: "ביטוח לאומי מעסיק", category: "עובדים ושכר", incomeTaxPct: 100, vatAllowed: false, report1320: "3-הוצאות נלוות לשכר" },
+
+  // מימון, בנק וסליקה
+  { item: "עמלות בנק", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
+  { item: "ריבית והפרשי הצמדה עסקיים", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: false, report1320: "6-הוצאות מימון" },
+  { item: "עמלות סליקה", category: "מימון ובנק", incomeTaxPct: 100, vatAllowed: true, report1320: "6-הוצאות מימון" }, // מע״מ תשומות רק כאשר התנועה סומנה ככוללת מע״מ ועל בסיס מסמך מתאים
+
+  // ביטוחים, אגרות וחובות
+  { item: "ביטוח אחריות מקצועית", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
+  { item: "ביטוח משרד / עסק", category: "ביטוח עסקי", incomeTaxPct: 100, vatAllowed: false, report1320: "14-ביטוח עסקי" },
+  { item: "אגרות ורישיונות עסקיים", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
+  { item: "אגרות משפט / בית משפט", category: "מיסים ואגרות", incomeTaxPct: 100, vatAllowed: false, report1320: "13-מיסים עירוניים אגרות והיטלים" },
+
+  // נסיעות, כיבוד, הכשרה וביגוד
+  { item: "תחבורה ציבורית", category: "נסיעות ותחבורה", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "מוניות / נסיעות עסקיות", category: "נסיעות ותחבורה", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "נסיעות לחו״ל לצורכי העסק", category: "נסיעות ואש״ל", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אש״ל לצורכי העסק", category: "נסיעות ואש״ל", incomeTaxPct: 100, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "קפה, תה, חלב, ירקות, פירות, עוגיות", category: "כיבוד קל", incomeTaxPct: 80, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "אירוח עסקי", category: "אירוח", incomeTaxPct: 0, vatAllowed: false, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "חומרי ניקוי לעסק", category: "אחזקת מקום העסק", incomeTaxPct: 100, vatAllowed: true, report1320: "8-אחזקה ותיקונים" },
+  { item: "כלים חד פעמיים", category: "כיבוד / מתכלים", incomeTaxPct: 80, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "קורסים / ספרים / מאגרים מקצועיים", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "כנסים והשתלמויות", category: "ספרות והכשרה מקצועית", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+  { item: "ביגוד מקצועי / ממותג", category: "ביגוד מקצועי", incomeTaxPct: 100, vatAllowed: true, report1320: "12-הוצאות מוכרות בהתאם לתקנות" },
+
+  // תשלומי מס סטטוטוריים — תנועת תזרים בלבד, לא הוצאה מוכרת.
+  { item: "תשלום מע״מ", category: "תשלומי מס וניכויים אישיים", incomeTaxPct: 0, vatAllowed: false, report1320: "מחוץ ל-1320", personalTaxItem: true },
+
+  { item: "הוצאה אחרת", category: "הוצאות אחרות", incomeTaxPct: 100, vatAllowed: true, report1320: "16-הוצאות אחרות" }
+];
+
+function resolveLegacyExpenseItem(row = {}) {
+  if (!row || row.type !== "expense") return "";
+
+  const rawCategory = String(row.category || "").trim();
+  const categoryKey = normalizeExpenseText(rawCategory);
+  const descKey = normalizeExpenseText(row.desc || "");
+
+  // אם זו כבר קטגוריה עדכנית — לא משנים.
+  const currentExact = EXPENSE_ITEMS.find(item =>
+    normalizeExpenseText(item.item) === categoryKey
+  );
+  if (currentExact) return currentExact.item;
+
+  const directMap = new Map([
+    [normalizeExpenseText("חנייה"), "חנייה / כבישי אגרה"],
+    [normalizeExpenseText("ביגוד"), "ביגוד מקצועי / ממותג"],
+    [normalizeExpenseText("מים"), "מים - משרד ביתי"],
+    [normalizeExpenseText("ביטוח"), "ביטוח רכב"],
+    [normalizeExpenseText("ייעוץ עסקי/פיתוח עסקי"), "ייעוץ עסקי / פיתוח עסקי"],
+    [normalizeExpenseText("אחסון אתר/דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר /דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("אחסון אתר/ דומיין"), "אחסון אתר / דומיין"],
+    [normalizeExpenseText("ציוד )כללי("), "ציוד (כללי)"]
+  ]);
+
+  if (directMap.has(categoryKey)) return directMap.get(categoryKey);
+
+  // קטגוריות כלליות ישנות — מסווגים רק כשיש אינדיקציה ברורה בתיאור.
+  if (categoryKey === normalizeExpenseText("כללי")) {
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  if (categoryKey === normalizeExpenseText("רכב")) {
+    if (/ביטוח|חובה|מקיף/.test(descKey)) return "ביטוח רכב";
+    if (/מוסך|טיפול|טסט|תיקון|צמיג|מצבר/.test(descKey)) return "טיפולים במוסך";
+    if (/שטיפ|מגב/.test(descKey)) return "שטיפת רכב ותחזוקה שוטפת";
+    if (/חני|כביש 6|אגרה/.test(descKey)) return "חנייה / כבישי אגרה";
+    if (/דלק|פז|delek|סונול|דור אלון/.test(descKey)) return "דלק";
+  }
+
+  return "";
+}
+
+
+
+function normalizeBusinessType(value) {
+  const v = String(value || '').trim().toLowerCase();
+  if (!v) return 'morasha';
+  if (v === 'ptor') return 'ptor';
+  if (v === 'morasha' || v === 'osek' || v === 'osek_morshe' || v === 'osek_murashe') return 'morasha';
+  if (v === 'hevra' || v === 'company') return 'hevra';
+  return 'morasha';
+}
+function getEffectiveVatRate(baseRate) {
+  const n = parseFloat(baseRate);
+  return Number.isFinite(n) && n > 0 ? n : DEFAULT_VAT;
+}
+function getSettings() {
+  const type = normalizeBusinessType(userProfile?.businessType);
+  const rate = getEffectiveVatRate(ledgerSettings?.vatRate || userProfile?.vatRate || DEFAULT_VAT);
+  return { vatEnabled: type === 'ptor' ? false : ledgerSettings?.vatEnabled !== false, vatRate: type === 'ptor' ? 0 : rate };
+}
+function splitVAT(amount, incVat, rate) {
+  const n = Number(amount) || 0;
+  const r = (Number(rate) || 0) / 100;
+  if (!r) return { net: n, vat: 0, gross: n };
+  if (incVat) {
+    const net = n / (1 + r);
+    return { net, vat: n - net, gross: n };
+  }
+  const vat = n * r;
+  return { net: n, vat, gross: n + vat };
+}
+function normalizeExpenseText(s) {
+  return String(s || '').trim().toLowerCase().replace(/["'׳״]/g, '').replace(/\s+/g, ' ');
+}
+function getExpenseMeta(row) {
+  if (!row) return null;
+  const categoryKey = normalizeExpenseText(resolveLegacyExpenseItem(row) || row.category || '');
+  const descKey = normalizeExpenseText(row.desc || '');
+  let match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.item) === categoryKey);
+  if (match) return match;
+  match = EXPENSE_ITEMS.find(item => normalizeExpenseText(item.category) === categoryKey);
+  if (match) return match;
+  match = EXPENSE_ITEMS.find(item => categoryKey && categoryKey.includes(normalizeExpenseText(item.item)));
+  if (match) return match;
+  match = EXPENSE_ITEMS.find(item => descKey && descKey.includes(normalizeExpenseText(item.item)));
+  return match || null;
+}
+function getRecognitionPctForRow(row) {
+  const meta = getExpenseMeta(row);
+  const pct = meta ? meta.incomeTaxPct : (row?.deductPct ?? 100);
+  return Math.max(0, Math.min(100, Number(pct) || 0)) / 100;
+}
+function getVatDeductibleFactorForRow(row) {
+  const meta = getExpenseMeta(row);
+  if (meta) return meta.vatAllowed ? 1 : 0;
+  return Math.max(0, Math.min(100, Number(row?.deductPct ?? 100) || 0)) / 100;
+}
+function getTaxDeductibleExpenseAmount(row, amounts) {
+  if (!row || row.type !== 'expense') return 0;
+  const meta = getExpenseMeta(row);
+  const pct = getRecognitionPctForRow(row);
+  const resolved = amounts || splitVAT(row.amount, row.incVat, getSettings().vatEnabled ? getSettings().vatRate : 0);
+  const base = meta ? (meta.vatAllowed ? resolved.net : resolved.gross) : resolved.net;
+  return base * pct;
+}
+function parseLocalDate(value) {
+  if (!value) return null;
+  const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+function monthSerial(d) { return d.getFullYear() * 12 + d.getMonth(); }
+function monthsInclusive(start, end) {
+  if (!start || !end || end < start) return 0;
+  return Math.max(0, monthSerial(end) - monthSerial(start) + 1);
+}
+function maxDate(a,b){ if (!a) return b; if (!b) return a; return a > b ? a : b; }
+function minDate(a,b){ if (!a) return b; if (!b) return a; return a < b ? a : b; }
+function assetBase(asset, vatRate) {
+  const original = Number(asset.originalCost) || 0;
+  const override = Number(asset.baseOverride);
+  if (Number.isFinite(override) && override > 0) return override;
+  const incVat = asset.incVat === true || asset.incVat === 'true';
+  const vatClaimed = asset.vatClaimed === true || asset.vatClaimed === 'true';
+  const rate = (Number(vatRate) || DEFAULT_VAT) / 100;
+  if (incVat && vatClaimed && rate > 0) return original / (1 + rate);
+  return original;
+}
+function calcAssetDepreciation(asset, year, vatRate) {
+  const base = Math.max(0, assetBase(asset, vatRate));
+  const legalRate = Math.max(0, Number(asset.legalRate ?? asset.depreciationRate) || 0);
+  const claimedRate = Math.max(0, Number(asset.claimedRate ?? asset.depreciationRate ?? legalRate) || 0);
+  const start = parseLocalDate(asset.activationDate || asset.purchaseDate);
+  const purchase = parseLocalDate(asset.purchaseDate || asset.activationDate);
+  const sold = asset.sold === true || asset.sold === 'true';
+  const saleDate = sold ? parseLocalDate(asset.saleDate) : null;
+  const y = Number(year);
+  const yearStart = new Date(y, 0, 1);
+  const yearEnd = new Date(y, 11, 31);
+  const activeEnd = sold && saleDate ? minDate(saleDate, yearEnd) : yearEnd;
+  const periodStart = maxDate(start, yearStart);
+  const monthsThisYear = start ? monthsInclusive(periodStart, activeEnd) : 0;
+  const monthsBefore = start ? monthsInclusive(start, minDate(saleDate || new Date(y-1, 11, 31), new Date(y-1, 11, 31))) : 0;
+  const monthlyDep = base * (claimedRate / 100) / 12;
+  const priorOverride = asset.priorAccumulated !== '' && asset.priorAccumulated != null ? Number(asset.priorAccumulated) : NaN;
+  const accumulatedBefore = Math.min(base, Math.max(0, Number.isFinite(priorOverride) ? priorOverride : monthlyDep * monthsBefore));
+  const rawYearDep = monthlyDep * monthsThisYear;
+  const yearDep = Math.min(Math.max(0, base - accumulatedBefore), Math.max(0, rawYearDep));
+  const totalDep = Math.min(base, accumulatedBefore + yearDep);
+  const writtenDown = Math.max(0, base - totalDep);
+  const additionThisYear = purchase && purchase.getFullYear() === y ? base : 0;
+  return { base, legalRate, claimedRate, monthsThisYear, accumulatedBefore, yearDep, totalDep, writtenDown, additionThisYear };
+}
+function fixedAssetsDepreciationForYear(year) {
+  const rate = getSettings().vatRate || DEFAULT_VAT;
+  return (fixedAssets || []).reduce((sum, asset) => sum + calcAssetDepreciation(asset, year, rate).yearDep, 0);
+}
+
+
+const list=(Array.isArray(ledgerData.rows)?ledgerData.rows:[]).filter(r=>String(r.date||'').slice(0,4)===String(year));
+const settings=getSettings();
+const capitalizedExpenseIds=new Set(fixedAssets.map(a=>a.sourceRowId).filter(Boolean));
+let incomeNet=0,totalDeductible=0,unclassified=0,unlinkedAssets=0;
+for(const r of list){const amounts=splitVAT(r.amount,r.incVat,settings.vatEnabled?settings.vatRate:0);
+if(r.type==='income'){incomeNet+=amounts.net;continue}
+if(r.type!=='expense'||capitalizedExpenseIds.has(r.id))continue;
+const meta=getExpenseMeta(r);if(!meta)unclassified++;if(meta?.depreciable)unlinkedAssets++;
+totalDeductible+=getTaxDeductibleExpenseAmount(r,amounts);
+}
+const fixedDepreciation=fixedAssetsDepreciationForYear(year);
+const manualRaw=localStorage.getItem(`yearEndDepV1_${userId}_${year}`);
+const manualDepreciation=manualRaw===null?0:Math.max(0,Number(manualRaw)||0);
+return {incomeNet,totalDeductible,fixedDepreciation,manualDepreciation,operatingProfit:incomeNet-totalDeductible-fixedDepreciation-manualDepreciation,unclassified,unlinkedAssets,manualFound:manualRaw!==null};
+}
+
 const SECTIONS=[
 ['א׳ — פרטים כלליים', [['marital','מצב משפחתי','', 'select'],['resident','תושבות ישראל','', 'select'],['bank','חשבון בנק להחזר מס','', 'text'],['bookkeeping','שיטת ניהול ספרים','', 'select'],['smallbusiness','מסלול עסק זעיר, אם רלוונטי','', 'select']]],
 ['ב׳ — פרטים אישיים ופרטי העסק', [['business','שם העסק','', 'text'],['taxid','מספר זהות / עוסק','', 'text'],['address','כתובת','', 'text'],['phone','טלפון','', 'text']]],
 ['ג׳–ז׳ — הכנסות', [['profit','הכנסה חייבת מעסק או ממשלח יד — התאמה לנספח 1320','150 / 170','number'],['benefitSelf','תקבולים חייבים מביטוח לאומי כעצמאי','250 / 270','number'],['salary','הכנסה ממשכורת ושכר עבודה','158 / 172','number'],['otherIncome','הכנסות נוספות לפי טופסי 106, 867 ואישורים','', 'textarea'],['turnover','מחזור מעסק או ממשלח יד ללא מע״מ','238 / 239','number']]],
 ['ח׳–י״א — נתונים נוספים והפסדים', [['capital','רווחי הון ושבח — פרטי נספחים','', 'textarea'],['foreign','הכנסות מחו״ל — פירוט לפי סוג הכנסה','','number'],['lossCurrent','הפסד עסקי בשנת המס','', 'number'],['lossCarry','הפסדים מועברים משנים קודמות','', 'number'],['lossNote','פירוט סוג ההפסד ושנת היווצרותו','', 'textarea']]],
 ['י״ב — ניכויים אישיים', [['disability','ביטוח אובדן כושר עבודה לעצמאי — תשלומים לבדיקה','','number'],['study','קרן השתלמות לעצמאים — תשלומים לבדיקה (לא ניכוי מחושב)','136 / 137','number'],['pension','קופת גמל / פנסיה — תשלומים לבדיקה (לא ניכוי מחושב)','135 / 180','number'],['national','ביטוח לאומי לעצמאי — תשלומים לבדיקה (לא ניכוי מחושב)','030 / 089','number']]],
-['י״ג — נקודות זיכוי', [['children','ילדים וזכאות משפחתית','', 'textarea'],['service','שירות צבאי / לאומי, לימודים והטבות אחרות','', 'textarea'],['credit','זיכויים נוספים לפי אישורים','', 'textarea']]],
+['י״ג — נקודות זיכוי', [['children','ילדים וזכאות משפחתית','', 'select'],['service','שירות צבאי / לאומי, לימודים והטבות אחרות','', 'select'],['credit','זיכויים נוספים לפי אישורים','', 'select']]],
 ['י״ד — זיכויים אישיים', [['life','ביטוח חיים — לפי אישור שנתי','','number'],['pensionCredit','הפקדות לקצבה לצורך זיכוי — נדרש חישוב זכאות','268 / 269','number'],['donations','תרומות למוסדות מוכרים לפי סעיף 46 — תשלומים לבדיקה','037 / 237','number'],['donationsNote','פרטי מוסד, אישור סעיף 46 ואישורי תרומות','', 'textarea']]],
 ['ט״ו — מחזור למקדמות, ניכויים במקור ומס שבח', [['advanceTurnover','מחזור למקדמות','294','number'],['salaryWithheld','מס שנוכה במקור ממשכורת וקצבאות','042','number'],['interestWithheld','מס שנוכה במקור מריבית','043','number'],['dividendWithheld','מס שנוכה במקור מדיבידנד — לפי אישור','','number'],['otherWithheld','מס שנוכה במקור מהכנסות אחרות','040','number'],['landTax','מס שבח ששולם','041','number'],['excessAdvances','מקדמות בשל הוצאות עודפות — לא מקדמות רגילות','115','number'],['taxAdvances','מקדמות מס הכנסה רגילות ששולמו — למעקב בלבד','', 'number']]],
 ['ט״ז — שדות נוספים שאינם נמצאים בדוח', [['additional','שדות מיוחדים / מידע נוסף לפי הצורך','', 'textarea']]]
 ];
-const AUTO_KEYS=new Set(['turnover','advanceTurnover','study','pension','national','disability','donations','business','taxid','address','phone','taxAdvances']);
+const AUTO_KEYS=new Set(['turnover','advanceTurnover','study','pension','national','disability','donations','business','taxid','address','phone','taxAdvances','profit']);
 let uid=null,profile={},ledger={},values={},auto={},rows=[],saveTimer=null,revision=0,loading=false,loadedYear="2026",saveQueue=Promise.resolve(),pendingSave=null,loadToken=0;
 const el=id=>document.getElementById(id),fmt=n=>Number(n||0).toLocaleString('he-IL',{maximumFractionDigits:2}),norm=s=>String(s||'').trim().toLowerCase().replace(/["'׳״]/g,'').replace(/\s+/g,' ');
 function draftRef(){return doc(db,'users',uid,'annualReportDrafts',String(el('year').value))}
@@ -63,10 +336,12 @@ async function flushDraft(yearOverride){
 function splitNet(r){let n=Number(r.amount)||0;if(!r.incVat)return n;let type=norm(profile.businessType),rate=type==='ptor'?0:Number(profile.vatRate||18);return n/(1+rate/100)}
 function compute(){let year=el('year').value;const list=rows.filter(r=>String(r.date||'').slice(0,4)===year);const sums={study:0,pension:0,national:0,disability:0,donations:0,taxAdvances:0};let income=0;
 for(const r of list){if(r.type==='income'){income+=splitNet(r);continue}if(r.type!=='expense')continue;let t=norm(r.category)+' '+norm(r.desc),n=Math.abs(Number(r.amount)||0);if(t.includes(norm('קרן השתלמות לעצמאי')))sums.study+=n;else if(t.includes(norm('פנסיה / קופת גמל לעצמאי')))sums.pension+=n;else if(t.includes(norm('ביטוח לאומי עצמאי')))sums.national+=n;else if(t.includes(norm('ביטוח אובדן כושר עבודה')))sums.disability+=n;else if(t.includes(norm('תרומות למוסדות מוכרים')))sums.donations+=n;else if(t.includes(norm('מקדמות מס הכנסה')))sums.taxAdvances+=n}
-auto={turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
+let yearEnd=null;
+try{yearEnd=computeYearEndSnapshot(profile,ledger,year,uid)}catch(e){console.warn('Year-end calculation unavailable',e)}
+auto={...(yearEnd?{profit:Number(yearEnd.operatingProfit.toFixed(2))}:{}),turnover:income,advanceTurnover:income,...sums,business:profile.businessName||profile.displayName||'',taxid:profile.idNumber||profile.businessId||'',address:profile.address||'',phone:profile.phone||''};
 }
-function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft()});return input}
-function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';box.append(makeInput(id,type,v));let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'תשלומים שאותרו בספרים בלבד; אינם ניכוי/זיכוי מחושב. יש לבדוק אישורים, תקרות וזכאות.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'להזין רק אחרי התאמת נספח 1320 והפחת; לא מועתק מהרווח הגולמי.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
+function makeInput(id,type,v){let input;if(type==='textarea'){input=document.createElement('textarea');input.rows=3}else if(type==='select'){input=document.createElement('select');let opts=id==='marital'?['','רווק/ה','נשוי/אה','גרוש/ה','אלמן/ה']:id==='bookkeeping'?['חד־צידית','כפולה']:id==='children'?['','אין ילדים מזכים','יש ילדים מזכים — נדרש פירוט גילאים ומשמורת','הורה יחיד / זכאות מיוחדת']:id==='service'?['','אין זכאות נוספת','שירות צבאי','שירות לאומי','תואר אקדמי / לימודים מזכים','מספר זכאויות — נדרש פירוט']:id==='credit'?['','אין זיכויים נוספים','יישוב מזכה','עולה חדש/ה','נכות / זכאות רפואית','זיכוי אחר','מספר זכאויות — נדרש פירוט']:['','כן','לא','לא ידוע'];for(let o of opts){let op=document.createElement('option');op.value=o;op.textContent=o||'יש לבחור';input.append(op)}}else{input=document.createElement('input');input.type=type; if(type==='number'){input.step='0.01';input.min='0'}}input.value=v??'';input.addEventListener('input',()=>{values[id]=input.value;saveDraft()});input.addEventListener('change',()=>{values[id]=input.value;saveDraft()});return input}
+function render(){const host=el('sections');host.replaceChildren();for(const [title,fields] of SECTIONS){const section=document.createElement('section');section.className='section';const heading=document.createElement('h2');heading.textContent=title;section.append(heading);const grid=document.createElement('div');grid.className='fields';for(const [id,label,code,type] of fields){let box=document.createElement('div');box.className='field';let useAuto=AUTO_KEYS.has(id)&&auto[id]!==undefined; if(useAuto)box.classList.add('auto');let lbl=document.createElement('label');lbl.textContent=label;if(code){let b=document.createElement('span');b.className='code';b.textContent=code;lbl.append(b)}box.append(lbl);let v=Object.hasOwn(values,id)?values[id]:id==='bookkeeping'?'חד־צידית':useAuto?(type==='number'?Number(auto[id]||0).toFixed(2):auto[id]):'';box.append(makeInput(id,type,v));let note=document.createElement('small');note.className='source';note.textContent=useAuto?(['study','pension','national','disability','donations'].includes(id)?'תשלומים שאותרו בספרים בלבד; אינם ניכוי/זיכוי מחושב. יש לבדוק אישורים, תקרות וזכאות.':'הצעה אוטומטית מנתוני העסק — יש לאמת מול אישורים; ניתן לתקן.'):id==='profit'?'חושב מנתוני סגירת שנה כולל הוצאות מוכרות ופחת; יש לאמת סיווגים והתאמות לפני הגשה.':id==='taxAdvances'?'למעקב ולהתאמה מול רשות המסים בלבד; אינו שדה 115.':'השלמה ידנית לפי טופס ואישורים';box.append(note);grid.append(box)}section.append(grid);host.append(section)}saveState(`נטענו ${rows.length} תנועות מהספרים · שנת מס ${el('year').value} · טיוטה בענן מוכנה לעריכה.`)}
 async function load(){if(!uid)return;loading=true;saveState('טוען נתונים וטיוטה מהענן…');try{const [p,l]=await Promise.all([getDoc(doc(db,'users',uid)),getDoc(doc(db,'ledgers',uid))]);profile=p.exists()?p.data():{};ledger=l.exists()?l.data():{};rows=Array.isArray(ledger.rows)?ledger.rows:[];compute();if(await loadDraft()){loadedYear=el('year').value;render()}}catch(e){saveState('לא ניתן לטעון נתונים או טיוטה: '+e.message)}finally{loading=false}}
 el('year').addEventListener('change',async()=>{const next=el('year').value;el('year').disabled=true;try{await flushDraft(loadedYear);await load()}catch(e){el('year').value=loadedYear;saveState('⚠ לא ניתן לשמור לפני מעבר שנה: '+e.message+' · נשארים בשנת '+loadedYear)}finally{el('year').disabled=false}});
 el('reload').onclick=async()=>{try{await flushDraft();await load()}catch(e){saveState('⚠ לא ניתן לרענן לפני השלמת שמירה: '+e.message)}};el('print').onclick=()=>window.print();
